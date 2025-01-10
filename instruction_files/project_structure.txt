@@ -1,0 +1,53 @@
+
+project_root/
+├── config/
+│   ├── config.yaml              # Configuration file for settings (e.g., timeouts, paths, API keys)
+│   ├── translation_config.yaml  # Configuration for translation models
+├── data/
+│   ├── embeddings/              # Precomputed embeddings storage
+│   ├── graphs/                  # Knowledge graph data
+│   ├── raw_documents/           # Uploaded documents (PDF, DOCX, TXT)
+│   └── processed_chunks/        # Preprocessed document chunks
+├── models/
+│   ├── gte_small/               # GTE-Small embedding model files
+│   ├── opus-mt-ar-en/           # Arabic-to-English translation model
+│   ├── opus-mt-en-ar/           # English-to-Arabic translation model
+│   └── ranking_model/           # Reranking model files
+├── src/
+│   ├── input_layer/
+│   │   ├── document_processor.py  # Handles document ingestion and segmentation
+│   │   ├── translator.py          # Translation module for queries and responses
+│   ├── processing_layer/
+│   │   ├── embedding_generator.py  # Embedding generation logic
+│   │   ├── graph_constructor.py    # Knowledge graph creation logic
+│   │   └── deduplication.py        # Data deduplication logic
+│   ├── storage_layer/
+│   │   ├── vector_store.py         # VectorStoreIndex implementation
+│   │   ├── arangodb_setup.py       # ArangoDB setup and management
+│   ├── retrieval_layer/
+│   │   ├── dense_retrieval.py      # FAISS-based retrieval
+│   │   ├── graph_retrieval.py      # Graph-based retrieval
+│   │   ├── hybrid_retrieval.py     # Hybrid retrieval logic
+│   │   └── ranker.py               # Ranking and reranking logic
+│   ├── presentation_layer/
+│   │   ├── ui.py                   # User interface for interactions
+│   │   └── result_formatter.py     # Formatting results for display
+│   ├── utils/
+│   │   ├── error_handling.py       # Centralized error handling logic
+│   │   ├── logger.py               # Logging setup and management
+│   │   ├── timeout_decorator.py    # Timeout management utility
+│   └── main.py                     # Main entry point for the application
+├── tests/
+│   ├── unit_tests/                 # Unit tests for individual modules
+│   ├── integration_tests/          # Tests for combined workflows
+│   ├── performance_tests/          # Performance and stress testing
+│   └── test_data/                  # Sample test data for validations
+├── scripts/
+│   ├── package_models.py           # Script for packaging models
+│   ├── create_exe.py               # Script for generating Windows .exe
+│   └── run_tests.py                # Script for running all tests
+├── docs/
+│   ├── installation_guide.md       # Installation and user guide
+│   ├── architecture_diagram.png    # Visual representation of architecture
+│   └── execution_plan.md           # Detailed execution plan
+└── README.md                       # Overview and instructions for the project
