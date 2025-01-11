@@ -95,14 +95,18 @@ class LLMGraphTransformer:
             logger.info(f"Processing document: {document.metadata.get('source', 'unknown')}")
             logger.info(f"Document length: {len(text)} characters")
             
-            # Format messages for OpenRouter API
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Extract entities and relationships from the following text:\n\n{text}"}
-            ]
-            
-            # Get raw model response
-            raw_response = self.llm.predict(messages=messages)
+            # Get raw model response using get_completion
+            if hasattr(self.llm, 'client'):
+                response = self.llm.client.get_completion(
+                    prompt=f"Extract entities and relationships from the following text:\n\n{text}",
+                    system_prompt=system_prompt,
+                    temperature=0.0,  # Use deterministic output for extraction
+                    max_tokens=2000  # Allow longer responses for complex graphs
+                )
+                raw_response = response.get('content', '')
+            else:
+                # Fallback to standard predict
+                raw_response = self.llm.predict(text=f"{system_prompt}\n\nExtract entities and relationships from the following text:\n\n{text}")
             
             # Log raw response
             logger.info("Raw model response:")
@@ -202,14 +206,19 @@ class LLMGraphTransformer:
             text = document.page_content
             logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
             
-            # Format messages for OpenRouter API
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Extract entities and relationships from the following text:\n\n{text}"}
-            ]
-            
-            # Get raw model response
-            raw_response = await self.llm.apredict(messages=messages)
+            # Get raw model response using predict
+            if hasattr(self.llm, 'client'):
+                # Note: OpenRouter client doesn't have async methods yet
+                response = self.llm.client.get_completion(
+                    prompt=f"Extract entities and relationships from the following text:\n\n{text}",
+                    system_prompt=system_prompt,
+                    temperature=0.0,
+                    max_tokens=2000
+                )
+                raw_response = response.get('content', '')
+            else:
+                # Fallback to standard apredict
+                raw_response = await self.llm.apredict(text=f"{system_prompt}\n\nExtract entities and relationships from the following text:\n\n{text}")
             
             # Log raw response
             logger.info("Raw model response (async):")
