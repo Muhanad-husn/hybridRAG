@@ -140,13 +140,12 @@ class LLMGraphTransformer:
             logger.info(f"Processing document: {document.metadata.get('source', 'unknown')}")
             logger.info(f"Document length: {len(text)} characters")
             
-            # Get raw model response
-            raw_response = self.llm(
-                [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
-                ]
-            )
+            # Get raw model response using generate
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
+            ]
+            raw_response = self.llm.generate([messages])
             
             # Log raw response
             logger.info("Raw model response:")
@@ -160,14 +159,15 @@ class LLMGraphTransformer:
             
             try:
                 # Parse the response
-                if isinstance(raw_response.content, str):
+                response_text = raw_response.generations[0][0].text
+                if isinstance(response_text, str):
                     # Try to parse as JSON
-                    parsed_json = json.loads(raw_response.content)
+                    parsed_json = json.loads(response_text)
                     if isinstance(parsed_json, dict):
                         parsed_json = [parsed_json]
                 else:
                     # Handle structured output
-                    parsed_json = raw_response.content
+                    parsed_json = response_text
                 
                 # Log parsed structure
                 logger.info("Parsed structure:")
@@ -246,15 +246,12 @@ class LLMGraphTransformer:
             text = document.page_content
             logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
             
-            # Get raw model response
-            raw_response = await self.llm.agenerate(
-                [
-                    [
-                        SystemMessage(content=system_prompt),
-                        HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
-                    ]
-                ]
-            )
+            # Get raw model response using agenerate
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
+            ]
+            raw_response = await self.llm.agenerate([messages])
             
             # Log raw response
             logger.info("Raw model response (async):")
@@ -268,12 +265,13 @@ class LLMGraphTransformer:
             
             try:
                 # Parse the response
-                if isinstance(raw_response.generations[0][0].text, str):
-                    parsed_json = json.loads(raw_response.generations[0][0].text)
+                response_text = raw_response.generations[0][0].text
+                if isinstance(response_text, str):
+                    parsed_json = json.loads(response_text)
                     if isinstance(parsed_json, dict):
                         parsed_json = [parsed_json]
                 else:
-                    parsed_json = raw_response.generations[0][0].text
+                    parsed_json = response_text
                 
                 # Extract nodes and relationships
                 for item in parsed_json:
