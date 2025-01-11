@@ -18,8 +18,9 @@ PyPDF2==3.0.1
 faiss-cpu==1.9.0
 fastembed==0.5.0
 
-# Graph Database
-python-arango==8.1.4
+# Graph Processing
+networkx==3.2.1
+pandas==2.1.4
 
 # Ranking and Reranking
 flashrank==0.2.10
