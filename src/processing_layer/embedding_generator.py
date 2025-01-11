@@ -85,11 +85,25 @@ class EmbeddingGenerator:
     def _initialize_vector_store(self) -> None:
         """Initialize the vector store."""
         try:
+            # Create a new Chroma client
             self.vector_store = Chroma(
                 collection_name="document_embeddings",
                 persist_directory=self.embeddings_dir,
                 embedding_function=self.embedding_function
             )
+
+            # Create an empty collection to ensure it exists
+            self.vector_store.add_texts(
+                texts=["initialization"],
+                metadatas=[{"source": "init"}],
+                ids=["init"]
+            )
+            
+            # Delete the initialization document
+            if hasattr(self.vector_store._collection, "delete"):
+                self.vector_store._collection.delete(ids=["init"])
+            
+            logger.info("Vector store initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing vector store: {str(e)}")
             raise
