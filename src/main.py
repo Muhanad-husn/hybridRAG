@@ -39,7 +39,9 @@ class HyperRAG:
             try:
                 # Delete the collection if it exists
                 if hasattr(self.embedding_generator.vector_store._client, "delete_collection"):
-                    self.embedding_generator.vector_store._client.delete_collection()
+                    self.embedding_generator.vector_store._client.delete_collection(
+                        name="document_embeddings"  # Same name used in EmbeddingGenerator
+                    )
                 # Reinitialize the vector store
                 self.embedding_generator._initialize_vector_store()
                 self.logger.info("Reset vector store")
