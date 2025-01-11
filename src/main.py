@@ -35,15 +35,9 @@ class HyperRAG:
     def reset_storage(self) -> None:
         """Reset all storage (vector store and graph files)."""
         try:
-            # Reset vector store by deleting and recreating the collection
+            # Reset vector store
             try:
-                # Delete the collection if it exists
-                if hasattr(self.embedding_generator.vector_store._client, "delete_collection"):
-                    self.embedding_generator.vector_store._client.delete_collection(
-                        name="document_embeddings"  # Same name used in EmbeddingGenerator
-                    )
-                # Reinitialize the vector store
-                self.embedding_generator._initialize_vector_store()
+                self.embedding_generator.reset_vector_store()
                 self.logger.info("Reset vector store")
             except Exception as e:
                 self.logger.error(f"Error resetting vector store: {str(e)}")
