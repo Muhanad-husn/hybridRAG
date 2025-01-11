@@ -6,7 +6,7 @@ from langchain_community.graphs import Neo4jGraph
 from langchain_core.language_models import BaseLanguageModel
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
-from tools.llm_graph_transformer import LLMGraphTransformer
+from ..tools.llm_graph_transformer import LLMGraphTransformer
 import logging
 from arango import ArangoClient
 
@@ -25,8 +25,8 @@ class GraphConstructor:
         """Initialize the graph constructor with configuration."""
         self.config = self._load_config(config_path)
         self.llm = llm or self._initialize_llm()
-        self.db_client = self._initialize_db_client()
-        self.graph = self._initialize_graph()
+        self.db_client = None
+        self.graph = None
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
@@ -38,15 +38,78 @@ class GraphConstructor:
             raise
 
     def _initialize_llm(self) -> BaseLanguageModel:
-        """Initialize the language model for graph construction."""
+        """Initialize the OpenRouter LLM for graph construction."""
         try:
-            # Use environment variable to determine LLM service
-            if os.environ.get('LLM_SERVER') == "openai":
-                return ChatOpenAI(temperature=0, model_name="gpt-4")
-            else:
-                return ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
+            from langchain.llms.base import LLM
+            from typing import Optional, List, Mapping, Any
+            from pydantic import Field, ConfigDict
+            from ..tools.openrouter_client import OpenRouterClient
+
+            class OpenRouterLLM(LLM):
+                """Custom LLM that uses OpenRouterClient"""
+                model_config = ConfigDict(
+                    arbitrary_types_allowed=True,
+                    extra='allow',
+                    validate_assignment=True,
+                    protected_namespaces=()
+                )
+                
+                client: Any = Field(default=None, description="OpenRouter client instance")
+                system_prompt: str = Field(default="", description="System prompt for the LLM")
+                
+                def __init__(self, **kwargs):
+                    logger.debug("Initializing OpenRouterLLM with kwargs: %s", kwargs)
+                    super().__init__(**kwargs)
+                    self.client = OpenRouterClient(component_type='extract_model')
+                    logger.debug("OpenRouterLLM initialized successfully")
+                
+                def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+                    """Call the OpenRouter API and return the response."""
+                    response = self.client.get_completion(
+                        prompt=prompt,
+                        system_prompt=self.system_prompt or """You are a specialized entity extractor for sociopolitical and historical analysis.
+                        Extract named entities, dates, events, and their relationships with high accuracy.""",
+                        temperature=0.0
+                    )
+                    if response.get("error"):
+                        raise ValueError(f"OpenRouter API error: {response['error']}")
+                    return response["content"]
+                
+                @property
+                def _llm_type(self) -> str:
+                    return "openrouter"
+                
+                @property
+                def _identifying_params(self) -> Mapping[str, Any]:
+                    return {"model": self.client.model}
+            
+            # Initialize our custom LLM
+            llm = OpenRouterLLM()
+            
+            # Update system prompt for sociopolitical context
+            llm.system_prompt = """
+            You are a specialized entity extractor for sociopolitical and historical analysis.
+            Your task is to identify and extract:
+            1. Named Entities: People, Organizations, Locations, Events
+            2. Temporal Information: Dates, Time Periods, Historical Eras
+            3. Relationships: Political, Social, Economic connections between entities
+            4. Key Concepts: Ideologies, Movements, Policies
+            
+            Extract as much detail as possible while maintaining accuracy. Pay special attention to:
+            - Historical figures and their roles
+            - Organizations and institutions
+            - Significant events and their dates
+            - Causal relationships between events
+            - Power dynamics and social structures
+            
+            Do not restrict yourself to predefined categories. The goal is to capture the rich
+            interconnections in sociopolitical and historical contexts.
+            """
+            
+            return llm
+            
         except Exception as e:
-            logger.error(f"Error initializing LLM: {str(e)}")
+            logger.error(f"Error initializing OpenRouter LLM: {str(e)}")
             raise
 
     def _initialize_db_client(self) -> ArangoClient:
@@ -54,8 +117,7 @@ class GraphConstructor:
         try:
             db_config = self.config['arangodb']
             client = ArangoClient(
-                host=db_config['host'],
-                port=db_config['port']
+                hosts=f"http://{db_config['host']}:{db_config['port']}"
             )
             
             # Connect to system database first
@@ -184,44 +246,60 @@ class GraphConstructor:
             batch_size: Size of document batches for processing
         """
         try:
-            # Initialize the LLM transformer
+            # Initialize the LLM transformer without restrictions for sociopolitical context
             transformer = LLMGraphTransformer(
                 llm=self.llm,
-                allowed_nodes=allowed_nodes,
-                allowed_relationships=allowed_relationships,
-                node_properties=True,
-                relationship_properties=True
+                allowed_nodes=[],  # Empty list to allow any node type
+                allowed_relationships=[],  # Empty list to allow any relationship type
+                strict_mode=False,  # Don't restrict entity/relationship types
+                ignore_tool_usage=True,  # Use simpler extraction without function calling
+                node_properties=False,  # Don't extract node properties
+                relationship_properties=False  # Don't extract relationship properties
             )
             
-            # Process documents in batches
+            # Process documents in batches and collect all graph documents
+            all_graph_documents = []
             for i in range(0, len(documents), batch_size):
                 batch = documents[i:i + batch_size]
-                
-                # Convert documents to graph documents
                 graph_documents = transformer.convert_to_graph_documents(batch)
-                
-                # Insert nodes and relationships from graph documents
-                for graph_doc in graph_documents:
-                    # Insert nodes
-                    if graph_doc.nodes:
-                        for node in graph_doc.nodes:
-                            self.insert_node({
-                                'id': node.id,
-                                'type': node.type,
-                                'properties': node.properties
-                            })
-                    
-                    # Insert relationships
-                    if graph_doc.relationships:
-                        for rel in graph_doc.relationships:
-                            self.insert_relationship({
-                                'source': {'id': rel.source.id},
-                                'target': {'id': rel.target.id},
-                                'type': rel.type,
-                                'properties': rel.properties
-                            })
-                
+                all_graph_documents.extend(graph_documents)
                 logger.info(f"Processed batch {i//batch_size + 1}")
+            
+            logger.info(f"Extracted entities and relationships from {len(documents)} documents")
+            
+            # Initialize database connection only when we have data to store
+            if any(doc.nodes or doc.relationships for doc in all_graph_documents):
+                try:
+                    if self.db_client is None:
+                        self.db_client = self._initialize_db_client()
+                    if self.graph is None:
+                        self.graph = self._initialize_graph()
+                        
+                    # Insert all nodes and relationships
+                    for graph_doc in all_graph_documents:
+                        # Insert nodes
+                        if graph_doc.nodes:
+                            for node in graph_doc.nodes:
+                                self.insert_node({
+                                    'id': node.id,
+                                    'type': node.type,
+                                    'properties': node.properties
+                                })
+                        
+                        # Insert relationships
+                        if graph_doc.relationships:
+                            for rel in graph_doc.relationships:
+                                self.insert_relationship({
+                                    'source': {'id': rel.source.id},
+                                    'target': {'id': rel.target.id},
+                                    'type': rel.type,
+                                    'properties': rel.properties
+                                })
+                    
+                    logger.info("Successfully stored graph in database")
+                except Exception as e:
+                    logger.warning(f"Failed to store graph in database: {str(e)}")
+                    logger.info("Continuing with in-memory graph only")
             
             logger.info("Completed graph construction")
             

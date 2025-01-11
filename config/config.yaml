@@ -1,6 +1,13 @@
 # API Endpoints
 llm_sherpa:
-  api_url: "https://readers.llmsherpa.com/api/document/developer/parseDocument?renderFormat=all"
+  api_url: http://localhost:5010/api/parseDocument?renderFormat=all
+
+# OpenRouter Settings
+openrouter:
+  api_key: ""  # Add your OpenRouter API key here
+  site_url: "http://localhost:3000"  # Optional: Your site URL
+  site_name: "HybridRAG"  # Optional: Your site name
+  model: "anthropic/claude-3-haiku-20240307"
 
 # Database Settings
 arangodb:

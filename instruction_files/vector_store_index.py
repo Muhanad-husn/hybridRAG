@@ -1,8 +1,8 @@
 
 # Import necessary modules from LlamaIndex
 from llama_index import VectorStoreIndex, StorageContext
-from llama_index.vector_stores import SimpleVectorStore
-from llama_index.schema import TextNode
+from llama_index.core.vector_stores import SimpleVectorStore
+from llama_index.core.schema import TextNode
 
 # Define your precomputed embeddings and corresponding text chunks
 # Replace 'your_precomputed_embeddings' with your actual embeddings

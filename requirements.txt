@@ -1,42 +1,46 @@
 # Core Dependencies
+langchain==0.1.0
+langchain_core==0.3.29
 langchain_community==0.3.14
-langchain_anthropic
-langchain_openai
+langchain_anthropic==0.3.1
+langchain_openai==0.3.0
+langchain_openrouter==0.0.1
 transformers==4.47.1
-torch
-sentence-transformers
+torch==2.5.1
+sentence-transformers==2.2.2
 
 # Document Processing
-llmsherpa
-python-docx
-PyPDF2
+llmsherpa==0.1.4
+python-docx==1.1.2
+PyPDF2==3.0.1
 
 # Embedding and Vector Search
-faiss-cpu
-fastembed
+faiss-cpu==1.9.0
+fastembed==0.5.0
 
 # Graph Database
-python-arango
+python-arango==8.1.4
 
 # Ranking and Reranking
-flashrank
+flashrank==0.2.10
 
 # Web Interface
-streamlit
-termcolor
+streamlit==1.41.1
+termcolor==2.5.0
 
 # Utilities
-pydantic
-numpy
-concurrent-futures
-json-repair
-fake-useragent
+pydantic==2.10.5
+numpy==2.2.1
+json-repair==0.8.1
+fake-useragent==1.4.0
+python-dotenv==1.0.0
+requests==2.31.0
 
 # Testing
-pytest
-pytest-benchmark
-pytest-cov
-pytest-html
+pytest==8.0.0
+pytest-benchmark==4.0.0
+pytest-cov==4.1.0
+pytest-html==4.1.1
 
 # Packaging
-pyinstaller
+pyinstaller==6.4.0

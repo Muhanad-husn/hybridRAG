@@ -1,0 +1,31 @@
+Hybrid RAG System Overview
+
+The Hybrid RAG (Retrieval-Augmented Generation) system combines graph-based and embedding-based approaches for efficient information retrieval. This system is designed to work offline and supports multiple document formats including PDF, DOCX, and TXT files.
+
+Key Features:
+1. Document Processing
+- Intelligent document segmentation using LLMSherpa
+- Support for multiple file formats
+- Parallel processing capabilities
+
+2. Embedding Generation
+- Uses GTE-Small model for generating embeddings
+- Efficient batch processing
+- GPU acceleration when available
+
+3. Knowledge Graph Construction
+- Entity and relationship extraction
+- Graph database storage using ArangoDB
+- Flexible schema for various domain types
+
+4. Hybrid Retrieval
+- Combines graph-based and dense vector search
+- Advanced reranking using FlashRank
+- Deduplication of search results
+
+5. Multilingual Support
+- Arabic to English translation
+- Bidirectional query processing
+- Preservation of context during translation
+
+The system is designed for educational and research purposes, providing a robust framework for information retrieval and knowledge management.

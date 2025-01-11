@@ -194,11 +194,13 @@ class HybridRetrieval:
             unique_results = []
             
             for result in results:
-                if rerank:
-                    identifier = (result['text'], str(result['meta']))
-                else:
+                if isinstance(result, tuple):
+                    # Handle (doc, score) format from similarity search
                     doc, score = result
                     identifier = (doc.page_content, str(doc.metadata.get('source', '')))
+                else:
+                    # Handle dictionary format from reranking
+                    identifier = (result['text'], str(result['meta']))
                 
                 if identifier not in seen:
                     seen.add(identifier)
@@ -295,10 +297,13 @@ class HybridRetrieval:
         try:
             results = []
             
-            if mode == "Hybrid":
-                # Perform graph search
-                graph_results = self.graph_search(graph_db, query)
-                results.extend(graph_results)
+            if mode == "Hybrid" and graph_db is not None:
+                try:
+                    # Perform graph search if available
+                    graph_results = self.graph_search(graph_db, query)
+                    results.extend(graph_results)
+                except Exception as e:
+                    logger.warning(f"Graph search failed, falling back to dense retrieval: {str(e)}")
             
             # Perform embedding search
             embedding_results = self.similarity_search(query_embedding, k=top_k)

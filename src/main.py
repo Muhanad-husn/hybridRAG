@@ -1,11 +1,11 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
-from input_layer.document_processor import DocumentProcessor
-from processing_layer.embedding_generator import EmbeddingGenerator
-from processing_layer.graph_constructor import GraphConstructor
-from retrieval_layer.hybrid_retrieval import HybridRetrieval
-from utils.logger import setup_logger
+from .input_layer.document_processor import DocumentProcessor
+from .processing_layer.embedding_generator import EmbeddingGenerator
+from .processing_layer.graph_constructor import GraphConstructor
+from .retrieval_layer.hybrid_retrieval import HybridRetrieval
+from .utils.logger import setup_logger
 
 class HyperRAG:
     """Main class for the Hyper RAG system."""
@@ -19,7 +19,14 @@ class HyperRAG:
         # Initialize components
         self.document_processor = DocumentProcessor(config_path)
         self.embedding_generator = EmbeddingGenerator(config_path)
-        self.graph_constructor = GraphConstructor(config_path)
+        
+        # Try to initialize graph constructor (optional)
+        try:
+            self.graph_constructor = GraphConstructor(config_path)
+        except Exception as e:
+            self.logger.warning(f"Graph constructor initialization failed: {str(e)}")
+            self.graph_constructor = None
+            
         self.retrieval_system = HybridRetrieval(config_path)
         
         self.logger.info("Hyper RAG system initialized")
@@ -59,10 +66,14 @@ class HyperRAG:
                 output_dir = os.path.join("data", "embeddings")
                 self.embedding_generator.save_embeddings(documents, output_dir)
             
-            # Construct knowledge graph
-            self.graph_constructor.construct_graph(documents)
-            
-            # Build retrieval index
+            # Construct knowledge graph if available
+            if self.graph_constructor is not None:
+                try:
+                    self.graph_constructor.construct_graph(documents)
+                except Exception as e:
+                    self.logger.warning(f"Graph construction failed: {str(e)}")
+                
+            # Build retrieval index (always required)
             self.retrieval_system.build_index(documents)
             
             self.logger.info("Document processing completed successfully")
@@ -96,14 +107,19 @@ class HyperRAG:
             # Generate query embedding
             query_embedding = self.embedding_generator.generate_embedding(query)
             
-            # Perform hybrid search
+            # Perform search (hybrid if graph is available, dense otherwise)
+            graph_db = self.graph_constructor.graph if self.graph_constructor is not None else None
+            actual_mode = mode if graph_db is not None else "Dense"
+            if actual_mode != mode:
+                self.logger.warning(f"Falling back to {actual_mode} mode as graph database is not available")
+                
             results = self.retrieval_system.hybrid_search(
                 query=query,
                 query_embedding=query_embedding,
-                graph_db=self.graph_constructor.graph,
+                graph_db=graph_db,
                 top_k=top_k,
                 rerank_top_k=rerank_top_k,
-                mode=mode
+                mode=actual_mode
             )
             
             self.logger.info(f"Query processed successfully, found {len(results)} results")
