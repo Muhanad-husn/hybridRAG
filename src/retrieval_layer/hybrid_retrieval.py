@@ -5,7 +5,6 @@ from typing import List, Dict, Any, Optional, Tuple
 from langchain.schema import Document
 from flashrank import Ranker, RerankRequest
 from ..processing_layer.embedding_generator import EmbeddingGenerator
-from ..processing_layer.graph_constructor import GraphConstructor
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import traceback
@@ -63,14 +62,14 @@ class HybridRetrieval:
 
     def similarity_search(
         self,
-        query_embedding: np.ndarray,
+        query: str,
         k: int = 100
     ) -> List[Tuple[Document, float]]:
         """
         Perform similarity search using Chroma vector store.
         
         Args:
-            query_embedding: Query embedding vector
+            query: Query text
             k: Number of results to retrieve
             
         Returns:
@@ -79,7 +78,7 @@ class HybridRetrieval:
         try:
             # Use Chroma's similarity search
             results = self.embedding_generator.vector_store.similarity_search_with_score(
-                query_embedding,
+                query,
                 k=k
             )
             
@@ -91,7 +90,7 @@ class HybridRetrieval:
 
     def graph_search(
         self,
-        graph: GraphConstructor,
+        graph,
         query: str,
         limit: int = 85
     ) -> List[Dict[str, Any]]:
@@ -280,7 +279,7 @@ class HybridRetrieval:
         
         Args:
             query: Search query
-            query_embedding: Query embedding vector
+            query_embedding: Query embedding vector (not used directly, we use query text instead)
             graph: GraphConstructor instance
             top_k: Number of results to retrieve
             rerank_top_k: Number of results after reranking
@@ -300,8 +299,8 @@ class HybridRetrieval:
                 except Exception as e:
                     logger.warning(f"Graph search failed, falling back to dense retrieval: {str(e)}")
             
-            # Perform embedding search
-            embedding_results = self.similarity_search(query_embedding, k=top_k)
+            # Perform embedding search using query text instead of embedding
+            embedding_results = self.similarity_search(query, k=top_k)
             results.extend(embedding_results)
             
             # Deduplicate results
