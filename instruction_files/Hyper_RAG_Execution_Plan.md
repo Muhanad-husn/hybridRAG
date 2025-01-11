@@ -1,4 +1,3 @@
-
 # High-Level Execution Plan
 
 Below is a high-level, step-by-step execution plan that follows a logical order while keeping things tool-agnostic. It’s meant as a general roadmap from concept to a working, downloadable app.
