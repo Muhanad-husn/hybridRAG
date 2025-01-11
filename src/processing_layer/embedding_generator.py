@@ -5,12 +5,29 @@ import numpy as np
 from typing import List, Dict, Union, Optional
 from transformers import AutoTokenizer, AutoModel
 from langchain.schema import Document
+from langchain_community.vectorstores import Chroma
+from langchain_core.embeddings import Embeddings
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class CustomEmbeddings(Embeddings):
+    """Custom embeddings class for use with LangChain."""
+    
+    def __init__(self, embedding_generator):
+        """Initialize with reference to EmbeddingGenerator."""
+        self.generator = embedding_generator
+        
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for a list of documents."""
+        return [self.generator.generate_embedding(text).tolist() for text in texts]
+        
+    def embed_query(self, text: str) -> List[float]:
+        """Generate embedding for query text."""
+        return self.generator.generate_embedding(text).tolist()
 
 class EmbeddingGenerator:
     """Generates embeddings for documents using the GTE-Small model."""
@@ -25,8 +42,22 @@ class EmbeddingGenerator:
         # Create cache directory if it doesn't exist
         os.makedirs(self.cache_dir, exist_ok=True)
         
-        # Initialize tokenizer and model
+        # Create embeddings directory if it doesn't exist
+        self.embeddings_dir = self.config["paths"]["embeddings"]
+        os.makedirs(self.embeddings_dir, exist_ok=True)
+        
+        # Initialize tokenizer and model first
         self._initialize_model()
+        
+        # Initialize custom embeddings
+        self.embedding_function = CustomEmbeddings(self)
+        
+        # Initialize vector store
+        self.vector_store = Chroma(
+            collection_name="document_embeddings",
+            persist_directory=self.embeddings_dir,
+            embedding_function=self.embedding_function
+        )
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
@@ -186,36 +217,74 @@ class EmbeddingGenerator:
 
     def save_embeddings(
         self,
-        documents: List[Document],
-        output_dir: str
+        documents: List[Document]
     ) -> None:
         """
-        Save document embeddings to disk.
+        Save document embeddings to the vector store.
         
         Args:
             documents: List of documents with embeddings
-            output_dir: Directory to save the embeddings
         """
         try:
-            os.makedirs(output_dir, exist_ok=True)
+            # Extract texts and metadata
+            texts = []
+            metadatas = []
+            ids = []
             
             for idx, doc in enumerate(documents):
-                if 'embedding' not in doc.metadata:
-                    logger.warning(f"Document {idx} has no embedding, skipping")
-                    continue
-                    
-                # Create filename from source document if available
-                base_name = f"embedding_{idx}"
+                texts.append(doc.page_content)
+                
+                # Create unique document ID using source and chunk index
+                doc_id = f"doc_{idx}"
                 if 'source' in doc.metadata:
-                    base_name += f"_{os.path.basename(doc.metadata['source'])}"
+                    base_name = os.path.basename(doc.metadata['source'])
+                    doc_id = f"{os.path.splitext(base_name)[0]}_chunk_{idx}"
+                ids.append(doc_id)
                 
-                output_path = os.path.join(output_dir, f"{base_name}.npy")
-                
-                # Save embedding as numpy array
-                np.save(output_path, doc.metadata['embedding'])
+                # Store all metadata except the embedding itself
+                meta = {k: v for k, v in doc.metadata.items() if k != 'embedding'}
+                metadatas.append(meta)
             
-            logger.info(f"Saved embeddings to {output_dir}")
+            # Add documents to vector store
+            self.vector_store.add_texts(
+                texts=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
+            
+            # Persist to disk
+            self.vector_store.persist()
+            
+            logger.info(f"Saved {len(documents)} embeddings to vector store")
             
         except Exception as e:
             logger.error(f"Error saving embeddings: {str(e)}")
+            raise
+            
+    def load_embeddings(self, query: str = "", k: int = 100) -> List[Document]:
+        """
+        Load embeddings from the vector store.
+        
+        Args:
+            query: Query text to find similar documents. If empty, returns random documents.
+            k: Number of documents to return
+            
+        Returns:
+            List[Document]: List of documents with embeddings
+        """
+        try:
+            # Use similarity search to retrieve documents
+            results = self.vector_store.similarity_search_with_score(
+                query if query else ".",  # Use "." as default query to get random docs
+                k=k
+            )
+            
+            # Extract just the documents from (doc, score) tuples
+            documents = [doc for doc, _ in results]
+            
+            logger.info(f"Loaded {len(documents)} embeddings from vector store")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error loading embeddings: {str(e)}")
             raise
