@@ -6,7 +6,7 @@ import logging
 from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import (
     ChatPromptTemplate,
@@ -93,24 +93,6 @@ system_prompt = (
     "Adhere to the rules strictly. Non-compliance will result in termination."
 )
 
-default_prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            system_prompt,
-        ),
-        (
-            "human",
-            (
-                "Tip: Make sure to answer in the correct format and do "
-                "not include any explanations. "
-                "Use the given format to extract information from the "
-                "following input: {input}"
-            ),
-        ),
-    ]
-)
-
 class LLMGraphTransformer:
     """Transform documents into graph-based documents using a LLM."""
     
@@ -132,7 +114,15 @@ class LLMGraphTransformer:
         self._function_call = not ignore_tool_usage
         
         # Initialize prompt
-        self.prompt = prompt or default_prompt
+        self.prompt = prompt or ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=(
+                "Extract entities and relationships from the following text. "
+                "Format your response as a list of JSON objects with 'head', 'head_type', "
+                "'relation', 'tail', and 'tail_type' fields.\n\n"
+                "Text: {input}"
+            ))
+        ])
         
         # Add logging for initialization
         logger.info("Initializing LLMGraphTransformer")
@@ -151,7 +141,12 @@ class LLMGraphTransformer:
             logger.info(f"Document length: {len(text)} characters")
             
             # Get raw model response
-            raw_response = self.llm.invoke({"input": text}, config=config)
+            raw_response = self.llm(
+                [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
+                ]
+            )
             
             # Log raw response
             logger.info("Raw model response:")
@@ -165,14 +160,14 @@ class LLMGraphTransformer:
             
             try:
                 # Parse the response
-                if isinstance(raw_response, str):
+                if isinstance(raw_response.content, str):
                     # Try to parse as JSON
-                    parsed_json = json.loads(raw_response)
+                    parsed_json = json.loads(raw_response.content)
                     if isinstance(parsed_json, dict):
                         parsed_json = [parsed_json]
                 else:
                     # Handle structured output
-                    parsed_json = raw_response
+                    parsed_json = raw_response.content
                 
                 # Log parsed structure
                 logger.info("Parsed structure:")
@@ -252,7 +247,14 @@ class LLMGraphTransformer:
             logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
             
             # Get raw model response
-            raw_response = await self.llm.ainvoke({"input": text}, config=config)
+            raw_response = await self.llm.agenerate(
+                [
+                    [
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
+                    ]
+                ]
+            )
             
             # Log raw response
             logger.info("Raw model response (async):")
@@ -266,12 +268,12 @@ class LLMGraphTransformer:
             
             try:
                 # Parse the response
-                if isinstance(raw_response, str):
-                    parsed_json = json.loads(raw_response)
+                if isinstance(raw_response.generations[0][0].text, str):
+                    parsed_json = json.loads(raw_response.generations[0][0].text)
                     if isinstance(parsed_json, dict):
                         parsed_json = [parsed_json]
                 else:
-                    parsed_json = raw_response
+                    parsed_json = raw_response.generations[0][0].text
                 
                 # Extract nodes and relationships
                 for item in parsed_json:
