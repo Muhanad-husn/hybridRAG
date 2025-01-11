@@ -63,8 +63,7 @@ class HyperRAG:
             
             # Save embeddings if requested
             if save_embeddings:
-                output_dir = os.path.join("data", "embeddings")
-                self.embedding_generator.save_embeddings(documents, output_dir)
+                self.embedding_generator.save_embeddings(documents)
             
             # Construct knowledge graph if available
             if self.graph_constructor is not None:
@@ -108,15 +107,14 @@ class HyperRAG:
             query_embedding = self.embedding_generator.generate_embedding(query)
             
             # Perform search (hybrid if graph is available, dense otherwise)
-            graph_db = self.graph_constructor.graph if self.graph_constructor is not None else None
-            actual_mode = mode if graph_db is not None else "Dense"
+            actual_mode = mode if self.graph_constructor is not None else "Dense"
             if actual_mode != mode:
-                self.logger.warning(f"Falling back to {actual_mode} mode as graph database is not available")
+                self.logger.warning(f"Falling back to {actual_mode} mode as graph is not available")
                 
             results = self.retrieval_system.hybrid_search(
                 query=query,
                 query_embedding=query_embedding,
-                graph_db=graph_db,
+                graph=self.graph_constructor,  # Pass the entire GraphConstructor instance
                 top_k=top_k,
                 rerank_top_k=rerank_top_k,
                 mode=actual_mode
@@ -132,8 +130,11 @@ class HyperRAG:
     def clear_graph(self) -> None:
         """Clear the knowledge graph."""
         try:
-            self.graph_constructor.clear_graph()
-            self.logger.info("Knowledge graph cleared successfully")
+            if self.graph_constructor is not None:
+                self.graph_constructor.clear_graph()
+                self.logger.info("Knowledge graph cleared successfully")
+            else:
+                self.logger.warning("No graph constructor available to clear")
         except Exception as e:
             self.logger.error(f"Error clearing graph: {str(e)}")
             raise

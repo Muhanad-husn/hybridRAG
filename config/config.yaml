@@ -9,13 +9,11 @@ openrouter:
   site_name: "HybridRAG"  # Optional: Your site name
   model: "anthropic/claude-3-haiku-20240307"
 
-# Database Settings
-arangodb:
-  host: "localhost"
-  port: 8529
-  database: "graph_db"
-  username: "root"
-  password: "your_password"  # Change this in production
+# Graph Settings
+graph:
+  storage:
+    nodes_file: "data/graphs/nodes.csv"
+    edges_file: "data/graphs/edges.csv"
 
 # Model Settings
 embedding:
