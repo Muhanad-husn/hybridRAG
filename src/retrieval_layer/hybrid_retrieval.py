@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from langchain.schema import Document
 from flashrank import Ranker, RerankRequest
 from ..processing_layer.embedding_generator import EmbeddingGenerator
+from ..processing_layer.graph_constructor import GraphConstructor
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import traceback
@@ -90,7 +91,7 @@ class HybridRetrieval:
 
     def graph_search(
         self,
-        graph,
+        graph: GraphConstructor,
         query: str,
         limit: int = 85
     ) -> List[Dict[str, Any]]:
