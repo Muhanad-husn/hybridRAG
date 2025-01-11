@@ -1,0 +1,43 @@
+# Translation Model Settings
+models:
+  ar_to_en:
+    name: "opus-mt-ar-en"
+    path: "models/opus-mt-ar-en"
+    max_length: 512
+    batch_size: 32
+    device: "cpu"  # Change to "cuda" if GPU is available
+    
+  en_to_ar:
+    name: "opus-mt-en-ar"
+    path: "models/opus-mt-en-ar"
+    max_length: 512
+    batch_size: 32
+    device: "cpu"  # Change to "cuda" if GPU is available
+
+# Language Detection Settings
+language_detection:
+  confidence_threshold: 0.8
+  fallback_language: "en"
+
+# Processing Settings
+text_processing:
+  remove_html: true
+  normalize_arabic: true  # Handles different forms of Arabic characters
+  preserve_formatting: true
+
+# Error Handling
+error_handling:
+  max_retries: 3
+  retry_delay: 1  # seconds
+  fallback_to_english: true  # If translation fails, return English text
+
+# Caching Settings
+cache:
+  enabled: true
+  max_size: 1000  # Number of translations to cache
+  ttl: 3600  # Time to live in seconds (1 hour)
+
+# Performance Settings
+performance:
+  concurrent_translations: 4  # Number of concurrent translation tasks
+  timeout: 30  # seconds per translation request

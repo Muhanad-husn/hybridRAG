@@ -1,2 +1,42 @@
+# Core Dependencies
 langchain_community==0.3.14
+langchain_anthropic
+langchain_openai
 transformers==4.47.1
+torch
+sentence-transformers
+
+# Document Processing
+llmsherpa
+python-docx
+PyPDF2
+
+# Embedding and Vector Search
+faiss-cpu
+fastembed
+
+# Graph Database
+python-arango
+
+# Ranking and Reranking
+flashrank
+
+# Web Interface
+streamlit
+termcolor
+
+# Utilities
+pydantic
+numpy
+concurrent-futures
+json-repair
+fake-useragent
+
+# Testing
+pytest
+pytest-benchmark
+pytest-cov
+pytest-html
+
+# Packaging
+pyinstaller

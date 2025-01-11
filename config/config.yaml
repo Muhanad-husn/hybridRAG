@@ -1,0 +1,54 @@
+# API Endpoints
+llm_sherpa:
+  api_url: "https://readers.llmsherpa.com/api/document/developer/parseDocument?renderFormat=all"
+
+# Database Settings
+arangodb:
+  host: "localhost"
+  port: 8529
+  database: "graph_db"
+  username: "root"
+  password: "your_password"  # Change this in production
+
+# Model Settings
+embedding:
+  model_name: "thenlper/gte-small"
+  max_length: 512
+  cache_dir: "/fastembed_cache"
+
+ranking:
+  model_name: "ms-marco-MiniLM-L-12-v2"
+  cache_dir: "/reranker_cache"
+
+# Processing Settings
+document:
+  supported_formats:
+    - pdf
+    - docx
+    - txt
+  chunk_size: 512
+  chunk_overlap: 50
+
+# Logging Settings
+logging:
+  log_level: "INFO"
+  max_log_size: 5242880  # 5 MB
+  backup_count: 3
+
+# Timeout Settings
+timeouts:
+  document_processing: 20  # seconds
+  query_processing: 30    # seconds
+  embedding_generation: 60 # seconds
+
+# Storage Paths
+paths:
+  embeddings: "data/embeddings"
+  graphs: "data/graphs"
+  raw_documents: "data/raw_documents"
+  processed_chunks: "data/processed_chunks"
+  models:
+    gte_small: "models/gte_small"
+    translation_ar_en: "models/opus-mt-ar-en"
+    translation_en_ar: "models/opus-mt-en-ar"
+    ranking: "models/ranking_model"
