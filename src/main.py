@@ -174,6 +174,20 @@ class HyperRAG:
             self.logger.error(f"Error clearing graph: {str(e)}")
             raise
 
+def format_result(result: Dict[str, Any]) -> str:
+    """Format a single search result for display."""
+    if isinstance(result, tuple):
+        doc, score = result
+        return f"Text: {doc.page_content[:200]}...\nSource: {doc.metadata.get('source', 'unknown')}\nScore: {score:.4f}"
+    elif 'node' in result:
+        node = result['node']
+        return f"Entity: {node['id']}\nType: {node['type']}\nProperties: {node['properties']}\nConnections: {len(result['edges'])} edges"
+    else:
+        text = result.get('text', '')[:200]
+        meta = result.get('meta', 'unknown')
+        score = result.get('score', 0.0)
+        return f"Text: {text}...\nSource: {meta}\nScore: {score:.4f}"
+
 def main():
     """Main entry point for the application."""
     try:
@@ -202,9 +216,7 @@ def main():
         print("\nSearch Results:")
         for idx, result in enumerate(results, 1):
             print(f"\nResult {idx}:")
-            print(f"Text: {result['text'][:200]}...")
-            print(f"Source: {result['meta']}")
-            print(f"Score: {result['score']:.4f}")
+            print(format_result(result))
         
     except Exception as e:
         logging.error(f"Application error: {str(e)}")
