@@ -20,42 +20,6 @@ from pydantic import BaseModel, Field, create_model
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-examples = [
-    {
-        "text": (
-            "Adam is a software engineer in Microsoft since 2009, "
-            "and last year he got an award as the Best Talent"
-        ),
-        "head": "Adam",
-        "head_type": "Person",
-        "relation": "WORKS_FOR",
-        "tail": "Microsoft",
-        "tail_type": "Company",
-    },
-    {
-        "text": (
-            "Adam is a software engineer in Microsoft since 2009, "
-            "and last year he got an award as the Best Talent"
-        ),
-        "head": "Adam",
-        "head_type": "Person",
-        "relation": "HAS_AWARD",
-        "tail": "Best Talent",
-        "tail_type": "Award",
-    },
-    {
-        "text": (
-            "Microsoft is a tech company that provide "
-            "several products such as Microsoft Word"
-        ),
-        "head": "Microsoft Word",
-        "head_type": "Product",
-        "relation": "PRODUCED_BY",
-        "tail": "Microsoft",
-        "tail_type": "Company",
-    },
-]
-
 system_prompt = (
     "# Knowledge Graph Instructions for GPT-4\n"
     "## 1. Overview\n"
@@ -114,15 +78,13 @@ class LLMGraphTransformer:
         self._function_call = not ignore_tool_usage
         
         # Initialize prompt
-        self.prompt = prompt or ChatPromptTemplate.from_messages([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=(
-                "Extract entities and relationships from the following text. "
-                "Format your response as a list of JSON objects with 'head', 'head_type', "
-                "'relation', 'tail', and 'tail_type' fields.\n\n"
-                "Text: {input}"
-            ))
-        ])
+        self.prompt = (
+            f"{system_prompt}\n\n"
+            "Extract entities and relationships from the following text. "
+            "Format your response as a list of JSON objects with 'head', 'head_type', "
+            "'relation', 'tail', and 'tail_type' fields.\n\n"
+            "Text: {input}"
+        )
         
         # Add logging for initialization
         logger.info("Initializing LLMGraphTransformer")
@@ -140,12 +102,11 @@ class LLMGraphTransformer:
             logger.info(f"Processing document: {document.metadata.get('source', 'unknown')}")
             logger.info(f"Document length: {len(text)} characters")
             
-            # Get raw model response using generate
-            messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
-            ]
-            raw_response = self.llm.generate([messages])
+            # Format prompt
+            formatted_prompt = self.prompt.format(input=text)
+            
+            # Get raw model response
+            raw_response = self.llm.predict(formatted_prompt)
             
             # Log raw response
             logger.info("Raw model response:")
@@ -159,15 +120,14 @@ class LLMGraphTransformer:
             
             try:
                 # Parse the response
-                response_text = raw_response.generations[0][0].text
-                if isinstance(response_text, str):
+                if isinstance(raw_response, str):
                     # Try to parse as JSON
-                    parsed_json = json.loads(response_text)
+                    parsed_json = json.loads(raw_response)
                     if isinstance(parsed_json, dict):
                         parsed_json = [parsed_json]
                 else:
                     # Handle structured output
-                    parsed_json = response_text
+                    parsed_json = raw_response
                 
                 # Log parsed structure
                 logger.info("Parsed structure:")
@@ -246,12 +206,11 @@ class LLMGraphTransformer:
             text = document.page_content
             logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
             
-            # Get raw model response using agenerate
-            messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=f"Extract entities and relationships from the following text:\n\n{text}")
-            ]
-            raw_response = await self.llm.agenerate([messages])
+            # Format prompt
+            formatted_prompt = self.prompt.format(input=text)
+            
+            # Get raw model response
+            raw_response = await self.llm.apredict(formatted_prompt)
             
             # Log raw response
             logger.info("Raw model response (async):")
@@ -265,13 +224,12 @@ class LLMGraphTransformer:
             
             try:
                 # Parse the response
-                response_text = raw_response.generations[0][0].text
-                if isinstance(response_text, str):
-                    parsed_json = json.loads(response_text)
+                if isinstance(raw_response, str):
+                    parsed_json = json.loads(raw_response)
                     if isinstance(parsed_json, dict):
                         parsed_json = [parsed_json]
                 else:
-                    parsed_json = response_text
+                    parsed_json = raw_response
                 
                 # Extract nodes and relationships
                 for item in parsed_json:
