@@ -1,5 +1,6 @@
 import os
 import logging
+import shutil
 from typing import List, Dict, Any, Optional
 from .input_layer.document_processor import DocumentProcessor
 from .processing_layer.embedding_generator import EmbeddingGenerator
@@ -31,6 +32,36 @@ class HyperRAG:
         
         self.logger.info("Hyper RAG system initialized")
 
+    def reset_storage(self) -> None:
+        """Reset all storage (vector store and graph files)."""
+        try:
+            # Reset vector store
+            embeddings_dir = self.embedding_generator.embeddings_dir
+            if os.path.exists(embeddings_dir):
+                shutil.rmtree(embeddings_dir)
+                os.makedirs(embeddings_dir)
+                self.logger.info(f"Reset vector store at {embeddings_dir}")
+
+            # Reset graph files
+            if self.graph_constructor is not None:
+                graphs_dir = os.path.join('data', 'graphs')
+                if os.path.exists(graphs_dir):
+                    shutil.rmtree(graphs_dir)
+                    os.makedirs(graphs_dir)
+                    self.logger.info(f"Reset graph files at {graphs_dir}")
+
+            # Reset processed chunks
+            chunks_dir = os.path.join('data', 'processed_chunks')
+            if os.path.exists(chunks_dir):
+                shutil.rmtree(chunks_dir)
+                os.makedirs(chunks_dir)
+                self.logger.info(f"Reset processed chunks at {chunks_dir}")
+
+            self.logger.info("Storage reset completed")
+        except Exception as e:
+            self.logger.error(f"Error resetting storage: {str(e)}")
+            raise
+
     def process_documents(
         self,
         input_dir: str,
@@ -47,6 +78,9 @@ class HyperRAG:
         """
         try:
             self.logger.info(f"Processing documents from {input_dir}")
+            
+            # Reset storage before processing
+            self.reset_storage()
             
             # Process documents
             documents = self.document_processor.process_directory(input_dir)
@@ -114,7 +148,7 @@ class HyperRAG:
             results = self.retrieval_system.hybrid_search(
                 query=query,
                 query_embedding=query_embedding,
-                graph=self.graph_constructor,  # Pass the entire GraphConstructor instance
+                graph=self.graph_constructor,
                 top_k=top_k,
                 rerank_top_k=rerank_top_k,
                 mode=actual_mode
