@@ -1,10 +1,11 @@
 import os
 import yaml
 import numpy as np
-import faiss
 from typing import List, Dict, Any, Optional, Tuple
 from langchain.schema import Document
 from flashrank import Ranker, RerankRequest
+from ..processing_layer.embedding_generator import EmbeddingGenerator
+from ..processing_layer.graph_constructor import GraphConstructor
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import traceback
@@ -20,9 +21,7 @@ class HybridRetrieval:
         """Initialize the hybrid retrieval system."""
         self.config = self._load_config(config_path)
         self.ranker = self._initialize_ranker()
-        self.index = None
-        self.docstore = {}
-        self.index_to_docstore_id = {}
+        self.embedding_generator = EmbeddingGenerator(config_path)
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
@@ -46,55 +45,17 @@ class HybridRetrieval:
             logger.error(f"Error initializing ranker: {str(e)}")
             raise
 
-    def build_index(self, documents: List[Document], batch_size: int = 25) -> None:
+    def build_index(self, documents: List[Document]) -> None:
         """
-        Build a FAISS index from document embeddings.
+        Add documents to the Chroma vector store.
         
         Args:
             documents: List of documents with embeddings in metadata
-            batch_size: Size of batches for processing
         """
         try:
-            logger.info(f"Building index for {len(documents)} documents")
-            
-            # Process documents in batches
-            for i in range(0, len(documents), batch_size):
-                batch = documents[i:i + batch_size]
-                
-                # Extract embeddings and create numpy array
-                embeddings = []
-                for doc in batch:
-                    if 'embedding' not in doc.metadata:
-                        logger.warning(f"Document missing embedding, skipping")
-                        continue
-                    embeddings.append(doc.metadata['embedding'])
-                
-                if not embeddings:
-                    continue
-                    
-                batch_embeddings = np.array(embeddings, dtype=np.float32)
-                
-                # Initialize index with first batch
-                if self.index is None:
-                    self.index = faiss.IndexFlatIP(batch_embeddings.shape[1])
-                
-                # Normalize embeddings
-                faiss.normalize_L2(batch_embeddings)
-                
-                # Add embeddings to index
-                start_id = len(self.index_to_docstore_id)
-                self.index.add(batch_embeddings)
-                
-                # Update docstore and mapping
-                for j, doc in enumerate(batch):
-                    if 'embedding' in doc.metadata:
-                        doc_id = f"{start_id + j}"
-                        self.docstore[doc_id] = doc
-                        self.index_to_docstore_id[start_id + j] = doc_id
-                
-                logger.info(f"Processed batch {i//batch_size + 1}")
-            
-            logger.info(f"Index built with {len(self.index_to_docstore_id)} documents")
+            logger.info(f"Adding {len(documents)} documents to vector store")
+            self.embedding_generator.save_embeddings(documents)
+            logger.info("Documents successfully added to vector store")
             
         except Exception as e:
             logger.error(f"Error building index: {str(e)}")
@@ -106,7 +67,7 @@ class HybridRetrieval:
         k: int = 100
     ) -> List[Tuple[Document, float]]:
         """
-        Perform similarity search using FAISS index.
+        Perform similarity search using Chroma vector store.
         
         Args:
             query_embedding: Query embedding vector
@@ -116,26 +77,13 @@ class HybridRetrieval:
             List of (document, score) tuples
         """
         try:
-            if self.index is None:
-                raise ValueError("Index not built. Call build_index first.")
+            # Use Chroma's similarity search
+            results = self.embedding_generator.vector_store.similarity_search_with_score(
+                query_embedding,
+                k=k
+            )
             
-            # Normalize query embedding
-            query_embedding = query_embedding.reshape(1, -1)
-            faiss.normalize_L2(query_embedding)
-            
-            # Perform search
-            scores, indices = self.index.search(query_embedding, k)
-            
-            # Gather results
-            results = []
-            for idx, score in zip(indices[0], scores[0]):
-                if idx < 0:  # FAISS returns -1 for empty slots
-                    continue
-                doc_id = self.index_to_docstore_id.get(idx)
-                if doc_id and doc_id in self.docstore:
-                    results.append((self.docstore[doc_id], float(score)))
-            
-            return results
+            return [(doc, float(score)) for doc, score in results]
             
         except Exception as e:
             logger.error(f"Error in similarity search: {str(e)}")
@@ -143,15 +91,15 @@ class HybridRetrieval:
 
     def graph_search(
         self,
-        graph_db,
+        graph: GraphConstructor,
         query: str,
         limit: int = 85
     ) -> List[Dict[str, Any]]:
         """
-        Perform graph-based search.
+        Perform graph-based search using NetworkX.
         
         Args:
-            graph_db: Graph database connection
+            graph: GraphConstructor instance
             query: Search query
             limit: Maximum number of results
             
@@ -159,16 +107,48 @@ class HybridRetrieval:
             List of graph search results
         """
         try:
-            # Example graph query - modify based on your graph structure
-            query = f"""
-            MATCH p = (n)-[r]->(m)
-            WHERE COUNT {{(n)--()}} > 30
-            RETURN p AS Path
-            LIMIT {limit}
-            """
+            # Use NetworkX to find important nodes and their relationships
+            results = []
             
-            response = graph_db.query(query)
-            return response
+            # Query the graph using NetworkX's centrality measures
+            query_params = {
+                'type': 'subgraph',
+                'params': {
+                    'nodes': list(graph.graph.nodes())[:limit]  # Get top nodes by degree
+                }
+            }
+            
+            # Get subgraph of important nodes
+            subgraph_data = graph.query_graph(query_params)
+            
+            # Convert NetworkX results to a format compatible with our system
+            for result in subgraph_data:
+                for node, node_data in result['nodes']:
+                    # Include node and its immediate neighbors
+                    neighbors = list(graph.graph.neighbors(node))
+                    edges = []
+                    for neighbor in neighbors:
+                        edge_data = graph.graph.get_edge_data(node, neighbor)
+                        edges.append({
+                            'source': node,
+                            'target': neighbor,
+                            'type': edge_data.get('type', 'unknown'),
+                            'properties': edge_data
+                        })
+                    
+                    results.append({
+                        'node': {
+                            'id': node,
+                            'type': node_data.get('type', 'unknown'),
+                            'properties': node_data
+                        },
+                        'edges': edges
+                    })
+                    
+                    if len(results) >= limit:
+                        break
+            
+            return results
             
         except Exception as e:
             logger.error(f"Error in graph search: {str(e)}")
@@ -199,8 +179,15 @@ class HybridRetrieval:
                     doc, score = result
                     identifier = (doc.page_content, str(doc.metadata.get('source', '')))
                 else:
-                    # Handle dictionary format from reranking
-                    identifier = (result['text'], str(result['meta']))
+                    # Handle dictionary format from reranking or graph search
+                    text = result.get('text', '')
+                    if not text and 'node' in result:
+                        # Handle graph search results
+                        text = str(result['node'].get('properties', {}))
+                    meta = result.get('meta', '')
+                    if not meta and 'node' in result:
+                        meta = result['node'].get('id', '')
+                    identifier = (text, str(meta))
                 
                 if identifier not in seen:
                     seen.add(identifier)
@@ -241,6 +228,14 @@ class HybridRetrieval:
                         "meta": doc.metadata.get("source", "unknown"),
                         "score": float(score)
                     }
+                elif 'node' in result:  # Handle graph search results
+                    node = result['node']
+                    passage = {
+                        "id": idx,
+                        "text": str(node.get('properties', {})),
+                        "meta": node.get('id', 'unknown'),
+                        "score": len(result.get('edges', []))  # Use number of edges as initial score
+                    }
                 else:  # Handle dictionary format
                     passage = {
                         "id": idx,
@@ -275,7 +270,7 @@ class HybridRetrieval:
         self,
         query: str,
         query_embedding: np.ndarray,
-        graph_db,
+        graph: Optional[GraphConstructor] = None,
         top_k: int = 100,
         rerank_top_k: Optional[int] = None,
         mode: str = "Hybrid"
@@ -286,7 +281,7 @@ class HybridRetrieval:
         Args:
             query: Search query
             query_embedding: Query embedding vector
-            graph_db: Graph database connection
+            graph: GraphConstructor instance
             top_k: Number of results to retrieve
             rerank_top_k: Number of results after reranking
             mode: Search mode ("Hybrid" or "Dense")
@@ -297,10 +292,10 @@ class HybridRetrieval:
         try:
             results = []
             
-            if mode == "Hybrid" and graph_db is not None:
+            if mode == "Hybrid" and graph is not None:
                 try:
                     # Perform graph search if available
-                    graph_results = self.graph_search(graph_db, query)
+                    graph_results = self.graph_search(graph, query)
                     results.extend(graph_results)
                 except Exception as e:
                     logger.warning(f"Graph search failed, falling back to dense retrieval: {str(e)}")
