@@ -177,16 +177,45 @@ class HyperRAG:
 def format_result(result: Dict[str, Any]) -> str:
     """Format a single search result for display."""
     if isinstance(result, tuple):
+        # Handle document results from similarity search
         doc, score = result
-        return f"Text: {doc.page_content[:200]}...\nSource: {doc.metadata.get('source', 'unknown')}\nScore: {score:.4f}"
+        return (
+            f"Document Chunk:\n"
+            f"Content: {doc.page_content[:200]}...\n"
+            f"Source: {doc.metadata.get('source', 'unknown')}\n"
+            f"Relevance: {score:.4f}"
+        )
     elif 'node' in result:
+        # Handle graph search results
         node = result['node']
-        return f"Entity: {node['id']}\nType: {node['type']}\nProperties: {node['properties']}\nConnections: {len(result['edges'])} edges"
+        edges = result['edges']
+        edge_info = []
+        for edge in edges:
+            edge_info.append(
+                f"- {edge['type']} -> {edge['target']}"
+            )
+        edge_summary = "\n".join(edge_info) if edge_info else "No connections"
+        
+        return (
+            f"Entity: {node['id']}\n"
+            f"Type: {node['type']}\n"
+            f"Connections:\n{edge_summary}"
+        )
     else:
+        # Handle reranked results
         text = result.get('text', '')[:200]
         meta = result.get('meta', 'unknown')
         score = result.get('score', 0.0)
-        return f"Text: {text}...\nSource: {meta}\nScore: {score:.4f}"
+        
+        # Normalize score to 0-1 range if it's very small
+        if score < 0.01:
+            score = score * 100
+        
+        return (
+            f"Content: {text}...\n"
+            f"Source: {meta}\n"
+            f"Relevance: {score:.4f}"
+        )
 
 def main():
     """Main entry point for the application."""
@@ -217,6 +246,7 @@ def main():
         for idx, result in enumerate(results, 1):
             print(f"\nResult {idx}:")
             print(format_result(result))
+            print("-" * 80)  # Add separator between results
         
     except Exception as e:
         logging.error(f"Application error: {str(e)}")
