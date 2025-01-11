@@ -54,7 +54,9 @@ system_prompt = (
     "Remember, the knowledge graph should be coherent and easily understandable, "
     "so maintaining consistency in entity references is crucial.\n"
     "## 4. Strict Compliance\n"
-    "Adhere to the rules strictly. Non-compliance will result in termination."
+    "Adhere to the rules strictly. Non-compliance will result in termination.\n\n"
+    "Format your response as a list of JSON objects with 'head', 'head_type', "
+    "'relation', 'tail', and 'tail_type' fields."
 )
 
 class LLMGraphTransformer:
@@ -77,15 +79,6 @@ class LLMGraphTransformer:
         self.strict_mode = strict_mode
         self._function_call = not ignore_tool_usage
         
-        # Initialize prompt
-        self.prompt = (
-            f"{system_prompt}\n\n"
-            "Extract entities and relationships from the following text. "
-            "Format your response as a list of JSON objects with 'head', 'head_type', "
-            "'relation', 'tail', and 'tail_type' fields.\n\n"
-            "Text: {input}"
-        )
-        
         # Add logging for initialization
         logger.info("Initializing LLMGraphTransformer")
         logger.info(f"Allowed nodes: {allowed_nodes}")
@@ -102,11 +95,14 @@ class LLMGraphTransformer:
             logger.info(f"Processing document: {document.metadata.get('source', 'unknown')}")
             logger.info(f"Document length: {len(text)} characters")
             
-            # Format prompt
-            formatted_prompt = self.prompt.format(input=text)
+            # Format messages for OpenRouter API
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Extract entities and relationships from the following text:\n\n{text}"}
+            ]
             
             # Get raw model response
-            raw_response = self.llm.predict(formatted_prompt)
+            raw_response = self.llm.predict(messages=messages)
             
             # Log raw response
             logger.info("Raw model response:")
@@ -206,11 +202,14 @@ class LLMGraphTransformer:
             text = document.page_content
             logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
             
-            # Format prompt
-            formatted_prompt = self.prompt.format(input=text)
+            # Format messages for OpenRouter API
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Extract entities and relationships from the following text:\n\n{text}"}
+            ]
             
             # Get raw model response
-            raw_response = await self.llm.apredict(formatted_prompt)
+            raw_response = await self.llm.apredict(messages=messages)
             
             # Log raw response
             logger.info("Raw model response (async):")
