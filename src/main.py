@@ -233,20 +233,32 @@ def main():
             save_embeddings=True
         )
         
-        # Example query
-        query = "What are the main topics discussed in the documents?"
-        results = rag_system.query(
-            query=query,
-            mode="Hybrid",
-            top_k=10
-        )
+        # Test queries
+        queries = [
+            "What were the key factors that escalated the peaceful demonstrations in Syria into a full-scale armed conflict?",
+            "How has the Syrian Civil War impacted the displacement of people both internally and internationally?",
+            "What role has Russia played in shaping the dynamics of the Syrian Civil War, and how did its intervention affect the conflict?"
+        ]
         
-        # Print results
-        print("\nSearch Results:")
-        for idx, result in enumerate(results, 1):
-            print(f"\nResult {idx}:")
-            print(format_result(result))
-            print("-" * 80)  # Add separator between results
+        # Process each query
+        for i, query in enumerate(queries, 1):
+            print(f"\nQuery {i}:")
+            print(query)
+            print("\nResults:")
+            
+            results = rag_system.query(
+                query=query,
+                mode="Hybrid",
+                top_k=5  # Limit to top 5 most relevant results
+            )
+            
+            # Print results
+            for idx, result in enumerate(results, 1):
+                print(f"\nResult {idx}:")
+                print(format_result(result))
+                print("-" * 80)  # Add separator between results
+            
+            print("\n" + "=" * 100 + "\n")  # Add separator between queries
         
     except Exception as e:
         logging.error(f"Application error: {str(e)}")
