@@ -94,11 +94,11 @@ class EmbeddingGenerator:
             
             # Get all existing document IDs
             if hasattr(self.vector_store._collection, "count") and self.vector_store._collection.count() > 0:
-                # Get all document IDs
-                all_ids = [m['id'] for m in self.vector_store._collection.get()['metadatas']]
-                if all_ids:
+                # Get all document IDs directly from collection
+                collection_data = self.vector_store._collection.get()
+                if 'ids' in collection_data and collection_data['ids']:
                     # Delete all existing documents
-                    self.vector_store._collection.delete(ids=all_ids)
+                    self.vector_store._collection.delete(ids=collection_data['ids'])
             
             logger.info("Vector store initialized successfully")
         except Exception as e:
@@ -110,11 +110,11 @@ class EmbeddingGenerator:
         try:
             # Get all existing document IDs
             if hasattr(self.vector_store._collection, "count") and self.vector_store._collection.count() > 0:
-                # Get all document IDs
-                all_ids = [m['id'] for m in self.vector_store._collection.get()['metadatas']]
-                if all_ids:
+                # Get all document IDs directly from collection
+                collection_data = self.vector_store._collection.get()
+                if 'ids' in collection_data and collection_data['ids']:
                     # Delete all existing documents
-                    self.vector_store._collection.delete(ids=all_ids)
+                    self.vector_store._collection.delete(ids=collection_data['ids'])
             logger.info("Vector store reset successfully")
         except Exception as e:
             logger.error(f"Error resetting vector store: {str(e)}")
