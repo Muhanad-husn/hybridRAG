@@ -1,21 +1,22 @@
 import os
 import yaml
+import json
+import networkx as nx
+import pandas as pd
 from typing import List, Dict, Optional, Any
 from langchain.schema import Document
-from langchain_community.graphs import Neo4jGraph
 from langchain_core.language_models import BaseLanguageModel
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from ..tools.llm_graph_transformer import LLMGraphTransformer
 import logging
-from arango import ArangoClient
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class GraphConstructor:
-    """Constructs and manages knowledge graphs from documents."""
+    """Constructs and manages knowledge graphs from documents using NetworkX."""
     
     def __init__(
         self,
@@ -25,9 +26,26 @@ class GraphConstructor:
         """Initialize the graph constructor with configuration."""
         self.config = self._load_config(config_path)
         self.llm = llm or self._initialize_llm()
-        self.db_client = None
-        self.graph = None
+        self.graph = nx.DiGraph()  # Using directed graph for relationships
+        self._setup_storage_paths()
+        self._load_existing_graph()
         
+    def _setup_storage_paths(self) -> None:
+        """Setup paths for CSV storage."""
+        try:
+            # Ensure graphs directory exists
+            graphs_dir = os.path.join('data', 'graphs')
+            os.makedirs(graphs_dir, exist_ok=True)
+            
+            # Set file paths
+            self.nodes_file = os.path.join(graphs_dir, 'nodes.csv')
+            self.edges_file = os.path.join(graphs_dir, 'edges.csv')
+            
+            logger.info(f"Storage paths setup: {graphs_dir}")
+        except Exception as e:
+            logger.error(f"Error setting up storage paths: {str(e)}")
+            raise
+
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
         try:
@@ -112,79 +130,77 @@ class GraphConstructor:
             logger.error(f"Error initializing OpenRouter LLM: {str(e)}")
             raise
 
-    def _initialize_db_client(self) -> ArangoClient:
-        """Initialize the ArangoDB client."""
+    def _load_existing_graph(self) -> None:
+        """Load existing graph from CSV files if they exist."""
         try:
-            db_config = self.config['arangodb']
-            client = ArangoClient(
-                hosts=f"http://{db_config['host']}:{db_config['port']}"
-            )
-            
-            # Connect to system database first
-            sys_db = client.db(
-                '_system',
-                username=db_config['username'],
-                password=db_config['password']
-            )
-            
-            # Create application database if it doesn't exist
-            if not sys_db.has_database(db_config['database']):
-                sys_db.create_database(db_config['database'])
-                logger.info(f"Created database: {db_config['database']}")
-            
-            return client
-            
+            if os.path.exists(self.nodes_file) and os.path.exists(self.edges_file):
+                # Load nodes
+                nodes_df = pd.read_csv(self.nodes_file)
+                for _, row in nodes_df.iterrows():
+                    properties = json.loads(row['properties']) if row['properties'] else {}
+                    self.graph.add_node(
+                        row['id'],
+                        type=row['type'],
+                        **properties
+                    )
+
+                # Load edges
+                edges_df = pd.read_csv(self.edges_file)
+                for _, row in edges_df.iterrows():
+                    properties = json.loads(row['properties']) if row['properties'] else {}
+                    self.graph.add_edge(
+                        row['source_id'],
+                        row['target_id'],
+                        type=row['type'],
+                        **properties
+                    )
+                
+                logger.info(f"Loaded existing graph: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges")
         except Exception as e:
-            logger.error(f"Error initializing database client: {str(e)}")
+            logger.error(f"Error loading existing graph: {str(e)}")
             raise
 
-    def _initialize_graph(self) -> Neo4jGraph:
-        """Initialize the graph database."""
+    def _save_graph(self) -> None:
+        """Save current graph to CSV files."""
         try:
-            db_config = self.config['arangodb']
-            db = self.db_client.db(
-                db_config['database'],
-                username=db_config['username'],
-                password=db_config['password']
-            )
-            
-            # Create or get the graph
-            if not db.has_graph('knowledge_graph'):
-                graph = db.create_graph('knowledge_graph')
-                logger.info("Created new knowledge graph")
-            else:
-                graph = db.graph('knowledge_graph')
-                logger.info("Connected to existing knowledge graph")
-            
-            # Ensure vertex collections exist
-            if not graph.has_vertex_collection('nodes'):
-                graph.create_vertex_collection('nodes')
-            
-            # Ensure edge collections exist
-            if not graph.has_edge_definition('relationships'):
-                graph.create_edge_definition(
-                    edge_collection='relationships',
-                    from_vertex_collections=['nodes'],
-                    to_vertex_collections=['nodes']
-                )
-            
-            return graph
-            
+            # Save nodes
+            nodes_data = []
+            for node_id, node_data in self.graph.nodes(data=True):
+                node_type = node_data.pop('type', 'unknown')
+                nodes_data.append({
+                    'id': node_id,
+                    'type': node_type,
+                    'properties': json.dumps(node_data)
+                })
+            pd.DataFrame(nodes_data).to_csv(self.nodes_file, index=False)
+
+            # Save edges
+            edges_data = []
+            for source, target, edge_data in self.graph.edges(data=True):
+                edge_type = edge_data.pop('type', 'unknown')
+                edges_data.append({
+                    'source_id': source,
+                    'target_id': target,
+                    'type': edge_type,
+                    'properties': json.dumps(edge_data)
+                })
+            pd.DataFrame(edges_data).to_csv(self.edges_file, index=False)
+
+            logger.info("Graph saved to CSV files successfully")
         except Exception as e:
-            logger.error(f"Error initializing graph: {str(e)}")
+            logger.error(f"Error saving graph: {str(e)}")
             raise
 
     def clear_graph(self) -> None:
         """Clear all nodes and relationships from the graph."""
         try:
-            # Delete all relationships first
-            self.graph.edge_collection('relationships').truncate()
-            logger.info("Cleared all relationships")
-            
-            # Then delete all nodes
-            self.graph.vertex_collection('nodes').truncate()
-            logger.info("Cleared all nodes")
-            
+            self.graph.clear()
+            # Clear CSV files if they exist
+            if os.path.exists(self.nodes_file):
+                os.remove(self.nodes_file)
+            if os.path.exists(self.edges_file):
+                os.remove(self.edges_file)
+            logger.info("Cleared graph and removed CSV files")
         except Exception as e:
             logger.error(f"Error clearing graph: {str(e)}")
             raise
@@ -192,16 +208,15 @@ class GraphConstructor:
     def insert_node(self, node: Dict[str, Any]) -> None:
         """Insert a node into the graph if it doesn't already exist."""
         try:
-            node_collection = self.graph.vertex_collection('nodes')
-            
-            if not node_collection.has(node['id']):
-                node_collection.insert({
-                    '_key': node['id'],
-                    'type': node['type'],
-                    **(node.get('properties') or {})
-                })
+            if not self.graph.has_node(node['id']):
+                properties = node.get('properties', {})
+                self.graph.add_node(
+                    node['id'],
+                    type=node['type'],
+                    **properties
+                )
+                self._save_graph()  # Save after each insertion
                 logger.debug(f"Inserted node: {node['id']}")
-                
         except Exception as e:
             logger.error(f"Error inserting node: {str(e)}")
             raise
@@ -209,22 +224,19 @@ class GraphConstructor:
     def insert_relationship(self, relationship: Dict[str, Any]) -> None:
         """Insert a relationship into the graph if it doesn't already exist."""
         try:
-            edge_collection = self.graph.edge_collection('relationships')
-            
             source_id = relationship['source']['id']
             target_id = relationship['target']['id']
-            edge_key = f"{source_id}_{relationship['type']}_{target_id}"
             
-            if not edge_collection.has(edge_key):
-                edge_collection.insert({
-                    '_key': edge_key,
-                    '_from': f"nodes/{source_id}",
-                    '_to': f"nodes/{target_id}",
-                    'type': relationship['type'],
-                    **(relationship.get('properties') or {})
-                })
-                logger.debug(f"Inserted relationship: {edge_key}")
-                
+            if not self.graph.has_edge(source_id, target_id):
+                properties = relationship.get('properties', {})
+                self.graph.add_edge(
+                    source_id,
+                    target_id,
+                    type=relationship['type'],
+                    **properties
+                )
+                self._save_graph()  # Save after each insertion
+                logger.debug(f"Inserted relationship: {source_id} -> {target_id}")
         except Exception as e:
             logger.error(f"Error inserting relationship: {str(e)}")
             raise
@@ -267,39 +279,26 @@ class GraphConstructor:
             
             logger.info(f"Extracted entities and relationships from {len(documents)} documents")
             
-            # Initialize database connection only when we have data to store
-            if any(doc.nodes or doc.relationships for doc in all_graph_documents):
-                try:
-                    if self.db_client is None:
-                        self.db_client = self._initialize_db_client()
-                    if self.graph is None:
-                        self.graph = self._initialize_graph()
-                        
-                    # Insert all nodes and relationships
-                    for graph_doc in all_graph_documents:
-                        # Insert nodes
-                        if graph_doc.nodes:
-                            for node in graph_doc.nodes:
-                                self.insert_node({
-                                    'id': node.id,
-                                    'type': node.type,
-                                    'properties': node.properties
-                                })
-                        
-                        # Insert relationships
-                        if graph_doc.relationships:
-                            for rel in graph_doc.relationships:
-                                self.insert_relationship({
-                                    'source': {'id': rel.source.id},
-                                    'target': {'id': rel.target.id},
-                                    'type': rel.type,
-                                    'properties': rel.properties
-                                })
-                    
-                    logger.info("Successfully stored graph in database")
-                except Exception as e:
-                    logger.warning(f"Failed to store graph in database: {str(e)}")
-                    logger.info("Continuing with in-memory graph only")
+            # Insert all nodes and relationships
+            for graph_doc in all_graph_documents:
+                # Insert nodes
+                if graph_doc.nodes:
+                    for node in graph_doc.nodes:
+                        self.insert_node({
+                            'id': node.id,
+                            'type': node.type,
+                            'properties': node.properties
+                        })
+                
+                # Insert relationships
+                if graph_doc.relationships:
+                    for rel in graph_doc.relationships:
+                        self.insert_relationship({
+                            'source': {'id': rel.source.id},
+                            'target': {'id': rel.target.id},
+                            'type': rel.type,
+                            'properties': rel.properties
+                        })
             
             logger.info("Completed graph construction")
             
@@ -307,25 +306,36 @@ class GraphConstructor:
             logger.error(f"Error constructing graph: {str(e)}")
             raise
 
-    def query_graph(self, query: str) -> List[Dict[str, Any]]:
+    def query_graph(self, query: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Execute a query on the graph database.
+        Query the graph using NetworkX functions.
         
         Args:
-            query: AQL query string
-            
+            query: Dictionary containing query parameters:
+                  - type: str (query type: 'neighbors', 'shortest_path', 'subgraph', etc.)
+                  - params: Dict (query-specific parameters)
+                  
         Returns:
             List of query results
         """
         try:
-            db = self.db_client.db(
-                self.config['arangodb']['database'],
-                username=self.config['arangodb']['username'],
-                password=self.config['arangodb']['password']
-            )
+            query_type = query.get('type', '')
+            params = query.get('params', {})
             
-            cursor = db.aql.execute(query)
-            results = [doc for doc in cursor]
+            if query_type == 'neighbors':
+                node_id = params.get('node_id')
+                results = list(self.graph.neighbors(node_id))
+            elif query_type == 'shortest_path':
+                source = params.get('source')
+                target = params.get('target')
+                results = nx.shortest_path(self.graph, source, target)
+            elif query_type == 'subgraph':
+                nodes = params.get('nodes', [])
+                subgraph = self.graph.subgraph(nodes)
+                results = [{'nodes': list(subgraph.nodes(data=True)), 
+                          'edges': list(subgraph.edges(data=True))}]
+            else:
+                raise ValueError(f"Unsupported query type: {query_type}")
             
             logger.info(f"Query executed successfully: {len(results)} results")
             return results
