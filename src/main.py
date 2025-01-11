@@ -38,8 +38,18 @@ class HyperRAG:
             # Reset vector store
             embeddings_dir = self.embedding_generator.embeddings_dir
             if os.path.exists(embeddings_dir):
+                # Delete the client first to release the file handle
+                if hasattr(self.embedding_generator.vector_store._client, "close"):
+                    self.embedding_generator.vector_store._client.close()
+                if hasattr(self.embedding_generator.vector_store._client, "persist"):
+                    self.embedding_generator.vector_store._client.persist()
+                # Delete the vector store attribute
+                delattr(self.embedding_generator, 'vector_store')
+                # Now we can safely delete the directory
                 shutil.rmtree(embeddings_dir)
                 os.makedirs(embeddings_dir)
+                # Reinitialize the vector store
+                self.embedding_generator._initialize_vector_store()
                 self.logger.info(f"Reset vector store at {embeddings_dir}")
 
             # Reset graph files

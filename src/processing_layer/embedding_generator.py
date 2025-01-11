@@ -53,11 +53,7 @@ class EmbeddingGenerator:
         self.embedding_function = CustomEmbeddings(self)
         
         # Initialize vector store
-        self.vector_store = Chroma(
-            collection_name="document_embeddings",
-            persist_directory=self.embeddings_dir,
-            embedding_function=self.embedding_function
-        )
+        self._initialize_vector_store()
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
@@ -84,6 +80,18 @@ class EmbeddingGenerator:
             
         except Exception as e:
             logger.error(f"Error initializing model: {str(e)}")
+            raise
+
+    def _initialize_vector_store(self) -> None:
+        """Initialize the vector store."""
+        try:
+            self.vector_store = Chroma(
+                collection_name="document_embeddings",
+                persist_directory=self.embeddings_dir,
+                embedding_function=self.embedding_function
+            )
+        except Exception as e:
+            logger.error(f"Error initializing vector store: {str(e)}")
             raise
 
     def generate_embedding(self, text: str) -> np.ndarray:
@@ -251,9 +259,6 @@ class EmbeddingGenerator:
                 metadatas=metadatas,
                 ids=ids
             )
-            
-            # Persist to disk
-            self.vector_store.persist()
             
             logger.info(f"Saved {len(documents)} embeddings to vector store")
             
