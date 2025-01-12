@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union, cast
 import logging
+import re
 
 from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
 from langchain_core.documents import Document
@@ -21,43 +22,169 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 system_prompt = (
-    "# Knowledge Graph Instructions for GPT-4\n"
-    "## 1. Overview\n"
-    "You are a top-tier algorithm designed for extracting information in structured "
-    "formats to build a knowledge graph.\n"
-    "Try to capture as much information from the text as possible without "
-    "sacrificing accuracy. Do not add any information that is not explicitly "
-    "mentioned in the text.\n"
-    "- **Nodes** represent entities and concepts.\n"
-    "- The aim is to achieve simplicity and clarity in the knowledge graph, making it\n"
-    "accessible for a vast audience.\n"
-    "## 2. Labeling Nodes\n"
-    "- **Consistency**: Ensure you use available types for node labels.\n"
-    "Ensure you use basic or elementary types for node labels.\n"
-    "- For example, when you identify an entity representing a person, "
-    "always label it as **'person'**. Avoid using more specific terms "
-    "like 'mathematician' or 'scientist'."
-    "- **Node IDs**: Never utilize integers as node IDs. Node IDs should be "
-    "names or human-readable identifiers found in the text.\n"
-    "- **Relationships** represent connections between entities or concepts.\n"
-    "Ensure consistency and generality in relationship types when constructing "
-    "knowledge graphs. Instead of using specific and momentary types "
-    "such as 'BECAME_PROFESSOR', use more general and timeless relationship types "
-    "like 'PROFESSOR'. Make sure to use general and timeless relationship types!\n"
-    "## 3. Coreference Resolution\n"
-    "- **Maintain Entity Consistency**: When extracting entities, it's vital to "
-    "ensure consistency.\n"
-    'If an entity, such as "John Doe", is mentioned multiple times in the text '
-    'but is referred to by different names or pronouns (e.g., "Joe", "he"),'
-    "always use the most complete identifier for that entity throughout the "
-    'knowledge graph. In this example, use "John Doe" as the entity ID.\n'
-    "Remember, the knowledge graph should be coherent and easily understandable, "
-    "so maintaining consistency in entity references is crucial.\n"
-    "## 4. Strict Compliance\n"
-    "Adhere to the rules strictly. Non-compliance will result in termination.\n\n"
-    "Format your response as a list of JSON objects with 'head', 'head_type', "
-    "'relation', 'tail', and 'tail_type' fields."
+    "## Updated Knowledge Graph Instructions\n\n"
+    "You are a **precise JSON generator** for knowledge graph construction. Your task is to:\n\n"
+    "1. **Extract entities** and **relationships** from the provided text.\n"
+    "2. **Format** them as **valid JSON objects**.\n"
+    "3. **Preserve** exact multi-word entity names (e.g., \"Nelson Mandela\", \"United Nations\").\n"
+    "4. **Ensure proper JSON syntax** with commas, quotes, and brackets.\n\n"
+    "### Output Format\n\n"
+    "- Return a **JSON array** of objects (`[...]`).\n"
+    "- Each object must have the following **5 fields**:\n"
+    "  1. `\"head\"`: Source entity (string)\n"
+    "  2. `\"head_type\"`: Type of source entity (string)\n"
+    "  3. `\"relation\"`: Relationship type in **UPPER_CASE** (string)\n"
+    "  4. `\"tail\"`: Target entity (string)\n"
+    "  5. `\"tail_type\"`: Type of target entity (string)\n\n"
+    "#### Example\n\n"
+    "[{\"head\":\"John\",\"head_type\":\"Person\",\"relation\":\"WORKS_FOR\",\"tail\":\"Microsoft\",\"tail_type\":\"Organization\"},"
+    "{\"head\":\"Microsoft\",\"head_type\":\"Organization\",\"relation\":\"LOCATED_IN\",\"tail\":\"Seattle\",\"tail_type\":\"Location\"}]\n\n"
+    "### Rules\n\n"
+    "1. **Extract only explicitly stated information** (no assumptions or inferences).\n"
+    "2. **Format your response as a SINGLE LINE** of valid JSON with **NO WHITESPACE** between properties, arrays, or objects.\n"
+    "3. **Include commas between ALL properties** within an object and **between ALL objects** in the array.\n"
+    "4. **Retain multi-word entities** exactly as they appear in the text (e.g., `\"The United Nations\"` → `\"head\":\"The United Nations\"`).\n"
+    "5. **Each property must be in the format `\"key\":\"value\"`** with a colon between them (e.g., `\"relation\":\"LOCATED_IN\"`).\n\n"
+    "### Example of Handling Multi-Word Entities\n\n"
+    "If the text says:\n"
+    "> \"Nelson Mandela led the African National Congress during the 1990s.\"\n\n"
+    "You should produce something like:\n"
+    "[{\"head\":\"Nelson Mandela\",\"head_type\":\"Person\",\"relation\":\"LEADS\",\"tail\":\"African National Congress\",\"tail_type\":\"Organization\"}]"
 )
+
+# Enhanced user prompt template
+user_prompt_template = (
+    "Extract entities and relationships from the following text as a SINGLE LINE of valid JSON array with NO WHITESPACE between properties:\n\n"
+    "{text}\n\n"
+    "Remember:\n"
+    "1. Extract only explicitly stated information - no assumptions or inferences\n"
+    "2. Preserve exact multi-word entities as they appear in the text\n"
+    "3. Ensure valid JSON with commas between ALL properties and objects\n"
+)
+
+def extract_objects(text: str) -> List[Dict[str, str]]:
+    """Extract objects from text using regex patterns."""
+    objects = []
+    # Match each object's content between curly braces
+    for obj_match in re.finditer(r'{[^}]+}', text):
+        obj_text = obj_match.group(0)
+        # Extract key-value pairs
+        pairs = {}
+        
+        # First pass: Look for standard key-value pairs with colons
+        # Format: "key":"value" (including values with spaces)
+        for pair_match in re.finditer(r'"(\w+)":"([^"]+)"', obj_text):
+            key, value = pair_match.groups()
+            pairs[key] = value
+            
+        # Second pass: Look for pairs with double quotes
+        # Format: "key""value" (including values with spaces)
+        if len(pairs) < 5:  # Only if we haven't found all pairs yet
+            # First try to split by double quotes and colons
+            parts = re.findall(r'"([^"]+)(?:":"|\s*"")([^"]+)"', obj_text)
+            for key, value in parts:
+                if key and value and key not in pairs:
+                    pairs[key] = value
+            
+            # If still missing pairs, try more aggressive parsing
+            if len(pairs) < 5:
+                # Remove curly braces and split by double quotes
+                clean_text = obj_text.strip('{}')
+                parts = clean_text.split('"')
+                # Filter out empty strings and process pairs
+                parts = [p for p in parts if p and not p.isspace()]
+                for i in range(0, len(parts)-1, 2):
+                    if i+1 < len(parts):
+                        key = parts[i]
+                        value = parts[i+1]
+                        if key and value and key not in pairs:
+                            pairs[key] = value
+        
+        # If we found all required fields, add the object
+        if all(k in pairs for k in ['head', 'head_type', 'relation', 'tail', 'tail_type']):
+            objects.append(pairs)
+            logger.debug(f"Extracted object: {pairs}")
+        else:
+            logger.warning(f"Skipping incomplete object, found keys: {list(pairs.keys())}")
+    
+    return objects
+
+def repair_json(text: str) -> str:
+    """Repair common JSON formatting issues."""
+    # Extract just the JSON array part
+    start = text.find('[')
+    end = text.rfind(']') + 1
+    if start == -1 or end == 0:
+        raise ValueError("No JSON array found in text")
+    text = text[start:end]
+    
+    # Remove all whitespace except within quotes
+    text = re.sub(r'\s+(?=(?:[^"]*"[^"]*")*[^"]*$)', '', text)
+    
+    # First pass: Fix property separators
+    # Convert "head""head_type" to "head","head_type"
+    text = re.sub(r'"([^"]+)""([^"]+)"', r'"\1","\2"', text)
+    
+    # Second pass: Fix property-value pairs
+    # Convert "head_type""Event" to "head_type":"Event"
+    text = re.sub(r'"(\w+)"(?!:)"([^"]+)"', r'"\1":"\2"', text)
+    
+    # Third pass: Fix any remaining issues
+    # Add missing commas between objects
+    text = re.sub(r'}{', '},{', text)
+    # Remove any extra commas at the start of objects
+    text = re.sub(r'{,', '{', text)
+    # Remove any trailing commas before closing brackets
+    text = re.sub(r',\s*([}\]])', r'\1', text)
+    
+    try:
+        # Try to parse the JSON
+        data = json.loads(text)
+        return json.dumps(data, indent=4)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parsing error: {str(e)}")
+        logger.error(f"Problematic JSON: {text}")
+        # If parsing fails, try to extract objects manually
+        objects = extract_objects(text)
+        if objects:
+            return json.dumps(objects, indent=4)
+        else:
+            raise ValueError("Failed to parse JSON")
+
+def process_json_response(raw_response: str) -> List[Dict[str, str]]:
+    """Process raw JSON response from LLM."""
+    # First try to extract objects directly
+    objects = extract_objects(raw_response)
+    if objects:
+        # Add commas between properties if missing
+        processed_objects = []
+        for obj in objects:
+            processed_obj = {}
+            for key, value in obj.items():
+                # Clean up any remaining formatting issues
+                key = key.strip().strip('"')
+                value = value.strip().strip('"')
+                processed_obj[key] = value
+            if all(k in processed_obj for k in ['head', 'head_type', 'relation', 'tail', 'tail_type']):
+                processed_objects.append(processed_obj)
+                logger.debug(f"Processed object: {processed_obj}")
+        
+        if processed_objects:
+            logger.debug(f"Successfully processed {len(processed_objects)} objects")
+            return processed_objects
+    
+    # If direct extraction fails, try repairing the JSON
+    try:
+        repaired_json = repair_json(raw_response)
+        parsed_json = json.loads(repaired_json)
+        if isinstance(parsed_json, dict):
+            logger.debug("Parsed single JSON object")
+            return [parsed_json]
+        logger.debug(f"Parsed {len(parsed_json)} JSON objects")
+        return parsed_json
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to parse JSON: {str(e)}")
+        return []
 
 class LLMGraphTransformer:
     """Transform documents into graph-based documents using a LLM."""
@@ -76,14 +203,14 @@ class LLMGraphTransformer:
         self.llm = llm
         self.allowed_nodes = allowed_nodes
         self.allowed_relationships = allowed_relationships
-        self.strict_mode = strict_mode
+        self.strict_mode = False  # Always disable strict mode to allow all types
         self._function_call = not ignore_tool_usage
         
         # Add logging for initialization
         logger.info("Initializing LLMGraphTransformer")
         logger.info(f"Allowed nodes: {allowed_nodes}")
         logger.info(f"Allowed relationships: {allowed_relationships}")
-        logger.info(f"Strict mode: {strict_mode}")
+        logger.info(f"Strict mode: {self.strict_mode}")
         logger.info(f"Function call mode: {self._function_call}")
 
     def process_response(
@@ -98,7 +225,7 @@ class LLMGraphTransformer:
             # Get raw model response using get_completion
             if hasattr(self.llm, 'client'):
                 response = self.llm.client.get_completion(
-                    prompt=f"Extract entities and relationships from the following text:\n\n{text}",
+                    prompt=user_prompt_template.format(text=text),
                     system_prompt=system_prompt,
                     temperature=0.0,  # Use deterministic output for extraction
                     max_tokens=2000  # Allow longer responses for complex graphs
@@ -106,7 +233,7 @@ class LLMGraphTransformer:
                 raw_response = response.get('content', '')
             else:
                 # Fallback to standard predict
-                raw_response = self.llm.predict(text=f"{system_prompt}\n\nExtract entities and relationships from the following text:\n\n{text}")
+                raw_response = self.llm.predict(text=f"{system_prompt}\n\n{user_prompt_template.format(text=text)}")
             
             # Log raw response
             logger.info("Raw model response:")
@@ -117,45 +244,62 @@ class LLMGraphTransformer:
             # Extract nodes and relationships
             nodes = []
             relationships = []
+            node_map = {}  # Keep track of created nodes to avoid duplicates
             
             try:
-                # Parse the response
-                if isinstance(raw_response, str):
-                    # Try to parse as JSON
-                    parsed_json = json.loads(raw_response)
-                    if isinstance(parsed_json, dict):
-                        parsed_json = [parsed_json]
-                else:
-                    # Handle structured output
-                    parsed_json = raw_response
+                # Process the JSON response
+                objects = process_json_response(raw_response)
                 
                 # Log parsed structure
                 logger.info("Parsed structure:")
-                logger.info(json.dumps(parsed_json, indent=2))
+                logger.info(json.dumps(objects, indent=2))
                 
                 # Extract nodes and relationships
-                for item in parsed_json:
-                    # Create nodes
-                    head_node = Node(
-                        id=item.get('head'),
-                        type=item.get('head_type'),
-                        properties={'source': document.metadata.get('source')}
-                    )
-                    tail_node = Node(
-                        id=item.get('tail'),
-                        type=item.get('tail_type'),
-                        properties={'source': document.metadata.get('source')}
-                    )
-                    nodes.extend([head_node, tail_node])
+                for item in objects:
+                    # Skip if required fields are missing
+                    if not all(k in item for k in ['head', 'head_type', 'relation', 'tail', 'tail_type']):
+                        logger.warning(f"Skipping incomplete object: {item}")
+                        continue
+                    
+                    # Create or get head node
+                    head_id = item['head']
+                    if head_id not in node_map:
+                        head_node = Node(
+                            id=head_id,
+                            type=item['head_type'],
+                            properties={'source': document.metadata.get('source')}
+                        )
+                        nodes.append(head_node)
+                        node_map[head_id] = head_node
+                        logger.debug(f"Created head node: {head_id}")
+                    else:
+                        head_node = node_map[head_id]
+                        logger.debug(f"Using existing head node: {head_id}")
+                    
+                    # Create or get tail node
+                    tail_id = item['tail']
+                    if tail_id not in node_map:
+                        tail_node = Node(
+                            id=tail_id,
+                            type=item['tail_type'],
+                            properties={'source': document.metadata.get('source')}
+                        )
+                        nodes.append(tail_node)
+                        node_map[tail_id] = tail_node
+                        logger.debug(f"Created tail node: {tail_id}")
+                    else:
+                        tail_node = node_map[tail_id]
+                        logger.debug(f"Using existing tail node: {tail_id}")
                     
                     # Create relationship
                     relationship = Relationship(
                         source=head_node,
                         target=tail_node,
-                        type=item.get('relation'),
+                        type=item['relation'],
                         properties={'source': document.metadata.get('source')}
                     )
                     relationships.append(relationship)
+                    logger.debug(f"Created relationship: {head_id} -{item['relation']}-> {tail_id}")
                 
                 # Log extraction results
                 logger.info(f"Extracted {len(nodes)} nodes and {len(relationships)} relationships")
@@ -210,7 +354,7 @@ class LLMGraphTransformer:
             if hasattr(self.llm, 'client'):
                 # Note: OpenRouter client doesn't have async methods yet
                 response = self.llm.client.get_completion(
-                    prompt=f"Extract entities and relationships from the following text:\n\n{text}",
+                    prompt=user_prompt_template.format(text=text),
                     system_prompt=system_prompt,
                     temperature=0.0,
                     max_tokens=2000
@@ -218,7 +362,7 @@ class LLMGraphTransformer:
                 raw_response = response.get('content', '')
             else:
                 # Fallback to standard apredict
-                raw_response = await self.llm.apredict(text=f"{system_prompt}\n\nExtract entities and relationships from the following text:\n\n{text}")
+                raw_response = await self.llm.apredict(text=f"{system_prompt}\n\n{user_prompt_template.format(text=text)}")
             
             # Log raw response
             logger.info("Raw model response (async):")
@@ -229,37 +373,58 @@ class LLMGraphTransformer:
             # Extract nodes and relationships (similar to sync version)
             nodes = []
             relationships = []
+            node_map = {}  # Keep track of created nodes to avoid duplicates
             
             try:
-                # Parse the response
-                if isinstance(raw_response, str):
-                    parsed_json = json.loads(raw_response)
-                    if isinstance(parsed_json, dict):
-                        parsed_json = [parsed_json]
-                else:
-                    parsed_json = raw_response
+                # Process the JSON response
+                objects = process_json_response(raw_response)
                 
                 # Extract nodes and relationships
-                for item in parsed_json:
-                    head_node = Node(
-                        id=item.get('head'),
-                        type=item.get('head_type'),
-                        properties={'source': document.metadata.get('source')}
-                    )
-                    tail_node = Node(
-                        id=item.get('tail'),
-                        type=item.get('tail_type'),
-                        properties={'source': document.metadata.get('source')}
-                    )
-                    nodes.extend([head_node, tail_node])
+                for item in objects:
+                    # Skip if required fields are missing
+                    if not all(k in item for k in ['head', 'head_type', 'relation', 'tail', 'tail_type']):
+                        logger.warning(f"Skipping incomplete object: {item}")
+                        continue
                     
+                    # Create or get head node
+                    head_id = item['head']
+                    if head_id not in node_map:
+                        head_node = Node(
+                            id=head_id,
+                            type=item['head_type'],
+                            properties={'source': document.metadata.get('source')}
+                        )
+                        nodes.append(head_node)
+                        node_map[head_id] = head_node
+                        logger.debug(f"Created head node: {head_id}")
+                    else:
+                        head_node = node_map[head_id]
+                        logger.debug(f"Using existing head node: {head_id}")
+                    
+                    # Create or get tail node
+                    tail_id = item['tail']
+                    if tail_id not in node_map:
+                        tail_node = Node(
+                            id=tail_id,
+                            type=item['tail_type'],
+                            properties={'source': document.metadata.get('source')}
+                        )
+                        nodes.append(tail_node)
+                        node_map[tail_id] = tail_node
+                        logger.debug(f"Created tail node: {tail_id}")
+                    else:
+                        tail_node = node_map[tail_id]
+                        logger.debug(f"Using existing tail node: {tail_id}")
+                    
+                    # Create relationship
                     relationship = Relationship(
                         source=head_node,
                         target=tail_node,
-                        type=item.get('relation'),
+                        type=item['relation'],
                         properties={'source': document.metadata.get('source')}
                     )
                     relationships.append(relationship)
+                    logger.debug(f"Created relationship: {head_id} -{item['relation']}-> {tail_id}")
                 
             except Exception as e:
                 logger.error(f"Error parsing async model response: {str(e)}")

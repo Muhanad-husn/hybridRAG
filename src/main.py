@@ -1,12 +1,13 @@
 import os
 import logging
 import shutil
+import pandas as pd
 from typing import List, Dict, Any, Optional
-from .input_layer.document_processor import DocumentProcessor
-from .processing_layer.embedding_generator import EmbeddingGenerator
-from .processing_layer.graph_constructor import GraphConstructor
-from .retrieval_layer.hybrid_retrieval import HybridRetrieval
-from .utils.logger import setup_logger
+from src.input_layer.document_processor import DocumentProcessor
+from src.processing_layer.embedding_generator import EmbeddingGenerator
+from src.processing_layer.graph_constructor import GraphConstructor
+from src.retrieval_layer.hybrid_retrieval import HybridRetrieval
+from src.utils.logger import setup_logger
 
 class HyperRAG:
     """Main class for the Hyper RAG system."""
@@ -44,12 +45,16 @@ class HyperRAG:
                 raise
 
             # Reset graph files
-            if self.graph_constructor is not None:
-                graphs_dir = os.path.join('data', 'graphs')
-                if os.path.exists(graphs_dir):
-                    shutil.rmtree(graphs_dir)
-                    os.makedirs(graphs_dir)
-                    self.logger.info(f"Reset graph files at {graphs_dir}")
+            graphs_dir = os.path.join('data', 'graphs')
+            if os.path.exists(graphs_dir):
+                shutil.rmtree(graphs_dir)
+            os.makedirs(graphs_dir)
+            # Initialize empty CSV files with headers
+            nodes_file = os.path.join(graphs_dir, 'nodes.csv')
+            edges_file = os.path.join(graphs_dir, 'edges.csv')
+            pd.DataFrame(columns=['id', 'type', 'properties']).to_csv(nodes_file, index=False)
+            pd.DataFrame(columns=['source_id', 'target_id', 'type', 'properties']).to_csv(edges_file, index=False)
+            self.logger.info(f"Reset and initialized graph files at {graphs_dir}")
 
             # Reset processed chunks
             chunks_dir = os.path.join('data', 'processed_chunks')
@@ -79,9 +84,6 @@ class HyperRAG:
         """
         try:
             self.logger.info(f"Processing documents from {input_dir}")
-            
-            # Reset storage before processing
-            self.reset_storage()
             
             # Process documents
             documents = self.document_processor.process_directory(input_dir)
@@ -162,18 +164,6 @@ class HyperRAG:
             self.logger.error(f"Error processing query: {str(e)}")
             raise
 
-    def clear_graph(self) -> None:
-        """Clear the knowledge graph."""
-        try:
-            if self.graph_constructor is not None:
-                self.graph_constructor.clear_graph()
-                self.logger.info("Knowledge graph cleared successfully")
-            else:
-                self.logger.warning("No graph constructor available to clear")
-        except Exception as e:
-            logger.error(f"Error clearing graph: {str(e)}")
-            raise
-
 def format_result(result: Dict[str, Any]) -> str:
     """Format a single search result for display."""
     if isinstance(result, tuple):
@@ -237,35 +227,40 @@ def format_result(result: Dict[str, Any]) -> str:
 def main():
     """Main entry point for the application."""
     try:
+        # Setup logging
+        setup_logger()
+        logger = logging.getLogger(__name__)
+        
         # Initialize the system
         rag_system = HyperRAG()
+        
+        # Reset storage to clear existing state
+        rag_system.reset_storage()
+        logger.info("Reset storage to clear existing state")
         
         # Example usage
         input_dir = os.path.join("data", "raw_documents")
         
-        # Process documents
+        # Process documents (this will trigger LLM extraction and graph construction)
         rag_system.process_documents(
             input_dir=input_dir,
             save_chunks=True,
             save_embeddings=True
         )
         
-        # Test queries
-        queries = [
-            "What were the key factors that escalated the peaceful demonstrations in Syria into a full-scale armed conflict?",
-            "How has the Syrian Civil War impacted the displacement of people both internally and internationally?",
-            "What role has Russia played in shaping the dynamics of the Syrian Civil War, and how did its intervention affect the conflict?"
-        ]
+        # Test query
+        query = "What were the key factors that escalated the peaceful demonstrations in Syria into a full-scale armed conflict?"
         
-        # Process each query
-        for i, query in enumerate(queries, 1):
-            print(f"\nQuery {i}:")
-            print(query)
-            print("\nResults:")
+        print(f"\nQuery:")
+        print(query)
+        
+        # Try both modes for comparison
+        for mode in ["Dense", "Hybrid"]:
+            print(f"\n{mode} Search Results:")
             
             results = rag_system.query(
                 query=query,
-                mode="Hybrid",
+                mode=mode,
                 top_k=5  # Limit to top 5 most relevant results
             )
             
@@ -275,7 +270,7 @@ def main():
                 print(format_result(result))
                 print("-" * 80)  # Add separator between results
             
-            print("\n" + "=" * 100 + "\n")  # Add separator between queries
+            print("=" * 100)  # Add separator between modes
         
     except Exception as e:
         logging.error(f"Application error: {str(e)}")

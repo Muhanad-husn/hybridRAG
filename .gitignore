@@ -44,6 +44,7 @@ ENV/
 data/embeddings/
 data/processed_chunks/
 data/graphs/
+data/cache/
 models/
 
 # OS-specific
@@ -57,3 +58,4 @@ logs/
 config/*.yaml
 !config/config.yaml.example
 !config/translation_config.yaml.example
+src/processing_layer/graph_constructor.py.bak

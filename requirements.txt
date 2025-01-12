@@ -21,6 +21,7 @@ fastembed==0.5.0
 # Graph Processing
 networkx==3.2.1
 pandas==2.1.4
+scikit-learn==1.4.0
 
 # Ranking and Reranking
 flashrank==0.2.10

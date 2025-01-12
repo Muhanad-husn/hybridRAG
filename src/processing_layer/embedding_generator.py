@@ -2,10 +2,12 @@ import os
 import yaml
 import torch
 import numpy as np
+import faiss
 from typing import List, Dict, Union, Optional
 from transformers import AutoTokenizer, AutoModel
 from langchain.schema import Document
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
+from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_core.embeddings import Embeddings
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -85,20 +87,33 @@ class EmbeddingGenerator:
     def _initialize_vector_store(self) -> None:
         """Initialize the vector store."""
         try:
-            # Create a new Chroma client with a fixed collection name
-            self.vector_store = Chroma(
-                collection_name="hybrid_rag_embeddings",  # Use a fixed name
-                persist_directory=self.embeddings_dir,
-                embedding_function=self.embedding_function
-            )
+            # Set up storage directory
+            embeddings_dir = os.path.join('data', 'embeddings')
+            os.makedirs(embeddings_dir, exist_ok=True)
+            self.index_path = os.path.join(embeddings_dir, 'index.faiss')
+            self.docstore_path = os.path.join(embeddings_dir, 'docstore.json')
             
-            # Get all existing document IDs
-            if hasattr(self.vector_store._collection, "count") and self.vector_store._collection.count() > 0:
-                # Get all document IDs directly from collection
-                collection_data = self.vector_store._collection.get()
-                if 'ids' in collection_data and collection_data['ids']:
-                    # Delete all existing documents
-                    self.vector_store._collection.delete(ids=collection_data['ids'])
+            # Try to load existing index, or create new one if it doesn't exist
+            if os.path.exists(self.index_path):
+                logger.info(f"Loading existing FAISS index from {embeddings_dir}")
+                self.vector_store = FAISS.load_local(
+                    embeddings_dir,
+                    self.embedding_function,
+                    allow_dangerous_deserialization=True
+                )
+            else:
+                logger.info("Creating new FAISS index")
+                # Create new empty FAISS index
+                dimension = 384  # GTE-small embedding dimension
+                index = faiss.IndexFlatIP(dimension)
+                
+                # Create new FAISS vector store
+                self.vector_store = FAISS(
+                    embedding_function=self.embedding_function,
+                    index=index,
+                    docstore=InMemoryDocstore({}),
+                    index_to_docstore_id={}
+                )
             
             logger.info("Vector store initialized successfully")
         except Exception as e:
@@ -106,20 +121,31 @@ class EmbeddingGenerator:
             raise
 
     def reset_vector_store(self) -> None:
-        """Reset the vector store by clearing all documents."""
+        """Reset the vector store by creating a new empty FAISS index."""
         try:
-            # Get all existing document IDs
-            if hasattr(self.vector_store._collection, "count") and self.vector_store._collection.count() > 0:
-                # Get all document IDs directly from collection
-                collection_data = self.vector_store._collection.get()
-                if 'ids' in collection_data and collection_data['ids']:
-                    # Delete all existing documents
-                    self.vector_store._collection.delete(ids=collection_data['ids'])
+            # Set up storage directory
+            embeddings_dir = os.path.join('data', 'embeddings')
+            os.makedirs(embeddings_dir, exist_ok=True)
+            self.index_path = os.path.join(embeddings_dir, 'index.faiss')
+            self.docstore_path = os.path.join(embeddings_dir, 'docstore.json')
+            
+            # Create new empty FAISS index
+            dimension = 384  # GTE-small embedding dimension
+            index = faiss.IndexFlatIP(dimension)
+            
+            # Create new FAISS vector store and save it
+            self.vector_store = FAISS(
+                embedding_function=self.embedding_function,
+                index=index,
+                docstore=InMemoryDocstore({}),
+                index_to_docstore_id={}
+            )
+            self.vector_store.save_local(embeddings_dir)
+            
             logger.info("Vector store reset successfully")
         except Exception as e:
             logger.error(f"Error resetting vector store: {str(e)}")
             raise
-
     def generate_embedding(self, text: str) -> np.ndarray:
         """
         Generate embedding for a single text input.
@@ -131,6 +157,79 @@ class EmbeddingGenerator:
             numpy array containing the embedding
         """
         try:
+            # Tokenize text
+            inputs = self.tokenizer(
+                text,
+                padding=True,
+                truncation=True,
+                max_length=512,
+                return_tensors="pt"
+            ).to(self.device)
+            
+            # Generate embeddings
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                embeddings = outputs.last_hidden_state.mean(dim=1)
+            
+            # Convert to numpy and normalize
+            embedding = embeddings[0].cpu().numpy()
+            embedding = embedding / np.linalg.norm(embedding)
+            
+            return embedding
+            
+        except Exception as e:
+            logger.error(f"Error generating embedding: {str(e)}")
+            raise
+            
+    def process_documents(self, documents: List[Document]) -> List[Document]:
+        """Process documents to add embeddings to metadata."""
+        try:
+            processed_docs = []
+            # Generate embeddings for each document
+            for doc in documents:
+                embedding = self.generate_embedding(doc.page_content)
+                doc.metadata['embedding'] = embedding.tolist()  # Convert numpy array to list for JSON serialization
+                processed_docs.append(doc)
+            return processed_docs
+        except Exception as e:
+            logger.error(f"Error processing documents: {str(e)}")
+            raise
+            
+        except Exception as e:
+            logger.error(f"Error generating embedding: {str(e)}")
+            raise
+            
+    def save_embeddings(self, documents: List[Document]) -> None:
+        """Save document embeddings to vector store and persist to disk."""
+        try:
+            # Add documents to vector store
+            self.vector_store.add_documents(documents)
+            
+            # Save the updated index to disk
+            embeddings_dir = os.path.join('data', 'embeddings')
+            self.vector_store.save_local(embeddings_dir)
+            
+            logger.info("Saved embeddings to vector store and persisted to disk")
+        except Exception as e:
+            logger.error(f"Error saving embeddings: {str(e)}")
+            raise
+            # Implementation remains the same
+            pass
+            
+    def save_embeddings(self, documents: List[Document]) -> None:
+        """Save document embeddings to vector store and persist to disk."""
+        try:
+            # Add documents to vector store
+            self.vector_store.add_documents(documents)
+            
+            # Save the updated index to disk
+            embeddings_dir = os.path.join('data', 'embeddings')
+            self.vector_store.save_local(embeddings_dir)
+            
+            logger.info("Saved embeddings to vector store and persisted to disk")
+        except Exception as e:
+            logger.error(f"Error saving embeddings: {str(e)}")
+            raise
             # Tokenize the input text
             inputs = self.tokenizer(
                 text,
