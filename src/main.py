@@ -1,13 +1,14 @@
 import os
 import logging
 import shutil
-import pandas as pd
-from typing import List, Dict, Any, Optional
+from typing import Optional, Any, Dict, List
 from src.input_layer.document_processor import DocumentProcessor
 from src.processing_layer.embedding_generator import EmbeddingGenerator
 from src.processing_layer.graph_constructor import GraphConstructor
 from src.retrieval_layer.hybrid_retrieval import HybridRetrieval
 from src.utils.logger import setup_logger
+from src.utils.error_handler import log_errors
+from src.utils.formatter import format_result
 
 class HyperRAG:
     """Main class for the Hyper RAG system."""
@@ -33,41 +34,43 @@ class HyperRAG:
         
         self.logger.info("Hyper RAG system initialized")
 
+    @log_errors(logging.getLogger(__name__))
     def reset_storage(self) -> None:
         """Reset all storage (vector store and graph files)."""
-        try:
-            # Reset vector store
-            try:
-                self.embedding_generator.reset_vector_store()
-                self.logger.info("Reset vector store")
-            except Exception as e:
-                self.logger.error(f"Error resetting vector store: {str(e)}")
-                raise
+        # Reset vector store
+        self.embedding_generator.reset_vector_store()
+        self.logger.info("Reset vector store")
 
-            # Reset graph files
-            graphs_dir = os.path.join('data', 'graphs')
-            if os.path.exists(graphs_dir):
-                shutil.rmtree(graphs_dir)
-            os.makedirs(graphs_dir)
-            # Initialize empty CSV files with headers
-            nodes_file = os.path.join(graphs_dir, 'nodes.csv')
-            edges_file = os.path.join(graphs_dir, 'edges.csv')
-            pd.DataFrame(columns=['id', 'type', 'properties']).to_csv(nodes_file, index=False)
-            pd.DataFrame(columns=['source_id', 'target_id', 'type', 'properties']).to_csv(edges_file, index=False)
-            self.logger.info(f"Reset and initialized graph files at {graphs_dir}")
+        # Reset graph files
+        graphs_dir = os.path.join('data', 'graphs')
+        if os.path.exists(graphs_dir):
+            shutil.rmtree(graphs_dir)
+        os.makedirs(graphs_dir)
+        
+        # Initialize empty CSV files
+        self._initialize_graph_files(graphs_dir)
+        self.logger.info(f"Reset and initialized graph files at {graphs_dir}")
 
-            # Reset processed chunks
-            chunks_dir = os.path.join('data', 'processed_chunks')
-            if os.path.exists(chunks_dir):
-                shutil.rmtree(chunks_dir)
-                os.makedirs(chunks_dir)
-                self.logger.info(f"Reset processed chunks at {chunks_dir}")
+        # Reset processed chunks
+        chunks_dir = os.path.join('data', 'processed_chunks')
+        if os.path.exists(chunks_dir):
+            shutil.rmtree(chunks_dir)
+            os.makedirs(chunks_dir)
+            self.logger.info(f"Reset processed chunks at {chunks_dir}")
 
-            self.logger.info("Storage reset completed")
-        except Exception as e:
-            self.logger.error(f"Error resetting storage: {str(e)}")
-            raise
+        self.logger.info("Storage reset completed")
 
+    def _initialize_graph_files(self, graphs_dir: str) -> None:
+        """Initialize empty graph files."""
+        nodes_file = os.path.join(graphs_dir, 'nodes.csv')
+        edges_file = os.path.join(graphs_dir, 'edges.csv')
+        
+        with open(nodes_file, 'w') as f:
+            f.write('id,type,properties\n')
+        with open(edges_file, 'w') as f:
+            f.write('source_id,target_id,type,properties\n')
+
+    @log_errors(logging.getLogger(__name__))
     def process_documents(
         self,
         input_dir: str,
@@ -82,49 +85,45 @@ class HyperRAG:
             save_chunks: Whether to save processed chunks
             save_embeddings: Whether to save generated embeddings
         """
-        try:
-            self.logger.info(f"Processing documents from {input_dir}")
+        self.logger.info(f"Processing documents from {input_dir}")
+        
+        # Process documents
+        documents = self.document_processor.process_directory(input_dir)
+        if not documents:
+            raise ValueError("No documents were processed successfully")
+        
+        # Save chunks if requested
+        if save_chunks:
+            output_dir = os.path.join("data", "processed_chunks")
+            self.document_processor.save_processed_chunks(documents, output_dir)
+        
+        # Generate embeddings
+        documents = self.embedding_generator.process_documents(documents)
+        
+        # Save embeddings if requested
+        if save_embeddings:
+            self.embedding_generator.save_embeddings(documents)
+        
+        # Construct knowledge graph if available
+        if self.graph_constructor is not None:
+            try:
+                self.graph_constructor.construct_graph(documents)
+            except Exception as e:
+                self.logger.warning(f"Graph construction failed: {str(e)}")
             
-            # Process documents
-            documents = self.document_processor.process_directory(input_dir)
-            if not documents:
-                raise ValueError("No documents were processed successfully")
-            
-            # Save chunks if requested
-            if save_chunks:
-                output_dir = os.path.join("data", "processed_chunks")
-                self.document_processor.save_processed_chunks(documents, output_dir)
-            
-            # Generate embeddings
-            documents = self.embedding_generator.process_documents(documents)
-            
-            # Save embeddings if requested
-            if save_embeddings:
-                self.embedding_generator.save_embeddings(documents)
-            
-            # Construct knowledge graph if available
-            if self.graph_constructor is not None:
-                try:
-                    self.graph_constructor.construct_graph(documents)
-                except Exception as e:
-                    self.logger.warning(f"Graph construction failed: {str(e)}")
-                
-            # Build retrieval index (always required)
-            self.retrieval_system.build_index(documents)
-            
-            self.logger.info("Document processing completed successfully")
-            
-        except Exception as e:
-            self.logger.error(f"Error processing documents: {str(e)}")
-            raise
+        # Build retrieval index
+        self.retrieval_system.build_index(documents)
+        
+        self.logger.info("Document processing completed successfully")
 
+    @log_errors(logging.getLogger(__name__))
     def query(
         self,
         query: str,
         mode: str = "Hybrid",
         top_k: int = 100,
         rerank_top_k: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Query the system using the specified mode.
         
@@ -137,92 +136,29 @@ class HyperRAG:
         Returns:
             List of search results
         """
-        try:
-            self.logger.info(f"Processing query: {query}")
+        self.logger.info(f"Processing query: {query}")
+        
+        # Generate query embedding
+        query_embedding = self.embedding_generator.generate_embedding(query)
+        
+        # Determine actual search mode
+        actual_mode = mode if self.graph_constructor is not None else "Dense"
+        if actual_mode != mode:
+            self.logger.warning(f"Falling back to {actual_mode} mode as graph is not available")
             
-            # Generate query embedding
-            query_embedding = self.embedding_generator.generate_embedding(query)
-            
-            # Perform search (hybrid if graph is available, dense otherwise)
-            actual_mode = mode if self.graph_constructor is not None else "Dense"
-            if actual_mode != mode:
-                self.logger.warning(f"Falling back to {actual_mode} mode as graph is not available")
-                
-            results = self.retrieval_system.hybrid_search(
-                query=query,
-                query_embedding=query_embedding,
-                graph=self.graph_constructor,
-                top_k=top_k,
-                rerank_top_k=rerank_top_k,
-                mode=actual_mode
-            )
-            
-            self.logger.info(f"Query processed successfully, found {len(results)} results")
-            return results
-            
-        except Exception as e:
-            self.logger.error(f"Error processing query: {str(e)}")
-            raise
+        # Perform search
+        results = self.retrieval_system.hybrid_search(
+            query=query,
+            query_embedding=query_embedding,
+            graph=self.graph_constructor,
+            top_k=top_k,
+            rerank_top_k=rerank_top_k,
+            mode=actual_mode
+        )
+        
+        self.logger.info(f"Query processed successfully, found {len(results)} results")
+        return results
 
-def format_result(result: Dict[str, Any]) -> str:
-    """Format a single search result for display."""
-    if isinstance(result, tuple):
-        # Handle document results from similarity search
-        doc, score = result
-        return (
-            f"Document Chunk:\n"
-            f"Content: {doc.page_content.strip()[:500]}...\n"
-            f"Source: {doc.metadata.get('source', 'unknown')}\n"
-            f"Relevance: {score:.4f}"
-        )
-    elif 'node' in result:
-        # Handle graph search results
-        node = result['node']
-        edges = result['edges']
-        
-        # Format node properties
-        properties = node.get('properties', {})
-        if isinstance(properties, str):
-            # If properties is a string (e.g., from JSON), clean it up
-            properties = properties.replace('{', '').replace('}', '').replace('"', '')
-        property_text = ', '.join(f"{k}: {v}" for k, v in properties.items() if k != 'source')
-        
-        # Format edges
-        edge_info = []
-        for edge in edges:
-            # Get target node properties if available
-            target_props = edge.get('properties', {})
-            if isinstance(target_props, str):
-                target_props = target_props.replace('{', '').replace('}', '').replace('"', '')
-            
-            edge_info.append(
-                f"- {edge['type']} -> {edge['target']} ({target_props})"
-            )
-        edge_summary = "\n".join(edge_info) if edge_info else "No connections"
-        
-        return (
-            f"Entity: {node['id']}\n"
-            f"Type: {node['type']}\n"
-            f"Properties: {property_text}\n"
-            f"Connections:\n{edge_summary}"
-        )
-    else:
-        # Handle reranked results
-        text = result.get('text', '')
-        if isinstance(text, str):
-            text = text.strip()[:500]  # Show more content, up to 500 chars
-        meta = result.get('meta', 'unknown')
-        score = result.get('score', 0.0)
-        
-        # Normalize score to 0-1 range if it's very small
-        if score < 0.01:
-            score = score * 100
-        
-        return (
-            f"Content: {text}...\n"
-            f"Source: {meta}\n"
-            f"Relevance: {score:.4f}"
-        )
 
 def main():
     """Main entry point for the application."""
