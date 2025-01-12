@@ -254,23 +254,20 @@ def main():
         print(f"\nQuery:")
         print(query)
         
-        # Try both modes for comparison
-        for mode in ["Dense", "Hybrid"]:
-            print(f"\n{mode} Search Results:")
-            
-            results = rag_system.query(
-                query=query,
-                mode=mode,
-                top_k=5  # Limit to top 5 most relevant results
-            )
-            
-            # Print results
-            for idx, result in enumerate(results, 1):
-                print(f"\nResult {idx}:")
-                print(format_result(result))
-                print("-" * 80)  # Add separator between results
-            
-            print("=" * 100)  # Add separator between modes
+        # Perform hybrid search with reranking
+        print("\nHybrid Search Results:")
+        results = rag_system.query(
+            query=query,
+            mode="Hybrid",
+            top_k=10,  # Get more results initially
+            rerank_top_k=5  # Rerank and limit to top 5
+        )
+        
+        # Print results
+        for idx, result in enumerate(results, 1):
+            print(f"\nResult {idx}:")
+            print(format_result(result))
+            print("-" * 80)  # Add separator between results
         
     except Exception as e:
         logging.error(f"Application error: {str(e)}")
