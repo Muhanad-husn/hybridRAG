@@ -103,34 +103,48 @@ def run_hybrid_search():
                 logger.info(f"Found existing vector store with files: {os.listdir(embeddings_dir)}")
                 need_processing = False
             
-            # Always process documents to get the Document objects
-            input_dir = os.path.join("data", "raw_documents")
-            logger.info(f"Processing documents from {input_dir}")
-            documents = document_processor.process_directory(input_dir)
-            if not documents:
-                raise ValueError("No documents were processed successfully")
-            
-            if need_processing:
-                logger.info("Vector store not found. Processing documents...")
+            # Load processed chunks if they exist
+            chunks_dir = os.path.join("data", "processed_chunks")
+            if os.path.exists(chunks_dir) and os.listdir(chunks_dir):
+                logger.info("Loading existing processed chunks...")
+                documents = []
+                for chunk_file in os.listdir(chunks_dir):
+                    if chunk_file.endswith('.txt'):
+                        with open(os.path.join(chunks_dir, chunk_file), 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            source = chunk_file.split('_', 2)[-1]  # Get original source from chunk filename
+                            documents.append(Document(page_content=content, metadata={"source": source}))
+                logger.info(f"Loaded {len(documents)} existing chunks")
+                
+                if need_processing:
+                    # Generate and save embeddings
+                    documents = embedding_generator.process_documents(documents)
+                    embedding_generator.save_embeddings(documents)
+                    retrieval_system.build_index(documents)
+                    logger.info("Built new vector store index")
+                else:
+                    # Just initialize retrieval system with documents
+                    retrieval_system.build_index(documents)
+                    logger.info("Using existing vector store and graph...")
+            else:
+                # Process documents from scratch
+                input_dir = os.path.join("data", "raw_documents")
+                logger.info(f"Processing documents from {input_dir}")
+                documents = document_processor.process_directory(input_dir)
+                if not documents:
+                    raise ValueError("No documents were processed successfully")
                 
                 # Save chunks
-                output_dir = os.path.join("data", "processed_chunks")
                 document_processor.save_processed_chunks(documents, output_dir)
                 
                 # Generate embeddings
                 documents = embedding_generator.process_documents(documents)
-                
-                # Save embeddings
                 embedding_generator.save_embeddings(documents)
                 
                 # Build retrieval index
                 logger.info("Building retrieval index...")
                 retrieval_system.build_index(documents)
                 logger.info("Retrieval index built successfully")
-            else:
-                logger.info("Using existing vector store...")
-                # Add documents to retrieval system without regenerating embeddings
-                retrieval_system.build_index(documents)
         except Exception as e:
             logger.error(f"Error checking/building vector store: {str(e)}")
             logger.error(f"Error details: {str(e.__class__.__name__)}: {str(e)}")
