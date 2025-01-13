@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import logging
 import traceback
@@ -75,7 +76,7 @@ setup_logger()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-def run_hybrid_search():
+def run_hybrid_search(query: str):
     """Run hybrid search with both dense retrieval and graph analysis."""
     logger.info("Starting retrieval process...")
     logger.info("Initializing retrieval components...")
@@ -135,7 +136,7 @@ def run_hybrid_search():
                     raise ValueError("No documents were processed successfully")
                 
                 # Save chunks
-                document_processor.save_processed_chunks(documents, output_dir)
+                document_processor.save_processed_chunks(documents, chunks_dir)
                 
                 # Generate embeddings
                 documents = embedding_generator.process_documents(documents)
@@ -154,8 +155,6 @@ def run_hybrid_search():
         logger.info("Successfully loaded vector store and graph")
         logger.info(f"Graph has {graph_constructor.graph.number_of_nodes()} nodes and {graph_constructor.graph.number_of_edges()} edges")
         
-        # Example query
-        query = "How has the Syrian Civil War impacted the displacement of people both internally and internationally?"
         logger.info(f"Processing query: {query}")
         
         # Generate query embedding
@@ -231,7 +230,11 @@ def main():
     
     try:
         logger.info("Starting main process...")
-        run_hybrid_search()
+        if len(sys.argv) < 2:
+            print("Please provide a query as a command line argument")
+            sys.exit(1)
+        query = sys.argv[1]
+        run_hybrid_search(query)
     except Exception as e:
         logger.error(f"Error in retrieval: {str(e)}")
         logger.error(f"Error details: {str(e.__class__.__name__)}: {str(e)}")
