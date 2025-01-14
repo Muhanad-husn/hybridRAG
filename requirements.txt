@@ -27,7 +27,7 @@ scikit-learn==1.4.0
 flashrank==0.2.10
 
 # Web Interface
-streamlit==1.41.1
+Flask==2.2.2
 termcolor==2.5.0
 
 # Utilities

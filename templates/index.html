@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HybridRAG Search Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HybridRAG Search</h1>
+            <p>Enter your query in English or Arabic</p>
+        </header>
+
+        <main>
+            <form id="searchForm" class="search-form">
+                <div class="input-group">
+                    <textarea 
+                        id="queryInput" 
+                        name="query" 
+                        placeholder="Enter your query here..."
+                        rows="3"
+                        required></textarea>
+                    <button type="submit" id="searchButton">Search</button>
+                </div>
+            </form>
+
+            <div id="loadingIndicator" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Processing your query...</p>
+            </div>
+
+            <div id="results" class="results hidden">
+                <div id="englishResponse" class="response-section">
+                    <h2>English Response</h2>
+                    <div class="response-content"></div>
+                </div>
+
+                <div id="arabicResponse" class="response-section hidden">
+                    <h2>Arabic Response</h2>
+                    <div class="response-content"></div>
+                </div>
+
+                <div id="sources" class="sources-section">
+                    <h2>Sources</h2>
+                    <ul class="sources-list"></ul>
+                </div>
+            </div>
+
+            <div id="error" class="error hidden">
+                <p class="error-message"></p>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
