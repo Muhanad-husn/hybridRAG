@@ -145,12 +145,13 @@ def run_hybrid_search(query: str) -> Dict[str, Any]:
         # Extract sources using regex
         import re
         sources = set()
-        source_pattern = r'\[([^\]]+)\]'
+        source_pattern = r'\[([^(\]]+)'  # Match everything between [ and ( or ]
         for part in context_parts:
             matches = re.findall(source_pattern, part)
             for match in matches:
-                if 'test_document' in match:
-                    sources.add('Syrian Civil War Documentation')
+                source = match.strip()
+                if source != 'graph_relationships':  # Exclude graph relationships
+                    sources.add(source)
         sources = sorted(list(sources))
         
         # Initialize OpenRouter client
@@ -205,7 +206,7 @@ def main():
             
         query = sys.argv[1]
         result = run_hybrid_search(query)
-        # Print only the LLM response
+        
         if result.get("error"):
             print(f"Error from LLM: {result['error']}")
             return
@@ -214,15 +215,12 @@ def main():
             print("Warning: No answer received from LLM")
             return
             
-        # Get the model's response and append sources
-        answer = result["answer"].strip()
-        
-        # Format sources section
-        sources_section = "\n\nSources:\n" + "\n".join(f"- {source}" for source in sorted(result["sources"]))
-        
-        # Print complete response with sources
-        print(answer + sources_section)
-        
+        # Print answer and append sources
+        print(result["answer"].strip())
+        print("\nSources:")
+        for source in sorted(result["sources"]):
+            print(f"- {source}")
+            
     except Exception as e:
         print(f"Error in retrieval: {str(e)}")
         raise
