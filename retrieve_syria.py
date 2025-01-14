@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import logging
 import traceback
@@ -158,15 +159,16 @@ def run_hybrid_search(query: str) -> Dict[str, Any]:
         llm_client = OpenRouterClient()
         
         # Create system prompt
-        system_prompt = """You are a knowledgeable academic assistant that provides well-structured, scholarly responses based on the provided context.
-        Your answers should:
-        1. Be based ONLY on the information from the provided context
-        2. Maintain a semi-academic tone while remaining clear and accessible
-        3. Include relevant quotes from the context when appropriate, using proper quotation marks
-        4. Structure responses with clear sections
-        5. Present information in a logical, hierarchical manner
-        6. Acknowledge when information might be incomplete or unclear
-        If the context doesn't contain enough information to answer the question, say so."""
+        system_prompt = """You are a well-informed academic assistant. Your goal is to provide structured, educational, and accessible responses in a semi-academic tone. Specifically:
+
+    Base your content on the provided context. If the context does not contain enough information, acknowledge this.
+    Adopt an article-like structure with paragraphs:
+        Introduction: Briefly set the stage.
+        Body: Present ideas in paragraph form with smooth transitions. Use subheadings if needed, but rely on paragraphs rather than bullet points.
+        Conclusion: Summarize the key points in a final paragraph.
+    Avoid bullet points except for minor lists that must be itemized. When possible, integrate details into sentences rather than listing them.
+    Semi-Academic Tone: Maintain clarity and accessibility for students or researchers in fields like sociopolitical, historical, or socioeconomic studies.
+    Acknowledge Gaps: If certain details are missing, explicitly note these gaps."""
 
         # Create user prompt
         user_prompt = f"""Context:
@@ -180,7 +182,7 @@ Please provide a clear and accurate answer based solely on the information provi
         llm_response = llm_client.get_completion(
             prompt=user_prompt,
             system_prompt=system_prompt,
-            temperature=0.2,  # Use slightly higher temperature for more natural academic tone
+            temperature=0.5,  # Higher temperature for more creative and natural academic tone
             max_tokens=1000
         )
         
@@ -215,8 +217,23 @@ def main():
             print("Warning: No answer received from LLM")
             return
             
-        # Print answer and append sources
-        print(result["answer"].strip())
+        # Format and print answer
+        answer = result["answer"].strip()
+        
+        # Add space after title
+        answer = re.sub(r'^(.*?)\n', r'\1\n\n', answer)
+        
+        # Add space between paragraphs
+        answer = re.sub(r'([.!?])\n', r'\1\n\n', answer)
+        
+        # Remove any triple or more newlines
+        answer = re.sub(r'\n{3,}', '\n\n', answer)
+        
+        # Ensure proper spacing before Sources
+        answer = re.sub(r'\n*Sources:', '\n\nSources:', answer)
+        
+        # Print formatted answer and sources
+        print(answer)
         print("\nSources:")
         for source in sorted(result["sources"]):
             print(f"- {source}")
