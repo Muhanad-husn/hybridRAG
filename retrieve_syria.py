@@ -3,7 +3,7 @@ import sys
 import json
 import logging
 import traceback
-from typing import Dict, Any
+from typing import Dict, Any, List
 from langchain.schema import Document
 from src.utils.logger import setup_logger
 from src.input_layer.document_processor import DocumentProcessor
@@ -11,14 +11,20 @@ from src.processing_layer.embedding_generator import EmbeddingGenerator
 from src.processing_layer.graph_constructor import GraphConstructor
 from src.retrieval_layer.hybrid_retrieval import HybridRetrieval
 from src.utils.formatter import format_result
+from src.tools.openrouter_client import OpenRouterClient
 
 # Suppress all logging except errors
 logging.getLogger().setLevel(logging.ERROR)
 for name in logging.root.manager.loggerDict:
     logging.getLogger(name).setLevel(logging.ERROR)
-
-def run_hybrid_search(query: str):
-    """Run hybrid search with both dense retrieval and graph analysis."""
+def run_hybrid_search(query: str) -> Dict[str, Any]:
+    """
+    Run hybrid search with both dense retrieval and graph analysis,
+    then process results with LLM to generate an answer.
+    
+    Returns:
+        Dict containing retrieved context and LLM-generated answer
+    """
     try:
         # Initialize components
         config_path = "config/config.yaml"
@@ -116,15 +122,50 @@ def run_hybrid_search(query: str):
         except Exception as e:
             print(f"Error in search pipeline: {str(e)}")
             raise
-        
-        # Print results in LLM-friendly format
-        print(f"User Query: {query}\n")
-        print("Retrieved Context (in order of relevance):")
-        print("=" * 80)
-        
+        # Format results for LLM
+        context_parts = []
         for result in results:
             formatted = format_result(result, format_type="text")
-            print(formatted)
+            context_parts.append(formatted)
+        
+        context = "\n\n".join(context_parts)
+        
+        # Initialize OpenRouter client
+        llm_client = OpenRouterClient()
+        
+        # Create system prompt
+        system_prompt = """You are a helpful assistant that answers questions based on the provided context.
+        Your answers should:
+        1. Be based ONLY on the information from the provided context
+        2. Be clear and concise
+        3. Include relevant quotes or references from the context when appropriate
+        4. Acknowledge when information might be incomplete or unclear
+        If the context doesn't contain enough information to answer the question, say so."""
+        
+        # Create user prompt combining context and query
+        user_prompt = f"""Context:
+{context}
+
+Question: {query}
+
+Please provide a clear and accurate answer based solely on the information provided in the context above."""
+        
+        # Get LLM response
+        llm_response = llm_client.get_completion(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            temperature=0.0,  # Use 0 temperature for more factual responses
+            max_tokens=1000
+        )
+        
+        # Return both context and answer
+        return {
+            "query": query,
+            "context": context,
+            "answer": llm_response.get("content", ""),
+            "error": llm_response.get("error")
+        }
+            
             
     except Exception as e:
         print(f"Error in hybrid search: {str(e)}")
@@ -136,8 +177,19 @@ def main():
         if len(sys.argv) < 2:
             print("Please provide a query as a command line argument")
             sys.exit(1)
+            
         query = sys.argv[1]
-        run_hybrid_search(query)
+        result = run_hybrid_search(query)
+        
+        # Print only the model's response
+        if result.get("error"):
+            print(f"Error from LLM: {result['error']}")
+        else:
+            if not result["answer"]:
+                print("Warning: No answer received from LLM")
+            else:
+                print(result["answer"])
+        
     except Exception as e:
         print(f"Error in retrieval: {str(e)}")
         raise

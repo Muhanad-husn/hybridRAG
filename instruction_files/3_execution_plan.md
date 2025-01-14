@@ -147,7 +147,14 @@
    - Log errors and fallback to the available retrieval method.
 
 9. **Testing**:
-   - Validate the retrieval system with queries of varying complexity to ensure effective hybrid retrieval and fallback functionality.
+    - Validate the retrieval system with queries of varying complexity to ensure effective hybrid retrieval and fallback functionality.
+
+10. **LLM Processing**:
+    - Process retrieved results with an LLM (using OpenRouter) to generate answers
+    - Format retrieved context into a clear prompt for the LLM
+    - Include system instructions to ensure answers are based only on provided context
+    - Handle LLM API errors gracefully with appropriate fallback behavior
+    - Return both the LLM-generated answer and supporting context (optional display)
 
 ---
 
