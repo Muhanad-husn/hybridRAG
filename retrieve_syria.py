@@ -4,7 +4,7 @@ import re
 import json
 import logging
 import traceback
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from contextlib import redirect_stderr
 from io import StringIO
 # Suppress all warnings and logging
@@ -25,15 +25,32 @@ from src.processing_layer.graph_constructor import GraphConstructor
 from src.retrieval_layer.hybrid_retrieval import HybridRetrieval
 from src.utils.formatter import format_result
 from src.tools.openrouter_client import OpenRouterClient
+from src.input_layer.translator import Translator
 
 # Suppress all logging
 logging.getLogger().setLevel(logging.CRITICAL)
 for name in logging.root.manager.loggerDict:
     logging.getLogger(name).setLevel(logging.CRITICAL)
-def run_hybrid_search(query: str) -> Dict[str, Any]:
+
+# Initialize logger
+logger = logging.getLogger(__name__)
+
+# Initialize translator lazily
+_translator = None
+def get_translator():
+    global _translator
+    if _translator is None:
+        _translator = Translator()
+    return _translator
+def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None) -> Dict[str, Any]:
     """
     Run hybrid search with both dense retrieval and graph analysis,
     then process results with LLM to generate an answer.
+    
+    Args:
+        query: The search query (in English)
+        original_lang: Original language of query if translated (e.g., 'ar' for Arabic)
+        original_query: Original query before translation if applicable
     
     Returns:
         Dict containing retrieved context and LLM-generated answer
@@ -186,12 +203,33 @@ Please provide a clear and accurate answer based solely on the information provi
             max_tokens=1000
         )
         
-        # Return answer and sources
+        # Get LLM response in English
+        english_answer = llm_response.get("content", "")
+        error = llm_response.get("error")
+        
+        # Initialize answer as English
+        answer = english_answer
+        
+        # Translate to Arabic if needed
+        if original_lang == 'ar' and english_answer:
+            try:
+                translator = get_translator()
+                logger.info("Translating LLM response to Arabic...")
+                answer = translator.translate(english_answer, source_lang='en', target_lang='ar')
+                logger.info("Translation completed")
+            except Exception as e:
+                logger.error(f"Error translating response to Arabic: {str(e)}")
+                answer = english_answer  # Fallback to English if translation fails
+        
+        # Return results
         return {
             "query": query,
-            "answer": llm_response.get("content", ""),
-            "error": llm_response.get("error"),
-            "sources": sources  # Include extracted sources
+            "original_query": original_query or query,  # Use original query if available
+            "answer": answer,
+            "english_answer": english_answer if original_lang == 'ar' else answer,
+            "error": error,
+            "sources": sources,
+            "language": original_lang or 'en'
         }
             
             
@@ -206,8 +244,22 @@ def main():
             print("Please provide a query as a command line argument")
             sys.exit(1)
             
-        query = sys.argv[1]
-        result = run_hybrid_search(query)
+        # Get query from command line
+        original_query = sys.argv[1]
+        
+        # Get translator instance
+        translator = get_translator()
+        
+        # Detect language and translate if needed
+        is_arabic = translator.is_arabic(original_query)
+        
+        if is_arabic:
+            # Translate query to English
+            english_query = translator.translate(original_query, source_lang='ar', target_lang='en')
+            print(f"Translated query: {english_query}")
+            result = run_hybrid_search(english_query, original_lang='ar', original_query=original_query)
+        else:
+            result = run_hybrid_search(original_query)
         
         if result.get("error"):
             print(f"Error from LLM: {result['error']}")
@@ -217,23 +269,30 @@ def main():
             print("Warning: No answer received from LLM")
             return
             
-        # Format and print answer
+        # Get the answer
         answer = result["answer"].strip()
         
-        # Add space after title
-        answer = re.sub(r'^(.*?)\n', r'\1\n\n', answer)
+        # Format answer
+        def format_answer(text: str) -> str:
+            text = re.sub(r'^(.*?)\n', r'\1\n\n', text)  # Add space after title
+            text = re.sub(r'([.!?])\n', r'\1\n\n', text)  # Add space between paragraphs
+            text = re.sub(r'\n{3,}', '\n\n', text)  # Remove extra newlines
+            text = re.sub(r'\n*Sources:', '\n\nSources:', text)  # Space before Sources
+            return text
         
-        # Add space between paragraphs
-        answer = re.sub(r'([.!?])\n', r'\1\n\n', answer)
+        # Print responses
+        if result.get("language") == "ar":
+            print("\nEnglish Response:")
+            print("-" * 80)
+            print(format_answer(result.get("english_answer", "")))
+            print("-" * 80)
+            print("\nArabic Response:")
+            print("-" * 80)
+            print(format_answer(answer))
+        else:
+            print(format_answer(answer))
         
-        # Remove any triple or more newlines
-        answer = re.sub(r'\n{3,}', '\n\n', answer)
-        
-        # Ensure proper spacing before Sources
-        answer = re.sub(r'\n*Sources:', '\n\nSources:', answer)
-        
-        # Print formatted answer and sources
-        print(answer)
+        # Print sources
         print("\nSources:")
         for source in sorted(result["sources"]):
             print(f"- {source}")
@@ -243,4 +302,6 @@ def main():
         raise
 
 if __name__ == "__main__":
+    from multiprocessing import freeze_support
+    freeze_support()
     main()
