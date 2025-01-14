@@ -34,6 +34,19 @@ document:
   chunk_size: 512
   chunk_overlap: 50
 
+# Cache Settings
+cache:
+  directory: "data/cache"
+  ttl_hours: 24  # Time-to-live for cached documents
+  max_size_gb: 10  # Maximum cache size in gigabytes
+
+# Processing Optimization
+processing:
+  batch_size: 1000  # Number of chunks to process in parallel
+  max_workers: null  # null means use CPU count
+  use_process_pool: true  # Use ProcessPoolExecutor for CPU-intensive tasks
+  use_thread_pool: true   # Use ThreadPoolExecutor for I/O-bound tasks
+
 # Logging Settings
 logging:
   log_level: "INFO"
