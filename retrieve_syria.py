@@ -134,12 +134,13 @@ def run_hybrid_search(query: str) -> Dict[str, Any]:
         llm_client = OpenRouterClient()
         
         # Create system prompt
-        system_prompt = """You are a helpful assistant that answers questions based on the provided context.
+        system_prompt = """You are a knowledgeable academic assistant that provides well-structured, scholarly responses based on the provided context.
         Your answers should:
         1. Be based ONLY on the information from the provided context
-        2. Be clear and concise
+        2. Maintain a semi-academic tone while remaining clear and accessible
         3. Include relevant quotes or references from the context when appropriate
         4. Acknowledge when information might be incomplete or unclear
+        5. Structure responses with clear organization and logical flow
         If the context doesn't contain enough information to answer the question, say so."""
         
         # Create user prompt combining context and query
@@ -154,7 +155,7 @@ Please provide a clear and accurate answer based solely on the information provi
         llm_response = llm_client.get_completion(
             prompt=user_prompt,
             system_prompt=system_prompt,
-            temperature=0.0,  # Use 0 temperature for more factual responses
+            temperature=0.2,  # Use slightly higher temperature for more natural academic tone
             max_tokens=1000
         )
         
@@ -180,14 +181,17 @@ def main():
             
         query = sys.argv[1]
         result = run_hybrid_search(query)
-        
-        # Print only the model's response
+        # Print model's response and sources
         if result.get("error"):
             print(f"Error from LLM: {result['error']}")
         else:
             if not result["answer"]:
                 print("Warning: No answer received from LLM")
             else:
+                print(result["answer"])
+                print("\nSources:")
+                print("=" * 80)
+                print(result["context"])
                 print(result["answer"])
         
     except Exception as e:
