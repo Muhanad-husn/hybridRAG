@@ -44,6 +44,23 @@ data/processed_chunks/
 # Results
 results/
 
+# Environment variables
+.env
+
+# Generated files
+*.pdf
+*.html
+!templates/*.html
+
+# Models and weights
+models/
+
+# Backup files
+*.bak
+
+# Documentation and planning
+instruction_files/
+
 # Test files
 test_*.pdf
 test_*.py
