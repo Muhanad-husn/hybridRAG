@@ -38,10 +38,21 @@ document.addEventListener('DOMContentLoaded', function() {
             tab.classList.add('active');
 
             const type = tab.dataset.type;
-            // Show corresponding response section
-            document.querySelectorAll('.response-section').forEach(section => {
-                section.classList.toggle('active', section.id === `${type}Response`);
-            });
+            if (type) {
+                // Show corresponding response section
+                document.querySelectorAll('.response-section').forEach(section => {
+                    const isActive = section.id === `${type}Response`;
+                    section.classList.toggle('active', isActive);
+                    section.classList.toggle('hidden', !isActive);
+                });
+
+                // Update current type
+                if (type === 'en' || type === 'ar') {
+                    currentLanguage = type;
+                } else {
+                    currentResultType = type;
+                }
+            }
         });
     });
     
@@ -211,15 +222,11 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsDiv.classList.remove('hidden');
         errorDiv.classList.add('hidden');
         
-        // Always show both tabs
-        document.querySelector('[data-lang="en"]').style.display = 'block';
-        document.querySelector('[data-lang="ar"]').style.display = 'block';
-        
         // Set active tab based on query language
-        if (data.language === 'ar') {
-            document.querySelector('[data-lang="ar"]').click();
-        } else {
-            document.querySelector('[data-lang="en"]').click();
+        const activeTab = data.language === 'ar' ? 'ar' : 'en';
+        const tabToActivate = document.querySelector(`.tab-btn[data-type="${activeTab}"]`);
+        if (tabToActivate) {
+            tabToActivate.click();
         }
 
         // Re-initialize language tabs more safely
@@ -242,18 +249,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 tab.classList.add('active');
                 
                 // Show/hide content sections
-                const lang = tab.dataset.lang;
-                if (lang === 'en') {
-                    englishResponse.classList.add('active');
-                    englishResponse.classList.remove('hidden');
-                    arabicResponse.classList.remove('active');
-                    arabicResponse.classList.add('hidden');
-                } else {
-                    arabicResponse.classList.add('active');
-                    arabicResponse.classList.remove('hidden');
-                    englishResponse.classList.remove('active');
-                    englishResponse.classList.add('hidden');
-                }
+                const type = tab.dataset.type;
+                document.querySelectorAll('.response-section').forEach(section => {
+                    const isActive = section.id === `${type}Response`;
+                    section.classList.toggle('active', isActive);
+                    section.classList.toggle('hidden', !isActive);
+                });
                 
                 // Reinitialize save buttons when switching tabs
                 initializeSaveButtons();
