@@ -54,7 +54,7 @@ def verify_font():
 # Verify font
 verify_font()
 
-def create_result_html(content, query, translated_query, sources, is_arabic=False):
+def create_result_html(content, query, translated_query, sources, confidence=0, is_arabic=False):
     try:
         # Create timestamp for display
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -90,7 +90,8 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
             translated_query=translated_query,
             sources=sources,
             is_arabic=is_arabic,
-            timestamp=timestamp
+            timestamp=timestamp,
+            confidence=confidence
         )
         
         # Create results directory if it doesn't exist

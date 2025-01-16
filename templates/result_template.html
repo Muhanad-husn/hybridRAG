@@ -195,6 +195,46 @@
                 text-align: justify;
                 line-height: 1.5;
             }
+    
+            /* Confidence Score Styles */
+            .confidence-score {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 15px;
+            }
+    
+            .score-container {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+    
+            .score-bar {
+                flex: 1;
+                height: 8px;
+                background: #eee;
+                border-radius: 4px;
+                overflow: hidden;
+                border: 1px solid var(--primary-color);
+            }
+    
+            .score-bar::after {
+                content: '';
+                display: block;
+                height: 100%;
+                background: var(--primary-color);
+                width: var(--score);
+                transition: width 0.3s ease-in-out;
+            }
+    
+            .score-value {
+                min-width: 48px;
+                text-align: right;
+                color: var(--primary-color);
+                font-weight: 500;
+            }
         }
     </style>
 </head>
@@ -240,6 +280,16 @@
                     <p>{{ paragraph }}</p>
                 {% endif %}
             {% endfor %}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="confidence-score">
+            <label>{% if is_arabic %}مستوى الثقة:{% else %}Answer Confidence:{% endif %}</label>
+            <div class="score-container">
+                <div class="score-bar" style="--score: {{ confidence }}%"></div>
+                <span class="score-value">{{ confidence }}%</span>
+            </div>
         </div>
     </div>
 
