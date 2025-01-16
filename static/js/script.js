@@ -18,87 +18,30 @@ document.addEventListener('DOMContentLoaded', function() {
     let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
     let currentLanguage = 'en';
 
-    // Debug wrapper for tab operations
-    function debugTabOperation(operation, details) {
-        console.group(`Tab Operation: ${operation}`);
-        console.log('Details:', details);
-        console.log('Current State:', {
-            activeTab: document.querySelector('.tab-btn.active')?.dataset.type,
-            englishContent: document.querySelector('#englishResponse .response-content')?.textContent.length,
-            arabicContent: document.querySelector('#arabicResponse .response-content')?.textContent.length,
-            englishVisible: !document.querySelector('#englishResponse')?.classList.contains('hidden'),
-            arabicVisible: !document.querySelector('#arabicResponse')?.classList.contains('hidden'),
-            direction: document.body.dir
-        });
-        console.groupEnd();
-    }
-
     function initializeResponseTabs() {
-        console.group('Tab Initialization');
-        
         const tabs = document.querySelectorAll('.response-tabs .tab-btn');
         const englishSection = document.getElementById('englishResponse');
         const arabicSection = document.getElementById('arabicResponse');
-
-        console.log('Found elements:', {
-            tabCount: tabs.length,
-            hasEnglishSection: !!englishSection,
-            hasArabicSection: !!arabicSection
-        });
         
         function switchTab(type) {
-            console.group('Tab Switch');
-            console.log('Switching to tab:', type);
-
-            // Validate type
             if (type !== 'en' && type !== 'ar') {
-                console.error('Invalid tab type:', type);
-                console.groupEnd();
                 return;
             }
 
-            // Log initial state
-            console.log('Initial state:', {
-                englishVisible: !englishSection.classList.contains('hidden'),
-                arabicVisible: !arabicSection.classList.contains('hidden'),
-                currentLang: currentLanguage
-            });
-
-            // Update tab states
             tabs.forEach(t => {
                 const isActive = t.dataset.type === type;
                 t.classList.toggle('active', isActive);
-                console.log(`Tab ${t.dataset.type}:`, isActive ? 'active' : 'inactive');
             });
             
-            // Update section visibility
             englishSection.classList.toggle('hidden', type !== 'en');
             englishSection.classList.toggle('active', type === 'en');
             arabicSection.classList.toggle('hidden', type !== 'ar');
             arabicSection.classList.toggle('active', type === 'ar');
 
-            // Log content state
-            const activeSection = type === 'en' ? englishSection : arabicSection;
-            console.log('Active section state:', {
-                id: activeSection.id,
-                hasContent: !!activeSection.querySelector('.response-content')?.textContent.trim(),
-                contentLength: activeSection.querySelector('.response-content')?.textContent.trim().length || 0,
-                isHidden: activeSection.classList.contains('hidden'),
-                isActive: activeSection.classList.contains('active')
-            });
-
-            // Update current language and direction
             currentLanguage = type;
             document.body.dir = type === 'ar' ? 'rtl' : 'ltr';
-            console.log('Language and direction updated:', {
-                language: currentLanguage,
-                direction: document.body.dir
-            });
-
-            console.groupEnd();
         }
 
-        // Add click handlers
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const type = tab.dataset.type;
@@ -108,13 +51,206 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // Export for use in other functions
         return switchTab;
     }
 
     // Initialize tabs and get the switchTab function
     const switchTab = initializeResponseTabs();
     
+    // Initialize save buttons
+    function initializeSaveButtons() {
+        document.querySelectorAll('.save-btn').forEach(btn => {
+            // Remove existing listeners to prevent duplicates
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            newBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const lang = newBtn.dataset.lang;
+                saveResponseAsHtml(lang);
+            });
+        });
+    }
+
+    // Initialize save buttons on page load
+    initializeSaveButtons();
+    
+    // Navigation Handler
+    navButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetView = button.dataset.view;
+            
+            navButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            views.forEach(view => {
+                view.classList.toggle('active', view.id === `${targetView}View`);
+                view.classList.toggle('hidden', view.id !== `${targetView}View`);
+            });
+
+            if (targetView === 'history') {
+                displaySearchHistory();
+            } else if (targetView === 'saved') {
+                displaySavedResults();
+            } else if (targetView === 'tutorial') {
+                loadTutorial();
+            }
+        });
+    });
+
+    // Search Form Handler
+    searchForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        errorDiv.classList.add('hidden');
+        resultsDiv.classList.add('hidden');
+        loadingIndicator.classList.remove('hidden');
+        searchButton.disabled = true;
+
+        startProcessAnimation();
+
+        try {
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    mode: 'hybrid'
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                addToSearchHistory({
+                    query: query,
+                    timestamp: new Date().toISOString(),
+                    result: data
+                });
+                
+                displayResults(data);
+            } else {
+                throw new Error(data.error || 'An error occurred while processing your query');
+            }
+        } catch (error) {
+            displayError(error.message);
+        } finally {
+            loadingIndicator.classList.add('hidden');
+            searchButton.disabled = false;
+            stopProcessAnimation();
+        }
+    });
+
+    // Process Animation
+    function startProcessAnimation() {
+        processSteps.forEach(step => step.classList.remove('active'));
+        processSteps[0].classList.add('active');
+        window.stepTimeout = setTimeout(() => {
+            processSteps[0].classList.remove('active');
+            processSteps[1].classList.add('active');
+        }, 1500);
+    }
+
+    function stopProcessAnimation() {
+        if (window.stepTimeout) {
+            clearTimeout(window.stepTimeout);
+        }
+        processSteps.forEach(step => step.classList.remove('active'));
+    }
+
+    // Results Display
+    function displayResults(data) {
+        document.querySelectorAll('.response-content').forEach(content => {
+            content.textContent = '';
+        });
+        sourcesList.innerHTML = '';
+
+        resultsDiv.classList.remove('hidden');
+        errorDiv.classList.add('hidden');
+
+        if (data.error) {
+            displayError(data.error);
+            return;
+        }
+
+        const responses = {
+            'en': {
+                element: document.querySelector('#englishResponse .response-content'),
+                content: data.answer,
+                dir: 'ltr'
+            },
+            'ar': {
+                element: document.querySelector('#arabicResponse .response-content'),
+                content: data.arabic_answer,
+                dir: 'rtl'
+            }
+        };
+
+        Object.entries(responses).forEach(([type, info]) => {
+            if (info.element) {
+                info.element.textContent = info.content || `No ${type} response available`;
+                info.element.setAttribute('dir', info.dir);
+                
+                const parentSection = info.element.closest('.response-section');
+                if (parentSection) {
+                    parentSection.setAttribute('dir', info.dir);
+                }
+            }
+        });
+
+        const confidenceScore = document.querySelector('.confidence-score');
+        if (confidenceScore) {
+            const score = data.confidence || '85%';
+            const confidenceBar = confidenceScore.querySelector('.score-bar');
+            const confidenceValue = confidenceScore.querySelector('.score-value');
+            
+            confidenceBar.style.setProperty('--score', score);
+            confidenceValue.textContent = score;
+            confidenceScore.classList.remove('hidden');
+        }
+
+        const activeTab = data.language === 'ar' ? 'ar' : 'en';
+        switchTab(activeTab);
+
+        if (data.sources && data.sources.length > 0) {
+            data.sources.forEach(source => {
+                const li = document.createElement('li');
+                li.textContent = source;
+                sourcesList.appendChild(li);
+            });
+        }
+
+        const querySuggestions = document.querySelector('.query-suggestions');
+        const relatedTopics = document.querySelector('.learning-resources');
+        querySuggestions.classList.add('hidden');
+        relatedTopics.classList.add('hidden');
+
+        if (data.related_topics) {
+            displayRelatedTopics(data.related_topics);
+        }
+
+        if (data.suggested_queries) {
+            displaySuggestedQueries(data.suggested_queries);
+        }
+
+        resultsDiv.classList.remove('hidden');
+        errorDiv.classList.add('hidden');
+
+        // Reinitialize save buttons after content is loaded
+        initializeSaveButtons();
+
+        if (data.stats) {
+            document.getElementById('docCount').textContent = data.stats.documents || 0;
+            document.getElementById('nodeCount').textContent = data.stats.nodes || 0;
+        }
+    }
+
     // Save Response Handler
     function saveResponseAsHtml(lang) {
         const responseSection = document.getElementById(`${lang}Response`);
@@ -125,15 +261,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Get first line for filename (limited to 50 chars)
         const firstLine = content.split('\n')[0].trim().substring(0, 50)
-            .replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g, '') // Keep English, Arabic, numbers, and spaces
-            .replace(/\s+/g, '_'); // Replace spaces with underscores
+            .replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g, '')
+            .replace(/\s+/g, '_');
         
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `${firstLine}_${lang}_${timestamp}.html`;
 
-        // Create HTML content
         const htmlContent = `
 <!DOCTYPE html>
 <html lang="${lang}">
@@ -168,7 +302,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 </html>`;
 
-        // Create blob and download
         const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -180,247 +313,6 @@ document.addEventListener('DOMContentLoaded', function() {
         URL.revokeObjectURL(url);
 
         showNotification(`Saved as ${filename}`);
-    }
-
-    // Initialize save buttons
-    function initializeSaveButtons() {
-        console.log('Initializing save buttons');
-        document.querySelectorAll('.save-btn').forEach(btn => {
-            // Remove existing listeners to prevent duplicates
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
-            
-            newBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const lang = newBtn.dataset.lang;
-                console.log('Save button clicked for language:', lang);
-                saveResponseAsHtml(lang);
-            });
-        });
-    }
-
-    // Initialize save buttons on page load
-    initializeSaveButtons();
-    
-    // Navigation Handler
-    navButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const targetView = button.dataset.view;
-            
-            // Update active states
-            navButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            
-            // Show target view
-            views.forEach(view => {
-                view.classList.toggle('active', view.id === `${targetView}View`);
-                view.classList.toggle('hidden', view.id !== `${targetView}View`);
-            });
-
-            // Load view-specific content
-            if (targetView === 'history') {
-                displaySearchHistory();
-            } else if (targetView === 'saved') {
-                displaySavedResults();
-            } else if (targetView === 'tutorial') {
-                loadTutorial();
-            }
-        });
-    });
-
-    // Search Form Handler
-    searchForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const query = queryInput.value.trim();
-        if (!query) return;
-
-        // Reset UI state
-        errorDiv.classList.add('hidden');
-        resultsDiv.classList.add('hidden');
-        loadingIndicator.classList.remove('hidden');
-        searchButton.disabled = true;
-
-        // Start process animation
-        startProcessAnimation();
-
-        try {
-            const response = await fetch('/search', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    query: query,
-                    mode: 'hybrid'  // Always use hybrid mode
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                // Add to search history
-                addToSearchHistory({
-                    query: query,
-                    timestamp: new Date().toISOString(),
-                    result: data
-                });
-                
-                displayResults(data);
-            } else {
-                throw new Error(data.error || 'An error occurred while processing your query');
-            }
-        } catch (error) {
-            displayError(error.message);
-        } finally {
-            loadingIndicator.classList.add('hidden');
-            searchButton.disabled = false;
-            stopProcessAnimation();
-        }
-    });
-
-    // Process Animation
-    function startProcessAnimation() {
-        processSteps.forEach(step => step.classList.remove('active'));
-        
-        // First step starts immediately
-        processSteps[0].classList.add('active');
-        
-        // Second step starts after 1.5 seconds
-        window.stepTimeout = setTimeout(() => {
-            processSteps[0].classList.remove('active');
-            processSteps[1].classList.add('active');
-        }, 1500);
-    }
-
-    function stopProcessAnimation() {
-        if (window.stepTimeout) {
-            clearTimeout(window.stepTimeout);
-        }
-        processSteps.forEach(step => step.classList.remove('active'));
-    }
-
-    // Results Display
-    function displayResults(data) {
-        // Clear previous results
-        document.querySelectorAll('.response-content').forEach(content => {
-            content.textContent = '';
-        });
-        sourcesList.innerHTML = '';
-
-        // Show results container and hide error
-        resultsDiv.classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-
-        if (data.error) {
-            displayError(data.error);
-            return;
-        }
-
-        console.group('Display Results');
-        console.log('Raw response data:', data);
-
-        // Update content for both languages
-        const responses = {
-            'en': {
-                element: document.querySelector('#englishResponse .response-content'),
-                content: data.answer,
-                dir: 'ltr'
-            },
-            'ar': {
-                element: document.querySelector('#arabicResponse .response-content'),
-                content: data.arabic_answer,
-                dir: 'rtl'
-            }
-        };
-
-        // Log response data
-        console.log('English content available:', !!responses.en.content);
-        console.log('Arabic content available:', !!responses.ar.content);
-        console.log('English element found:', !!responses.en.element);
-        console.log('Arabic element found:', !!responses.ar.element);
-
-        // Update content for both languages
-        Object.entries(responses).forEach(([type, info]) => {
-            if (info.element) {
-                console.log(`Updating ${type} content:`, {
-                    contentLength: info.content?.length || 0,
-                    hasContent: !!info.content,
-                    elementId: info.element.id,
-                    parentId: info.element.parentElement?.id
-                });
-
-                info.element.textContent = info.content || `No ${type} response available`;
-                info.element.setAttribute('dir', info.dir);
-                
-                // Ensure parent section has correct direction
-                const parentSection = info.element.closest('.response-section');
-                if (parentSection) {
-                    parentSection.setAttribute('dir', info.dir);
-                    console.log(`Set direction for ${type} section:`, info.dir);
-                }
-            } else {
-                console.warn(`${type} response element not found`);
-            }
-        });
-
-        console.groupEnd();
-
-        // Update confidence score if available
-        const confidenceScore = document.querySelector('.confidence-score');
-        if (confidenceScore) {
-            const score = data.confidence || '85%';
-            const confidenceBar = confidenceScore.querySelector('.score-bar');
-            const confidenceValue = confidenceScore.querySelector('.score-value');
-            
-            confidenceBar.style.setProperty('--score', score);
-            confidenceValue.textContent = score;
-            confidenceScore.classList.remove('hidden');
-        }
-
-        // Switch to appropriate tab based on query language
-        const activeTab = data.language === 'ar' ? 'ar' : 'en';
-        switchTab(activeTab);
-
-        // Display sources
-        if (data.sources && data.sources.length > 0) {
-            data.sources.forEach(source => {
-                const li = document.createElement('li');
-                li.textContent = source;
-                sourcesList.appendChild(li);
-            });
-        }
-
-        // Hide empty sections
-        const querySuggestions = document.querySelector('.query-suggestions');
-        const relatedTopics = document.querySelector('.learning-resources');
-        querySuggestions.classList.add('hidden');
-        relatedTopics.classList.add('hidden');
-
-        // Update stats with reasonable defaults
-        document.getElementById('docCount').textContent = '1';
-        document.getElementById('nodeCount').textContent = '42';
-
-        // Display related topics
-        if (data.related_topics) {
-            displayRelatedTopics(data.related_topics);
-        }
-
-        // Display suggested queries
-        if (data.suggested_queries) {
-            displaySuggestedQueries(data.suggested_queries);
-        }
-
-        // Show results
-        resultsDiv.classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-
-        // Reinitialize save buttons after content is loaded
-        initializeSaveButtons();
-
-        // Update stats
-        updateStats(data.stats);
     }
 
     // Related Topics Display
@@ -520,13 +412,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    function updateStats(stats) {
-        if (stats) {
-            document.getElementById('docCount').textContent = stats.documents || 0;
-            document.getElementById('nodeCount').textContent = stats.nodes || 0;
-        }
-    }
-
     // Tutorial Content
     function loadTutorial() {
         const tutorialSteps = document.querySelector('.tutorial-steps');
@@ -539,7 +424,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="tutorial-step">
                 <h3>2. Explore Results</h3>
-                <p>Review the answers in different formats: English, Arabic, Dense Vector, and Knowledge Graph representations.</p>
+                <p>Review the answers in both English and Arabic.</p>
             </div>
             <div class="tutorial-step">
                 <h3>3. Check Sources</h3>
