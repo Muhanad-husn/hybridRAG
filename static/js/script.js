@@ -18,29 +18,40 @@ document.addEventListener('DOMContentLoaded', function() {
     let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
     let currentLanguage = 'en';
 
-    // Initialize response tabs
-    document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Update active state for all tabs
-            document.querySelectorAll('.response-tabs .tab-btn').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
+    function initializeResponseTabs() {
+        document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const type = tab.dataset.type;
+                if (!type) return;
 
-            const type = tab.dataset.type;
-            if (type) {
-                // Show corresponding response section
+                // Update active state for tabs
+                document.querySelectorAll('.response-tabs .tab-btn').forEach(t => {
+                    t.classList.remove('active');
+                });
+                tab.classList.add('active');
+
+                // Show corresponding response section, hide others
                 document.querySelectorAll('.response-section').forEach(section => {
-                    const isActive = section.id === `${type}Response`;
-                    section.classList.toggle('active', isActive);
-                    section.classList.toggle('hidden', !isActive);
+                    const sectionId = `${type}Response`;
+                    if (section.id === sectionId) {
+                        section.classList.remove('hidden');
+                        section.classList.add('active');
+                    } else {
+                        section.classList.add('hidden');
+                        section.classList.remove('active');
+                    }
                 });
 
                 // Update current language if it's a language tab
                 if (type === 'en' || type === 'ar') {
                     currentLanguage = type;
                 }
-            }
+            });
         });
-    });
+    }
+
+    // Initialize tabs when DOM is loaded
+    document.addEventListener('DOMContentLoaded', initializeResponseTabs);
     
     // Navigation Handler
     navButtons.forEach(button => {
@@ -156,29 +167,34 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Update English response
-        const englishContent = document.querySelector('#englishResponse .response-content');
-        if (englishContent) {
-            englishContent.textContent = data.answer || '';
-        }
+        // Update all response sections
+        const responses = {
+            'english': { selector: '#englishResponse .response-content', content: data.answer },
+            'arabic': { selector: '#arabicResponse .response-content', content: data.arabic_answer },
+            'dense': { selector: '#denseResponse .response-content', content: data.dense_results || data.dense?.answer },
+            'graph': { selector: '#graphResponse .response-content', content: data.graph_results || data.graph?.answer }
+        };
 
-        // Update Arabic response
-        const arabicContent = document.querySelector('#arabicResponse .response-content');
-        if (arabicContent) {
-            arabicContent.textContent = data.arabic_answer || '';
-        }
+        Object.entries(responses).forEach(([type, info]) => {
+            const element = document.querySelector(info.selector);
+            if (element) {
+                element.textContent = info.content || `No ${type} results available`;
+                if (type === 'arabic') {
+                    element.setAttribute('dir', 'rtl');
+                }
+            }
+        });
 
-        // Update Dense Vector response
-        const denseContent = document.querySelector('#denseResponse .response-content');
-        if (denseContent) {
-            denseContent.textContent = data.dense_results || data.dense?.answer || 'No dense vector results available';
-        }
+        // Show English response by default
+        document.querySelectorAll('.response-section').forEach(section => {
+            section.classList.toggle('active', section.id === 'englishResponse');
+            section.classList.toggle('hidden', section.id !== 'englishResponse');
+        });
 
-        // Update Knowledge Graph response
-        const graphContent = document.querySelector('#graphResponse .response-content');
-        if (graphContent) {
-            graphContent.textContent = data.graph_results || data.graph?.answer || 'No knowledge graph results available';
-        }
+        // Make English tab active by default
+        document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.type === 'en');
+        });
 
         // Handle confidence score
         const confidenceScore = document.querySelector('.confidence-score');
