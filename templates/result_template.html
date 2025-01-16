@@ -50,7 +50,17 @@
         }
 
         .content p {
-            margin: 1.5em 0;
+            margin: 1.2em 0;
+            text-indent: 1em;
+        }
+
+        .content h2 {
+            margin: 1.5em 0 1em;
+            font-size: 1.3em;
+            font-weight: normal;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5em;
         }
 
         .header {
@@ -70,34 +80,37 @@
         .timestamp {
             color: var(--secondary-color);
             font-size: 0.9em;
-            margin: 30px 0;
-            padding: 15px 0;
-            border-bottom: 1px solid var(--border-color);
+            margin: 20px 0 40px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            background-color: var(--section-bg);
             font-style: italic;
+            text-align: center;
         }
 
         .section {
-            margin: 30px 0;
-            padding: 30px;
+            margin: 35px 0;
+            padding: 35px;
             background-color: var(--section-bg);
             border-radius: 12px;
             box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
         }
 
         .section-title {
             font-family: 'Georgia', serif;
             font-weight: normal;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             color: var(--primary-color);
-            font-size: 1.4em;
-            padding-bottom: 10px;
+            font-size: 1.5em;
+            padding-bottom: 12px;
             border-bottom: 2px solid var(--border-color);
+            letter-spacing: 0.02em;
         }
 
-        .content {
-            margin: 15px 0;
-            text-align: justify;
-            line-height: 1.8;
+        .section:first-of-type .content {
+            font-size: 1.2em;
+            color: var(--secondary-color);
         }
 
         .sources {
@@ -109,11 +122,26 @@
         }
 
         .source-item {
-            margin: 12px 0;
-            padding: 8px 0;
+            margin: 8px 0;
+            padding: 8px 12px;
             line-height: 1.6;
             color: var(--secondary-color);
             font-size: 0.95em;
+            border-left: 3px solid var(--border-color);
+            transition: border-color 0.2s ease;
+        }
+
+        .source-item:hover {
+            border-left-color: var(--primary-color);
+        }
+
+        .source-item.arabic {
+            border-left: none;
+            border-right: 3px solid var(--border-color);
+        }
+
+        .source-item.arabic:hover {
+            border-right-color: var(--primary-color);
         }
 
         /* Responsive Design */
@@ -205,7 +233,13 @@
             {% endif %}
         </div>
         <div class="content {{ 'arabic' if is_arabic else 'english' }}">
-            {{ content }}
+            {% for paragraph in content.split('\n\n') %}
+                {% if loop.first and paragraph.strip().endswith(':') %}
+                    <h2>{{ paragraph }}</h2>
+                {% else %}
+                    <p>{{ paragraph }}</p>
+                {% endif %}
+            {% endfor %}
         </div>
     </div>
 
