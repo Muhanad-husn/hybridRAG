@@ -182,13 +182,26 @@ document.addEventListener('DOMContentLoaded', function() {
         showNotification(`Saved as ${filename}`);
     }
 
-    // Add event listeners to save buttons
-    document.querySelectorAll('.save-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const lang = btn.dataset.lang;
-            saveResponseAsHtml(lang);
+    // Initialize save buttons
+    function initializeSaveButtons() {
+        console.log('Initializing save buttons');
+        document.querySelectorAll('.save-btn').forEach(btn => {
+            // Remove existing listeners to prevent duplicates
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            newBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const lang = newBtn.dataset.lang;
+                console.log('Save button clicked for language:', lang);
+                saveResponseAsHtml(lang);
+            });
         });
-    });
+    }
+
+    // Initialize save buttons on page load
+    initializeSaveButtons();
     
     // Navigation Handler
     navButtons.forEach(button => {
@@ -402,6 +415,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show results
         resultsDiv.classList.remove('hidden');
         errorDiv.classList.add('hidden');
+
+        // Reinitialize save buttons after content is loaded
+        initializeSaveButtons();
 
         // Update stats
         updateStats(data.stats);
