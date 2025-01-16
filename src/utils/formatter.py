@@ -7,7 +7,7 @@ OutputFormat = Literal["text", "markdown", "html"]
 class ResultFormatter:
     """Enhanced formatter for search results with LLM-friendly output."""
     
-    def __init__(self, format_type: OutputFormat = "text", max_length: int = 500):
+    def __init__(self, format_type: OutputFormat = "text", max_length: int = 2000):
         """Initialize the formatter with desired output format and settings."""
         self.format_type = format_type
         self.max_length = max_length
