@@ -147,13 +147,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // Display responses in both languages, preserving original form
         englishResponse.querySelector('.response-content').textContent = data.answer;
         
-        if (data.arabic_answer) {
+        // For Arabic queries, english_answer contains the English translation
+        // and answer contains the Arabic translation
+        if (data.language === 'ar') {
             const arabicContent = arabicResponse.querySelector('.response-content');
-            arabicContent.textContent = data.arabic_answer;
+            arabicContent.textContent = data.answer;
+            englishResponse.querySelector('.response-content').textContent = data.english_answer;
             arabicContent.setAttribute('dir', 'rtl');
+            // Show Arabic tab for Arabic queries
             document.querySelector('[data-lang="ar"]').style.display = 'block';
+            // Set Arabic tab as active for Arabic queries
+            document.querySelector('[data-lang="ar"]').click();
         } else {
+            // Hide Arabic tab for non-Arabic queries
             document.querySelector('[data-lang="ar"]').style.display = 'none';
+            // Ensure English tab is active
+            document.querySelector('[data-lang="en"]').click();
         }
 
         // Initialize language tabs
