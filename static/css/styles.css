@@ -388,6 +388,31 @@ textarea:focus {
     box-shadow: 0 -4px 6px rgba(0,0,0,0.05);
 }
 
+.save-controls {
+    margin: 20px 0;
+    text-align: right;
+}
+
+.save-btn {
+    padding: 8px 16px;
+    background: var(--card-background);
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all var(--transition-speed);
+}
+
+.save-btn:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+[dir="rtl"] .save-controls {
+    text-align: left;
+}
+
 .confidence-score {
     display: flex;
     align-items: center;

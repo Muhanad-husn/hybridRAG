@@ -18,40 +18,177 @@ document.addEventListener('DOMContentLoaded', function() {
     let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
     let currentLanguage = 'en';
 
+    // Debug wrapper for tab operations
+    function debugTabOperation(operation, details) {
+        console.group(`Tab Operation: ${operation}`);
+        console.log('Details:', details);
+        console.log('Current State:', {
+            activeTab: document.querySelector('.tab-btn.active')?.dataset.type,
+            englishContent: document.querySelector('#englishResponse .response-content')?.textContent.length,
+            arabicContent: document.querySelector('#arabicResponse .response-content')?.textContent.length,
+            englishVisible: !document.querySelector('#englishResponse')?.classList.contains('hidden'),
+            arabicVisible: !document.querySelector('#arabicResponse')?.classList.contains('hidden'),
+            direction: document.body.dir
+        });
+        console.groupEnd();
+    }
+
     function initializeResponseTabs() {
-        document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
+        console.group('Tab Initialization');
+        
+        const tabs = document.querySelectorAll('.response-tabs .tab-btn');
+        const englishSection = document.getElementById('englishResponse');
+        const arabicSection = document.getElementById('arabicResponse');
+
+        console.log('Found elements:', {
+            tabCount: tabs.length,
+            hasEnglishSection: !!englishSection,
+            hasArabicSection: !!arabicSection
+        });
+        
+        function switchTab(type) {
+            console.group('Tab Switch');
+            console.log('Switching to tab:', type);
+
+            // Validate type
+            if (type !== 'en' && type !== 'ar') {
+                console.error('Invalid tab type:', type);
+                console.groupEnd();
+                return;
+            }
+
+            // Log initial state
+            console.log('Initial state:', {
+                englishVisible: !englishSection.classList.contains('hidden'),
+                arabicVisible: !arabicSection.classList.contains('hidden'),
+                currentLang: currentLanguage
+            });
+
+            // Update tab states
+            tabs.forEach(t => {
+                const isActive = t.dataset.type === type;
+                t.classList.toggle('active', isActive);
+                console.log(`Tab ${t.dataset.type}:`, isActive ? 'active' : 'inactive');
+            });
+            
+            // Update section visibility
+            englishSection.classList.toggle('hidden', type !== 'en');
+            englishSection.classList.toggle('active', type === 'en');
+            arabicSection.classList.toggle('hidden', type !== 'ar');
+            arabicSection.classList.toggle('active', type === 'ar');
+
+            // Log content state
+            const activeSection = type === 'en' ? englishSection : arabicSection;
+            console.log('Active section state:', {
+                id: activeSection.id,
+                hasContent: !!activeSection.querySelector('.response-content')?.textContent.trim(),
+                contentLength: activeSection.querySelector('.response-content')?.textContent.trim().length || 0,
+                isHidden: activeSection.classList.contains('hidden'),
+                isActive: activeSection.classList.contains('active')
+            });
+
+            // Update current language and direction
+            currentLanguage = type;
+            document.body.dir = type === 'ar' ? 'rtl' : 'ltr';
+            console.log('Language and direction updated:', {
+                language: currentLanguage,
+                direction: document.body.dir
+            });
+
+            console.groupEnd();
+        }
+
+        // Add click handlers
+        tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const type = tab.dataset.type;
-                if (!type) return;
-
-                // Update active state for tabs
-                document.querySelectorAll('.response-tabs .tab-btn').forEach(t => {
-                    t.classList.remove('active');
-                });
-                tab.classList.add('active');
-
-                // Show corresponding response section, hide others
-                document.querySelectorAll('.response-section').forEach(section => {
-                    const sectionId = `${type}Response`;
-                    if (section.id === sectionId) {
-                        section.classList.remove('hidden');
-                        section.classList.add('active');
-                    } else {
-                        section.classList.add('hidden');
-                        section.classList.remove('active');
-                    }
-                });
-
-                // Update current language if it's a language tab
-                if (type === 'en' || type === 'ar') {
-                    currentLanguage = type;
+                if (type) {
+                    switchTab(type);
                 }
             });
         });
+
+        // Export for use in other functions
+        return switchTab;
     }
 
-    // Initialize tabs when DOM is loaded
-    document.addEventListener('DOMContentLoaded', initializeResponseTabs);
+    // Initialize tabs and get the switchTab function
+    const switchTab = initializeResponseTabs();
+    
+    // Save Response Handler
+    function saveResponseAsHtml(lang) {
+        const responseSection = document.getElementById(`${lang}Response`);
+        const content = responseSection.querySelector('.response-content').textContent;
+        
+        if (!content) {
+            showNotification('No content to save');
+            return;
+        }
+
+        // Get first line for filename (limited to 50 chars)
+        const firstLine = content.split('\n')[0].trim().substring(0, 50)
+            .replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g, '') // Keep English, Arabic, numbers, and spaces
+            .replace(/\s+/g, '_'); // Replace spaces with underscores
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `${firstLine}_${lang}_${timestamp}.html`;
+
+        // Create HTML content
+        const htmlContent = `
+<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+    <meta charset="UTF-8">
+    <title>${firstLine}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 40px;
+            direction: ${lang === 'ar' ? 'rtl' : 'ltr'};
+        }
+        .content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <div class="timestamp">Generated on: ${new Date().toLocaleString()}</div>
+        <div class="response-content">
+            ${content.split('\n').map(line => `<p>${line}</p>`).join('')}
+        </div>
+    </div>
+</body>
+</html>`;
+
+        // Create blob and download
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showNotification(`Saved as ${filename}`);
+    }
+
+    // Add event listeners to save buttons
+    document.querySelectorAll('.save-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const lang = btn.dataset.lang;
+            saveResponseAsHtml(lang);
+        });
+    });
     
     // Navigation Handler
     navButtons.forEach(button => {
@@ -159,109 +296,79 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         sourcesList.innerHTML = '';
 
-        // Show results container
+        // Show results container and hide error
         resultsDiv.classList.remove('hidden');
+        errorDiv.classList.add('hidden');
 
         if (data.error) {
             displayError(data.error);
             return;
         }
 
-        // Update all response sections
+        console.group('Display Results');
+        console.log('Raw response data:', data);
+
+        // Update content for both languages
         const responses = {
-            'english': { selector: '#englishResponse .response-content', content: data.answer },
-            'arabic': { selector: '#arabicResponse .response-content', content: data.arabic_answer },
-            'dense': { selector: '#denseResponse .response-content', content: data.dense_results || data.dense?.answer },
-            'graph': { selector: '#graphResponse .response-content', content: data.graph_results || data.graph?.answer }
+            'en': {
+                element: document.querySelector('#englishResponse .response-content'),
+                content: data.answer,
+                dir: 'ltr'
+            },
+            'ar': {
+                element: document.querySelector('#arabicResponse .response-content'),
+                content: data.arabic_answer,
+                dir: 'rtl'
+            }
         };
 
+        // Log response data
+        console.log('English content available:', !!responses.en.content);
+        console.log('Arabic content available:', !!responses.ar.content);
+        console.log('English element found:', !!responses.en.element);
+        console.log('Arabic element found:', !!responses.ar.element);
+
+        // Update content for both languages
         Object.entries(responses).forEach(([type, info]) => {
-            const element = document.querySelector(info.selector);
-            if (element) {
-                element.textContent = info.content || `No ${type} results available`;
-                if (type === 'arabic') {
-                    element.setAttribute('dir', 'rtl');
+            if (info.element) {
+                console.log(`Updating ${type} content:`, {
+                    contentLength: info.content?.length || 0,
+                    hasContent: !!info.content,
+                    elementId: info.element.id,
+                    parentId: info.element.parentElement?.id
+                });
+
+                info.element.textContent = info.content || `No ${type} response available`;
+                info.element.setAttribute('dir', info.dir);
+                
+                // Ensure parent section has correct direction
+                const parentSection = info.element.closest('.response-section');
+                if (parentSection) {
+                    parentSection.setAttribute('dir', info.dir);
+                    console.log(`Set direction for ${type} section:`, info.dir);
                 }
+            } else {
+                console.warn(`${type} response element not found`);
             }
         });
 
-        // Initialize response sections and tabs
-        const defaultType = 'en';
-        document.querySelectorAll('.response-section').forEach(section => {
-            const isDefault = section.id === `${defaultType}Response`;
-            section.style.display = isDefault ? 'block' : 'none';
-            section.classList.toggle('active', isDefault);
-        });
+        console.groupEnd();
 
-        document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.type === defaultType);
-        });
-
-        // Ensure the default tab is properly initialized
-        const defaultTab = document.querySelector(`.response-tabs .tab-btn[data-type="${defaultType}"]`);
-        if (defaultTab) {
-            defaultTab.click();
-        }
-
-        // Handle confidence score
+        // Update confidence score if available
         const confidenceScore = document.querySelector('.confidence-score');
         if (confidenceScore) {
+            const score = data.confidence || '85%';
             const confidenceBar = confidenceScore.querySelector('.score-bar');
             const confidenceValue = confidenceScore.querySelector('.score-value');
-            const score = '85%'; // Default confidence score
+            
             confidenceBar.style.setProperty('--score', score);
             confidenceValue.textContent = score;
             confidenceScore.classList.remove('hidden');
         }
 
-        // Show English response by default
-        document.querySelectorAll('.response-section').forEach(section => {
-            section.classList.toggle('active', section.id === 'englishResponse');
-            section.classList.toggle('hidden', section.id !== 'englishResponse');
-        });
-
-        // Show results container
-        resultsDiv.classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-        
-        // Set active tab based on query language
+        // Switch to appropriate tab based on query language
         const activeTab = data.language === 'ar' ? 'ar' : 'en';
-        const tabToActivate = document.querySelector(`.tab-btn[data-type="${activeTab}"]`);
-        if (tabToActivate) {
-            tabToActivate.click();
-        }
-
-        // Re-initialize language tabs more safely
-        const tabButtons = document.querySelectorAll('.response-tabs .tab-btn');
-        tabButtons.forEach(tab => {
-            // Remove old event listeners by cloning and replacing
-            if (tab && tab.parentNode) {
-                const newTab = tab.cloneNode(true);
-                tab.parentNode.replaceChild(newTab, tab);
-            }
-        });
-
-        // Add new event listeners
-        document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Update active states for tabs
-                document.querySelectorAll('.response-tabs .tab-btn').forEach(t => {
-                    t.classList.remove('active');
-                });
-                tab.classList.add('active');
-                
-                // Show/hide content sections
-                const type = tab.dataset.type;
-                document.querySelectorAll('.response-section').forEach(section => {
-                    const isActive = section.id === `${type}Response`;
-                    section.classList.toggle('active', isActive);
-                    section.classList.toggle('hidden', !isActive);
-                });
-                
-                // Reinitialize save buttons when switching tabs
-                initializeSaveButtons();
-            });
-        });
+        switchTab(activeTab);
 
         // Display sources
         if (data.sources && data.sources.length > 0) {
@@ -298,9 +405,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Update stats
         updateStats(data.stats);
-
-        // Reinitialize save buttons after displaying results
-        initializeSaveButtons();
     }
 
     // Related Topics Display
@@ -385,125 +489,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Save Result Handlers
-    function initializeSaveButtons() {
-        // Remove any existing event listeners
-        document.querySelectorAll('.control-btn').forEach(btn => {
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
-        });
-
-        // Add new event listeners
-        const types = ['en', 'ar', 'dense', 'graph'];
-        types.forEach(type => {
-            const saveBtn = document.getElementById(`save${type === 'en' ? 'English' : type === 'ar' ? 'Arabic' : type}Result`);
-            if (saveBtn) {
-                saveBtn.addEventListener('click', () => {
-                    console.log(`${type} save button clicked`);
-                    saveResult(type);
-                });
-            }
-        });
-    }
-
-    // Initialize save buttons when DOM is loaded
-    document.addEventListener('DOMContentLoaded', initializeSaveButtons);
-    
-    // Re-initialize save buttons after displaying results and when switching tabs
-    document.querySelectorAll('.tab-btn').forEach(tab => {
-        tab.addEventListener('click', () => {
-            setTimeout(initializeSaveButtons, 100); // Small delay to ensure DOM is updated
-        });
-    });
-
-    async function saveResult(type) {
-        console.log(`saveResult called with type: ${type}`);
-        try {
-            console.log('Starting HTML generation process...');
-            showNotification(`Preparing to save ${type} content...`);
-
-            // Get content based on type
-            const contentElement = document.querySelector(`#${type}Response .response-content`);
-
-            if (!contentElement || !contentElement.textContent.trim()) {
-                console.error(`No ${type} content available`);
-                showNotification(`No ${type} content available to save.`);
-                return;
-            }
-
-            const content = contentElement.textContent;
-            const sources = Array.from(sourcesList.children).map(li => li.textContent);
-            
-            console.log('Sending request to generate HTML...');
-            const isArabic = type === 'ar';
-            
-            // Only use original query, no translation needed
-            const originalQuery = queryInput.value;
-
-            try {
-                const response = await fetch('/generate-result', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        content: content,
-                        query: originalQuery,
-                        translatedQuery: '', // No translation needed
-                        sources: sources,
-                        isArabic: type === 'ar'
-                    })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.details || error.error || 'Failed to generate HTML');
-                }
-
-                // Get the HTML blob
-                const blob = await response.blob();
-                if (blob.size === 0) {
-                    throw new Error('Generated HTML is empty');
-                }
-                
-                // Create a unique filename with timestamp
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                // Create a unique filename with timestamp
-                const typeName = type === 'en' ? 'English' :
-                               type === 'ar' ? 'Arabic' :
-                               type === 'dense' ? 'DenseVector' :
-                               'KnowledgeGraph';
-                const filename = `HybridRAG_${typeName}_${timestamp}.html`;
-                
-                // Create a link to download the HTML
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = filename;
-                
-                // Add to document and click
-                document.body.appendChild(a);
-                a.click();
-                
-                // Clean up
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                }, 100);
-
-                console.log('HTML downloaded successfully');
-                showNotification(`${typeName} result saved as HTML!`);
-            } catch (htmlError) {
-                console.error('HTML generation error:', htmlError);
-                showNotification('Error generating HTML: ' + htmlError.message);
-                throw htmlError;
-            }
-        } catch (error) {
-            console.error('Save error:', error);
-            showNotification('Error saving result: ' + error.message);
-        }
-    }
+    // Set initial tab
+    switchTab('en');
 
     // Utility Functions
     function showNotification(message) {

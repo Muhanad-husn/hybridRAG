@@ -54,18 +54,14 @@
                         <div class="response-tabs">
                             <button class="tab-btn active" data-type="en">English</button>
                             <button class="tab-btn" data-type="ar">عربي</button>
-                            <button class="tab-btn" data-type="dense">Dense Vector</button>
-                            <button class="tab-btn" data-type="graph">Knowledge Graph</button>
                         </div>
                         
                         <div class="response-panels">
                             <!-- English Response -->
                             <div id="englishResponse" class="response-section active">
                                 <div class="response-content"></div>
-                                <div class="response-controls">
-                                    <button id="saveEnglishResult" class="control-btn">
-                                        <span class="icon">📥</span> Save English Result
-                                    </button>
+                                <div class="save-controls">
+                                    <button class="save-btn" data-lang="en">Save as HTML</button>
                                 </div>
                                 <div class="response-metadata">
                                     <div class="confidence-score">
@@ -81,32 +77,12 @@
                             <!-- Arabic Response -->
                             <div id="arabicResponse" class="response-section" dir="rtl">
                                 <div class="response-content"></div>
-                                <div class="response-controls">
-                                    <button id="saveArabicResult" class="control-btn">
-                                        <span class="icon">📥</span> حفظ النتيجة بالعربية
-                                    </button>
+                                <div class="save-controls">
+                                    <button class="save-btn" data-lang="ar">حفظ كملف HTML</button>
                                 </div>
                             </div>
 
-                            <!-- Dense Vector Response -->
-                            <div id="denseResponse" class="response-section">
-                                <div class="response-content"></div>
-                                <div class="response-controls">
-                                    <button id="saveDenseResult" class="control-btn">
-                                        <span class="icon">📥</span> Save Dense Vector Result
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Knowledge Graph Response -->
-                            <div id="graphResponse" class="response-section">
-                                <div class="response-content"></div>
-                                <div class="response-controls">
-                                    <button id="saveGraphResult" class="control-btn">
-                                        <span class="icon">📥</span> Save Knowledge Graph Result
-                                    </button>
-                                </div>
-                            </div>
+                            <!-- No content here - removing Dense Vector and Knowledge Graph sections -->
                         </div>
                     </div>
 
