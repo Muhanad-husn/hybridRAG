@@ -446,21 +446,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Create a unique filename with timestamp
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 // Create a unique filename with timestamp
-                let typeName;
-                switch (type) {
-                    case 'en':
-                        typeName = 'English';
-                        break;
-                    case 'ar':
-                        typeName = 'Arabic';
-                        break;
-                    case 'dense':
-                        typeName = 'DenseVector';
-                        break;
-                    case 'graph':
-                        typeName = 'KnowledgeGraph';
-                        break;
-                }
+                const typeName = type === 'en' ? 'English' :
+                               type === 'ar' ? 'Arabic' :
+                               type === 'dense' ? 'DenseVector' :
+                               'KnowledgeGraph';
                 const filename = `HybridRAG_${typeName}_${timestamp}.html`;
                 
                 // Create a link to download the HTML
