@@ -263,17 +263,40 @@ textarea:focus {
     background: var(--card-background);
     border: 1px solid var(--primary-color);
     border-radius: 0 var(--border-radius) var(--border-radius) var(--border-radius);
-    padding: 25px;
+    height: 500px;
+    overflow: hidden;
 }
 
 .response-section {
     display: none;
     background: var(--card-background);
+    height: 100%;
+    overflow-y: auto;
+    padding: 25px;
 }
 
 .response-section.active {
     display: block;
     animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Scrollbar styling */
+.response-section::-webkit-scrollbar {
+    width: 8px;
+}
+
+.response-section::-webkit-scrollbar-track {
+    background: var(--background-color);
+    border-radius: 4px;
+}
+
+.response-section::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+.response-section::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
 }
 
 @keyframes fadeIn {
@@ -284,6 +307,7 @@ textarea:focus {
 .response-content {
     white-space: pre-line;
     line-height: 1.8;
+    padding-bottom: 20px;
 }
 
 .response-content strong {
@@ -292,9 +316,13 @@ textarea:focus {
 }
 
 .response-metadata {
+    position: sticky;
+    bottom: 0;
+    background: var(--card-background);
     margin-top: 15px;
-    padding-top: 15px;
+    padding: 15px 0;
     border-top: 1px solid #eee;
+    box-shadow: 0 -4px 6px rgba(0,0,0,0.05);
 }
 
 .confidence-score {
