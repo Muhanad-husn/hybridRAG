@@ -321,11 +321,17 @@ textarea:focus {
     height: 100%;
     overflow-y: auto;
     padding: 25px;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
 }
 
 .response-section.active {
     display: block;
-    animation: fadeIn 0.3s ease-in-out;
+    opacity: 1;
+}
+
+.response-section:not(.hidden) {
+    display: block;
 }
 
 .language-section {

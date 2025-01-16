@@ -185,16 +185,23 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Show English response by default
+        // Initialize response sections and tabs
+        const defaultType = 'en';
         document.querySelectorAll('.response-section').forEach(section => {
-            section.classList.toggle('active', section.id === 'englishResponse');
-            section.classList.toggle('hidden', section.id !== 'englishResponse');
+            const isDefault = section.id === `${defaultType}Response`;
+            section.style.display = isDefault ? 'block' : 'none';
+            section.classList.toggle('active', isDefault);
         });
 
-        // Make English tab active by default
         document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.type === 'en');
+            tab.classList.toggle('active', tab.dataset.type === defaultType);
         });
+
+        // Ensure the default tab is properly initialized
+        const defaultTab = document.querySelector(`.response-tabs .tab-btn[data-type="${defaultType}"]`);
+        if (defaultTab) {
+            defaultTab.click();
+        }
 
         // Handle confidence score
         const confidenceScore = document.querySelector('.confidence-score');
