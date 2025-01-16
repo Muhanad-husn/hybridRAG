@@ -18,12 +18,34 @@ from src.utils.logger import setup_logger, get_logger
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 
-# Initialize logger
-setup_logger()  # This will set up the root logger with config
-logger = get_logger(__name__)  # Get a logger for this module
+# Configure logging with UTF-8 support
+def setup_utf8_logger():
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    
+    # Create handlers with UTF-8 encoding
+    file_handler = logging.FileHandler('logs/app.log', encoding='utf-8')
+    console_handler = logging.StreamHandler(sys.stdout)
+    
+    # Create a formatter
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    
+    # Add handlers to the logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+# Initialize logger with UTF-8 support
+logger = setup_utf8_logger()
 
 # Initialize translator
 translator = Translator()
+
+# Configure Flask app
+app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 
 def register_font():
     try:
@@ -44,133 +66,76 @@ register_font()
 
 def create_pdf(content, query, translated_query, sources, is_arabic=False):
     buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
+    doc = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-
-    # Set font and size
-    p.setFont('NotoNaskh' if is_arabic else 'Helvetica', 12)
-    
-    # Initialize positions
     margin = 50
     y = height - margin
-    line_height = 20
-    max_width = width - 2 * margin
     
-    def add_text_line(text, y_pos, font_name=None):
-        if font_name:
-            p.setFont(font_name, 12)
-        if is_arabic and text:
-            # Reshape and reorder Arabic text
-            reshaped_text = arabic_reshaper.reshape(text)
-            bidi_text = get_display(reshaped_text)
-            p.drawRightString(width - margin, y_pos, bidi_text)
-        else:
-            p.drawString(margin, y_pos, text)
-        return y_pos - line_height
-
-    # Add timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    y = add_text_line(f"{'تم إنشاؤه في' if is_arabic else 'Generated at'}: {timestamp}", y)
-    y -= line_height
-
-    # Add query in both languages
-    y = add_text_line(f"{'السؤال' if is_arabic else 'Query'}:", y)
-    if is_arabic:
-        # For Arabic PDF, show Arabic first then English
-        if query:
-            y = add_text_line(query, y)
+    # Basic PDF generation with minimal formatting
+    try:
+        # Set basic font
+        doc.setFont('Helvetica', 12)
+        
+        # Add timestamp
+        doc.drawString(margin, y, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        y -= 20
+        
+        # Add query
+        doc.drawString(margin, y, "Query:")
+        y -= 20
+        doc.drawString(margin, y, query)
+        y -= 20
+        
         if translated_query:
-            y = add_text_line("English Query:", y, 'Helvetica')
-            y = add_text_line(translated_query, y, 'Helvetica')
-    else:
-        # For English PDF, show English first then Arabic
-        if query:
-            y = add_text_line(query, y)
-        if translated_query:
-            y = add_text_line("الترجمة:", y, 'NotoNaskh')
-            y = add_text_line(translated_query, y, 'NotoNaskh')
-    y -= line_height
-
-    # Add content
-    y = add_text_line(f"{'الإجابة' if is_arabic else 'Answer'}:", y)
-    
-    # Split content into lines that fit the page width
-    words = content.split()
-    current_line = []
-    for word in words:
-        current_line.append(word)
-        line_text = ' '.join(current_line)
-        if p.stringWidth(line_text, p._fontname, p._fontsize) > max_width:
-            current_line.pop()
-            y = add_text_line(' '.join(current_line), y)
-            current_line = [word]
-            
-            # Check if we need a new page
-            if y < margin:
-                p.showPage()
-                p.setFont('NotoNaskh' if is_arabic else 'Helvetica', 12)
-                y = height - margin
-    
-    if current_line:
-        y = add_text_line(' '.join(current_line), y)
-    y -= line_height
-
-    # Add sources with proper formatting
-    if sources:
-        # Add a page break if we're close to the bottom
-        if y < margin + 100:
-            p.showPage()
-            p.setFont('NotoNaskh' if is_arabic else 'Helvetica', 12)
-            y = height - margin
-
-        # Add sources header
-        y = add_text_line(f"{'المصادر' if is_arabic else 'Sources'}:", y)
-        y -= line_height/2  # Add some spacing
-
-        for i, source in enumerate(sources, 1):
-            if not source.strip():  # Skip empty sources
-                continue
-
-            # Format source with bullet point and number
-            if is_arabic:
-                source_text = f"●  {source}"
-                # Add source number in parentheses
-                source_text += f" ({get_display(str(i))})"
-            else:
-                source_text = f"{i}. {source}"
-
-            # Split long sources into multiple lines
-            words = source_text.split()
-            current_line = []
-            first_line = True
-            indent = "    " if not is_arabic else ""  # Indent continuation lines
-
-            for word in words:
-                current_line.append(word)
-                test_line = (indent if not first_line else "") + " ".join(current_line)
-
-                if p.stringWidth(test_line, p._fontname, p._fontsize) > max_width - margin:
-                    # Remove the last word
-                    current_line.pop()
-                    # Print current line
-                    line_text = (indent if not first_line else "") + " ".join(current_line)
-                    y = add_text_line(line_text, y)
-                    # Start new line with removed word
-                    current_line = [word]
-                    first_line = False
-
-                    # Check if we need a new page
+            doc.drawString(margin, y, "Translated Query:")
+            y -= 20
+            doc.drawString(margin, y, translated_query)
+            y -= 20
+        
+        # Add content
+        doc.drawString(margin, y, "Answer:")
+        y -= 20
+        
+        # Simple text wrapping
+        words = content.split()
+        line = []
+        for word in words:
+            line.append(word)
+            if doc.stringWidth(' '.join(line)) > width - 2 * margin:
+                line.pop()
+                doc.drawString(margin, y, ' '.join(line))
+                y -= 15
+                line = [word]
+                
+                if y < margin:
+                    doc.showPage()
+                    doc.setFont('Helvetica', 12)
+                    y = height - margin
+        
+        if line:
+            doc.drawString(margin, y, ' '.join(line))
+            y -= 20
+        
+        # Add sources
+        if sources:
+            doc.drawString(margin, y, "Sources:")
+            y -= 20
+            for i, source in enumerate(sources, 1):
+                if source.strip():
+                    doc.drawString(margin, y, f"{i}. {source}")
+                    y -= 15
                     if y < margin:
-                        p.showPage()
-                        p.setFont('NotoNaskh' if is_arabic else 'Helvetica', 12)
+                        doc.showPage()
+                        doc.setFont('Helvetica', 12)
                         y = height - margin
-
-            # Print remaining words
-            if current_line:
-                line_text = (indent if not first_line else "") + " ".join(current_line)
-                y = add_text_line(line_text, y)
-
-            y -= line_height/2  # Add spacing between sources
+        
+        doc.save()
+        buffer.seek(0)
+        return buffer
+        
+    except Exception as e:
+        logger.error(f"Error generating PDF: {str(e)}")
+        raise
 
     p.save()
     buffer.seek(0)
@@ -214,36 +179,62 @@ def search():
 @app.route('/generate-pdf', methods=['POST'])
 def generate_pdf():
     try:
+        # Get request data
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # Extract and validate content
         content = data.get('content', '').strip()
-        query = data.get('query', '').strip()
-        translated_query = data.get('translatedQuery', '').strip()
-        sources = [s for s in data.get('sources', []) if s.strip()]  # Filter out empty sources
-        is_arabic = data.get('isArabic', False)
-        
         if not content:
             return jsonify({'error': 'Content cannot be empty'}), 400
 
-        logger.info(f"Generating PDF for {'Arabic' if is_arabic else 'English'} content")
-        logger.info(f"Query: {query}")
-        logger.info(f"Translated Query: {translated_query}")
+        # Extract other fields with defaults
+        query = data.get('query', '').strip()
+        translated_query = data.get('translatedQuery', '').strip()
+        sources = [s for s in data.get('sources', []) if s.strip()]
+        is_arabic = data.get('isArabic', False)
+
+        # Log basic info without Arabic text to avoid encoding issues
+        logger.info(f"Starting PDF generation - Language: {'Arabic' if is_arabic else 'English'}")
+        logger.info(f"Content length: {len(content)}")
         logger.info(f"Number of sources: {len(sources)}")
-        
-        pdf_buffer = create_pdf(content, query, translated_query, sources, is_arabic)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"HybridRAG_Result_{'Arabic' if is_arabic else 'English'}_{timestamp}.pdf"
-        
-        return send_file(
-            pdf_buffer,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=filename
-        )
-        
+
+        try:
+            # Generate PDF
+            pdf_buffer = create_pdf(content, query, translated_query, sources, is_arabic)
+
+            # Create filename with unique timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            filename = f"HybridRAG_Result_{'Arabic' if is_arabic else 'English'}_{timestamp}.pdf"
+
+            # Return PDF file with cache prevention headers
+            response = send_file(
+                pdf_buffer,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=filename
+            )
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+
+            logger.info("PDF generated successfully")
+            return response
+
+        except Exception as pdf_error:
+            logger.error(f"PDF generation failed: {str(pdf_error)}")
+            return jsonify({
+                'error': 'Failed to generate PDF',
+                'details': str(pdf_error)
+            }), 500
+
     except Exception as e:
-        logger.error(f"PDF generation error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Request processing error: {str(e)}")
+        return jsonify({
+            'error': 'Failed to process request',
+            'details': str(e)
+        }), 400
 
 if __name__ == '__main__':
     try:
