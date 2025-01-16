@@ -412,14 +412,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
             console.log('Number of sources:', sources.length);
 
-            // Initialize PDF
-            console.log('Initializing PDF document...');
+            // Initialize PDF with Unicode support
+            console.log('Initializing PDF document with Unicode support...');
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
-                format: 'a4'
+                format: 'a4',
+                putOnlyUsedFonts: true,
+                compress: true
             });
+
+            // Configure for Unicode and RTL if Arabic
+            if (lang === 'ar') {
+                console.log('Configuring PDF for Arabic text...');
+                doc.setLanguage("ar");
+                doc.setR2L(true);
+            }
 
             try {
                 // Configure PDF settings
@@ -432,22 +441,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 const pageWidth = doc.internal.pageSize.width;
                 let currentY = margin;
 
+                // Configure text rendering options
+                const textOptions = {
+                    align: lang === 'ar' ? 'right' : 'left',
+                    renderingMode: 'fill',
+                    maxWidth: pageWidth - 2 * margin
+                };
+
                 // Add metadata
-                doc.text('Generated: ' + new Date().toLocaleString(), margin, currentY);
+                doc.text('Generated: ' + new Date().toLocaleString(), margin, currentY, textOptions);
                 currentY += 15;
 
                 // Add query
-                doc.text('Query:', margin, currentY);
+                doc.text(lang === 'ar' ? 'السؤال:' : 'Query:', margin, currentY, textOptions);
                 currentY += 10;
                 const queryLines = doc.splitTextToSize(queryInput.value, pageWidth - 2 * margin);
-                doc.text(queryLines, margin, currentY);
+                doc.text(queryLines, lang === 'ar' ? pageWidth - margin : margin, currentY, textOptions);
                 currentY += queryLines.length * 7 + 10;
 
                 // Add answer
-                doc.text('Answer:', margin, currentY);
+                doc.text(lang === 'ar' ? 'الإجابة:' : 'Answer:', margin, currentY, textOptions);
                 currentY += 10;
                 const contentLines = doc.splitTextToSize(content, pageWidth - 2 * margin);
-                doc.text(contentLines, margin, currentY);
+                doc.text(contentLines, lang === 'ar' ? pageWidth - margin : margin, currentY, textOptions);
                 currentY += contentLines.length * 7 + 10;
 
                 // Add sources if available
@@ -456,10 +472,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         doc.addPage();
                         currentY = margin;
                     }
-                    doc.text('Sources:', margin, currentY);
+                    doc.text(lang === 'ar' ? 'المصادر:' : 'Sources:', margin, currentY, textOptions);
                     currentY += 10;
                     sources.forEach((source, i) => {
-                        const sourceText = `${i + 1}. ${source}`;
+                        const sourceText = lang === 'ar' ?
+                            `${source} .${i + 1}` :
+                            `${i + 1}. ${source}`;
                         const sourceLines = doc.splitTextToSize(sourceText, pageWidth - 2 * margin);
                         
                         if (currentY + (sourceLines.length * 7) > doc.internal.pageSize.height - margin) {
@@ -467,7 +485,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             currentY = margin;
                         }
                         
-                        doc.text(sourceLines, margin, currentY);
+                        doc.text(sourceLines, lang === 'ar' ? pageWidth - margin : margin, currentY, textOptions);
                         currentY += sourceLines.length * 7;
                     });
                 }
