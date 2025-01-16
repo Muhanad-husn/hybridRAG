@@ -144,24 +144,27 @@ document.addEventListener('DOMContentLoaded', function() {
             confidenceScore.classList.add('hidden');
         }
 
-        // Display responses in both languages, preserving original form
-        englishResponse.querySelector('.response-content').textContent = data.answer;
-        
-        // For Arabic queries, english_answer contains the English translation
-        // and answer contains the Arabic translation
+        // Always show both language tabs
+        document.querySelector('[data-lang="ar"]').style.display = 'block';
+        document.querySelector('[data-lang="en"]').style.display = 'block';
+
+        // Handle responses based on language
         if (data.language === 'ar') {
+            // For Arabic queries:
+            // - english_answer contains the English translation
+            // - answer contains the Arabic translation
+            englishResponse.querySelector('.response-content').textContent = data.english_answer;
             const arabicContent = arabicResponse.querySelector('.response-content');
             arabicContent.textContent = data.answer;
-            englishResponse.querySelector('.response-content').textContent = data.english_answer;
             arabicContent.setAttribute('dir', 'rtl');
-            // Show Arabic tab for Arabic queries
-            document.querySelector('[data-lang="ar"]').style.display = 'block';
-            // Set Arabic tab as active for Arabic queries
+            // Set Arabic tab as active
             document.querySelector('[data-lang="ar"]').click();
         } else {
-            // Hide Arabic tab for non-Arabic queries
-            document.querySelector('[data-lang="ar"]').style.display = 'none';
-            // Ensure English tab is active
+            // For English queries:
+            // - answer contains the English response
+            englishResponse.querySelector('.response-content').textContent = data.answer;
+            arabicResponse.querySelector('.response-content').textContent = '';
+            // Set English tab as active
             document.querySelector('[data-lang="en"]').click();
         }
 
