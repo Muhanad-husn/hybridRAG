@@ -210,6 +210,22 @@ Please provide a clear and accurate answer based solely on the information provi
         # Always keep English answer
         answer = english_answer
 
+        # Save English response to HTML
+        if english_answer:
+            try:
+                from app import create_result_html
+                logger.info("Saving English response to HTML...")
+                english_filepath = create_result_html(
+                    content=english_answer,
+                    query=query,
+                    translated_query="",
+                    sources=sources,
+                    is_arabic=False
+                )
+                logger.info(f"English response saved to: {english_filepath}")
+            except Exception as e:
+                logger.error(f"Error saving English response to HTML: {str(e)}")
+
         # Always translate to Arabic
         arabic_answer = None
         if english_answer:
@@ -217,22 +233,82 @@ Please provide a clear and accurate answer based solely on the information provi
                 translator = get_translator()
                 logger.info("Translating LLM response to Arabic...")
                 arabic_answer = translator.translate(english_answer, source_lang='en', target_lang='ar')
-                logger.info("Translation completed")
+                logger.info(f"Translation completed. Length: {len(arabic_answer)}")
+
+                if not arabic_answer:
+                    raise ValueError("Arabic translation is empty")
+
+                # Save Arabic response to HTML
+                try:
+                    from app import create_result_html
+                    logger.info("Saving Arabic response to HTML...")
+                    arabic_filepath = create_result_html(
+                        content=arabic_answer,
+                        query=original_query or query,
+                        translated_query=query if original_query else "",
+                        sources=sources,
+                        is_arabic=True
+                    )
+                    logger.info(f"Arabic response saved to: {arabic_filepath}")
+                    
+                    # Verify file was created
+                    if not os.path.exists(arabic_filepath):
+                        raise FileNotFoundError(f"Arabic HTML file not found at: {arabic_filepath}")
+                    
+                    logger.info(f"Verified Arabic HTML file exists at: {arabic_filepath}")
+                except Exception as e:
+                    logger.error(f"Error saving Arabic response to HTML: {str(e)}")
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    raise
+
             except Exception as e:
-                logger.error(f"Error translating response to Arabic: {str(e)}")
+                logger.error(f"Error in Arabic processing: {str(e)}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 # Don't fallback to English for Arabic answer
+                arabic_answer = None
         
-        # Return results with both languages
-        return {
+        # Prepare base response
+        response = {
             "query": query,
             "original_query": original_query or query,
-            "answer": english_answer,  # Original English answer
-            "arabic_answer": arabic_answer,  # Arabic translation
-            "english_answer": english_answer,  # Always include English
+            "answer": english_answer,
+            "arabic_answer": None,  # Initialize as None
+            "english_answer": english_answer,
             "error": error,
             "sources": sources,
-            "language": original_lang or 'en'
+            "language": original_lang or 'en',
+            "english_file": None,
+            "arabic_file": None
         }
+
+        # Add English file if available
+        try:
+            if 'english_filepath' in locals() and os.path.exists(english_filepath):
+                logger.info(f"Adding English file to response: {english_filepath}")
+                response["english_file"] = os.path.basename(english_filepath)
+        except Exception as e:
+            logger.error(f"Error adding English file to response: {str(e)}")
+
+        # Add Arabic content and file if available
+        try:
+            if arabic_answer and 'arabic_filepath' in locals() and os.path.exists(arabic_filepath):
+                logger.info("Adding Arabic content and file to response")
+                response["arabic_answer"] = arabic_answer
+                response["arabic_file"] = os.path.basename(arabic_filepath)
+                logger.info(f"Arabic content length: {len(arabic_answer)}")
+                logger.info(f"Arabic file: {response['arabic_file']}")
+        except Exception as e:
+            logger.error(f"Error adding Arabic content to response: {str(e)}")
+
+        # Log final response state
+        logger.info("Final response state:", {
+            "has_english": bool(response["answer"]),
+            "has_arabic": bool(response["arabic_answer"]),
+            "english_file": response["english_file"],
+            "arabic_file": response["arabic_file"]
+        })
+
+        return response
             
             
     except Exception as e:

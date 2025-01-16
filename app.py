@@ -59,10 +59,22 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
         # Create timestamp
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # Format content - split into paragraphs and handle apostrophes
+        def format_content(text):
+            # Replace HTML entities with actual characters
+            text = text.replace('&#39;', "'")
+            text = text.replace('&quot;', '"')
+            
+            # Split into paragraphs and filter out empty ones
+            paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+            
+            # Join with double newlines for proper paragraph spacing
+            return '\n\n'.join(paragraphs)
+        
         # Render HTML template
         html = render_template(
             'result_template.html',
-            content=content,
+            content=format_content(content),
             query=query,
             translated_query=translated_query,
             sources=sources,
@@ -119,10 +131,61 @@ def search():
         logger.debug("Response data: %s", result)
         logger.debug("Response keys: %s", result.keys())
         logger.debug("Language: %s", result.get('language'))
+
+        # Get the most recent HTML files from results directory
+        results_dir = os.path.join(os.path.dirname(__file__), 'results')
+        html_files = [f for f in os.listdir(results_dir) if f.endswith('.html')]
+        html_files.sort(key=lambda x: os.path.getmtime(os.path.join(results_dir, x)), reverse=True)
+
+        # Get the latest English and Arabic files
+        latest_english = next((f for f in html_files if 'English' in f), None)
+        latest_arabic = next((f for f in html_files if 'Arabic' in f), None)
+
+        # Add file paths to result
+        if latest_english:
+            result['english_file'] = latest_english
+        if latest_arabic:
+            result['arabic_file'] = latest_arabic
             
         return jsonify(result)
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/results/<path:filename>')
+def serve_result(filename):
+    try:
+        results_dir = os.path.join(os.path.dirname(__file__), 'results')
+        filepath = os.path.join(results_dir, filename)
+        
+        print(f"\nServing result file:")
+        print(f"Filename requested: {filename}")
+        print(f"Full filepath: {filepath}")
+        
+        if not os.path.exists(filepath):
+            print(f"ERROR: File not found at {filepath}")
+            logger.error(f"File not found: {filepath}")
+            return jsonify({'error': 'File not found'}), 404
+            
+        print(f"File exists, preparing to serve...")
+        logger.info(f"Serving file: {filepath}")
+        
+        try:
+            response = send_file(
+                filepath,
+                mimetype='text/html',
+                as_attachment=True,
+                download_name=filename
+            )
+            print(f"File served successfully: {filename}")
+            return response
+        except Exception as serve_error:
+            print(f"ERROR serving file: {str(serve_error)}")
+            raise serve_error
+            
+    except Exception as e:
+        print(f"ERROR in serve_result: {str(e)}")
+        logger.error(f"Error serving result file: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/generate-result', methods=['POST'])

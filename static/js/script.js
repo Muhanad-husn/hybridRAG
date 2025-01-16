@@ -9,97 +9,122 @@ document.addEventListener('DOMContentLoaded', function() {
     const arabicResponse = document.getElementById('arabicResponse');
     const errorDiv = document.getElementById('error');
     const sourcesList = document.querySelector('.sources-list');
-    const navButtons = document.querySelectorAll('.nav-btn');
-    const views = document.querySelectorAll('.view');
-    const langTabs = document.querySelectorAll('.response-tabs .tab-btn');
-    const processSteps = document.querySelectorAll('.process-steps .step');
 
-    // State Management
-    let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
-    let currentLanguage = 'en';
-
+    // Initialize response tabs
     function initializeResponseTabs() {
         const tabs = document.querySelectorAll('.response-tabs .tab-btn');
         const englishSection = document.getElementById('englishResponse');
         const arabicSection = document.getElementById('arabicResponse');
         
         function switchTab(type) {
-            if (type !== 'en' && type !== 'ar') {
-                return;
-            }
-
-            tabs.forEach(t => {
-                const isActive = t.dataset.type === type;
-                t.classList.toggle('active', isActive);
-            });
+            if (type !== 'en' && type !== 'ar') return;
             
+            console.log(`Switching to ${type} tab`);
+            
+            // Update tab buttons
+            tabs.forEach(t => t.classList.toggle('active', t.dataset.type === type));
+            
+            // Update section visibility
             englishSection.classList.toggle('hidden', type !== 'en');
             englishSection.classList.toggle('active', type === 'en');
             arabicSection.classList.toggle('hidden', type !== 'ar');
             arabicSection.classList.toggle('active', type === 'ar');
-
-            currentLanguage = type;
-            document.body.dir = type === 'ar' ? 'rtl' : 'ltr';
+            
+            // Update RTL/LTR
+            if (type === 'ar') {
+                arabicSection.dir = 'rtl';
+                arabicSection.style.textAlign = 'right';
+                arabicSection.querySelector('.response-content').style.fontFamily = "'Noto Naskh Arabic', Arial, sans-serif";
+            } else {
+                englishSection.dir = 'ltr';
+                englishSection.style.textAlign = 'left';
+            }
+            
+            console.log(`Tab switched to ${type}`);
         }
 
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const type = tab.dataset.type;
-                if (type) {
-                    switchTab(type);
-                }
+                if (type) switchTab(type);
             });
         });
 
         return switchTab;
     }
 
-    // Initialize tabs and get the switchTab function
     const switchTab = initializeResponseTabs();
     
-    // Initialize save buttons
-    function initializeSaveButtons() {
-        document.querySelectorAll('.save-btn').forEach(btn => {
-            // Remove existing listeners to prevent duplicates
+    // Save functionality
+    function setupSaveButtons(data) {
+        console.log('Setting up save buttons with data:', {
+            hasEnglishFile: Boolean(data.english_file),
+            hasArabicFile: Boolean(data.arabic_file)
+        });
+
+        const saveButtons = document.querySelectorAll('.save-btn');
+        console.log(`Found ${saveButtons.length} save buttons`);
+
+        saveButtons.forEach(btn => {
+            const lang = btn.dataset.lang;
+            const filename = lang === 'en' ? data.english_file : data.arabic_file;
+            
+            console.log(`Configuring ${lang} save button:`, {
+                hasFile: Boolean(filename),
+                filename: filename
+            });
+            
+            // Remove existing listeners
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
             
-            newBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const lang = newBtn.dataset.lang;
-                saveResponseAsHtml(lang);
-            });
+            if (filename) {
+                console.log(`Setting up save button for ${lang}:`, {
+                    filename: filename,
+                    buttonId: newBtn.id,
+                    buttonLang: newBtn.dataset.lang
+                });
+                
+                newBtn.disabled = false;
+                newBtn.title = lang === 'en' ? "Click to download HTML file" : "انقر للتحميل بصيغة HTML";
+                
+                newBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('\nSave button clicked:');
+                    console.log('Language:', lang);
+                    console.log('Filename:', filename);
+                    console.log('Button state:', {
+                        disabled: newBtn.disabled,
+                        dataset: newBtn.dataset,
+                        title: newBtn.title
+                    });
+                    
+                    const downloadUrl = `/results/${filename}`;
+                    console.log('Download URL:', downloadUrl);
+                    
+                    try {
+                        window.location.href = downloadUrl;
+                        console.log('Download initiated');
+                    } catch (error) {
+                        console.error('Error initiating download:', error);
+                    }
+                });
+                
+                console.log(`${lang} save button enabled and configured`);
+            } else {
+                console.log(`${lang} save button disabled:`, {
+                    reason: 'No filename available',
+                    buttonId: newBtn.id,
+                    buttonLang: newBtn.dataset.lang
+                });
+                
+                newBtn.disabled = true;
+                newBtn.title = lang === 'en' ? "No file available" : "الملف غير متوفر";
+            }
         });
     }
 
-    // Initialize save buttons on page load
-    initializeSaveButtons();
-    
-    // Navigation Handler
-    navButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const targetView = button.dataset.view;
-            
-            navButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            
-            views.forEach(view => {
-                view.classList.toggle('active', view.id === `${targetView}View`);
-                view.classList.toggle('hidden', view.id !== `${targetView}View`);
-            });
-
-            if (targetView === 'history') {
-                displaySearchHistory();
-            } else if (targetView === 'saved') {
-                displaySavedResults();
-            } else if (targetView === 'tutorial') {
-                loadTutorial();
-            }
-        });
-    });
-
-    // Search Form Handler
+    // Search form handler
     searchForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -110,8 +135,6 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsDiv.classList.add('hidden');
         loadingIndicator.classList.remove('hidden');
         searchButton.disabled = true;
-
-        startProcessAnimation();
 
         try {
             const response = await fetch('/search', {
@@ -126,16 +149,27 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
+            console.log('\nSearch response received:', {
+                status: response.status,
+                ok: response.ok,
+                hasEnglishAnswer: Boolean(data.answer),
+                hasArabicAnswer: Boolean(data.arabic_answer),
+                englishFile: data.english_file,
+                arabicFile: data.arabic_file,
+                language: data.language
+            });
 
             if (response.ok) {
-                addToSearchHistory({
-                    query: query,
-                    timestamp: new Date().toISOString(),
-                    result: data
+                console.log('Processing search response data:', {
+                    englishContentLength: data.answer?.length,
+                    arabicContentLength: data.arabic_answer?.length,
+                    hasEnglishFile: Boolean(data.english_file),
+                    hasArabicFile: Boolean(data.arabic_file),
+                    sourceCount: data.sources?.length
                 });
-                
                 displayResults(data);
             } else {
+                console.error('Search response error:', data.error);
                 throw new Error(data.error || 'An error occurred while processing your query');
             }
         } catch (error) {
@@ -143,81 +177,65 @@ document.addEventListener('DOMContentLoaded', function() {
         } finally {
             loadingIndicator.classList.add('hidden');
             searchButton.disabled = false;
-            stopProcessAnimation();
         }
     });
 
-    // Process Animation
-    function startProcessAnimation() {
-        processSteps.forEach(step => step.classList.remove('active'));
-        processSteps[0].classList.add('active');
-        window.stepTimeout = setTimeout(() => {
-            processSteps[0].classList.remove('active');
-            processSteps[1].classList.add('active');
-        }, 1500);
-    }
-
-    function stopProcessAnimation() {
-        if (window.stepTimeout) {
-            clearTimeout(window.stepTimeout);
-        }
-        processSteps.forEach(step => step.classList.remove('active'));
-    }
-
-    // Results Display
+    // Display results
     function displayResults(data) {
-        document.querySelectorAll('.response-content').forEach(content => {
-            content.textContent = '';
-        });
-        sourcesList.innerHTML = '';
-
-        resultsDiv.classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-
         if (data.error) {
             displayError(data.error);
             return;
         }
 
-        const responses = {
-            'en': {
-                element: document.querySelector('#englishResponse .response-content'),
-                content: data.answer,
-                dir: 'ltr'
-            },
-            'ar': {
-                element: document.querySelector('#arabicResponse .response-content'),
-                content: data.arabic_answer,
-                dir: 'rtl'
-            }
-        };
+        // Clear previous content
+        document.querySelectorAll('.response-content').forEach(content => {
+            content.textContent = '';
+        });
+        sourcesList.innerHTML = '';
 
-        Object.entries(responses).forEach(([type, info]) => {
-            if (info.element) {
-                info.element.textContent = info.content || `No ${type} response available`;
-                info.element.setAttribute('dir', info.dir);
-                
-                const parentSection = info.element.closest('.response-section');
-                if (parentSection) {
-                    parentSection.setAttribute('dir', info.dir);
-                }
-            }
+        console.log('Displaying responses with data:', {
+            hasEnglish: Boolean(data.answer),
+            hasArabic: Boolean(data.arabic_answer),
+            englishFile: data.english_file,
+            arabicFile: data.arabic_file
         });
 
-        const confidenceScore = document.querySelector('.confidence-score');
-        if (confidenceScore) {
-            const score = data.confidence || '85%';
-            const confidenceBar = confidenceScore.querySelector('.score-bar');
-            const confidenceValue = confidenceScore.querySelector('.score-value');
-            
-            confidenceBar.style.setProperty('--score', score);
-            confidenceValue.textContent = score;
-            confidenceScore.classList.remove('hidden');
+        console.log('Setting up responses with data:', {
+            hasEnglish: Boolean(data.answer),
+            hasArabic: Boolean(data.arabic_answer),
+            englishLength: data.answer?.length,
+            arabicLength: data.arabic_answer?.length
+        });
+
+        // Display English response
+        const englishContent = document.querySelector('#englishResponse .response-content');
+        if (englishContent && data.answer) {
+            englishContent.textContent = data.answer;
+            console.log('English content set');
         }
 
-        const activeTab = data.language === 'ar' ? 'ar' : 'en';
-        switchTab(activeTab);
+        // Display Arabic response
+        const arabicContent = document.querySelector('#arabicResponse .response-content');
+        if (arabicContent) {
+            if (data.arabic_answer) {
+                arabicContent.textContent = data.arabic_answer;
+                arabicContent.dir = 'rtl';
+                arabicContent.style.textAlign = 'right';
+                arabicContent.style.fontFamily = "'Noto Naskh Arabic', Arial, sans-serif";
+                console.log('Arabic content set');
+            } else {
+                console.error('No Arabic content available');
+                arabicContent.textContent = 'المحتوى العربي غير متوفر';
+                arabicContent.dir = 'rtl';
+                arabicContent.style.textAlign = 'right';
+                arabicContent.style.color = '#666';
+            }
+        }
 
+        // Setup save buttons with file information
+        setupSaveButtons(data);
+
+        // Display sources
         if (data.sources && data.sources.length > 0) {
             data.sources.forEach(source => {
                 const li = document.createElement('li');
@@ -226,219 +244,26 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        const querySuggestions = document.querySelector('.query-suggestions');
-        const relatedTopics = document.querySelector('.learning-resources');
-        querySuggestions.classList.add('hidden');
-        relatedTopics.classList.add('hidden');
-
-        if (data.related_topics) {
-            displayRelatedTopics(data.related_topics);
-        }
-
-        if (data.suggested_queries) {
-            displaySuggestedQueries(data.suggested_queries);
-        }
-
-        resultsDiv.classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-
-        // Reinitialize save buttons after content is loaded
-        initializeSaveButtons();
-
+        // Update stats if available
         if (data.stats) {
             document.getElementById('docCount').textContent = data.stats.documents || 0;
             document.getElementById('nodeCount').textContent = data.stats.nodes || 0;
         }
+
+        // Show results and switch to appropriate tab
+        resultsDiv.classList.remove('hidden');
+        errorDiv.classList.add('hidden');
+        switchTab(data.language === 'ar' ? 'ar' : 'en');
     }
 
-    // Save Response Handler
-    function saveResponseAsHtml(lang) {
-        const responseSection = document.getElementById(`${lang}Response`);
-        const content = responseSection.querySelector('.response-content').textContent;
-        
-        if (!content) {
-            showNotification('No content to save');
-            return;
-        }
-
-        const firstLine = content.split('\n')[0].trim().substring(0, 50)
-            .replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g, '')
-            .replace(/\s+/g, '_');
-        
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `${firstLine}_${lang}_${timestamp}.html`;
-
-        const htmlContent = `
-<!DOCTYPE html>
-<html lang="${lang}">
-<head>
-    <meta charset="UTF-8">
-    <title>${firstLine}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 40px;
-            direction: ${lang === 'ar' ? 'rtl' : 'ltr'};
-        }
-        .content {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        .timestamp {
-            color: #666;
-            font-size: 0.9em;
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="content">
-        <div class="timestamp">Generated on: ${new Date().toLocaleString()}</div>
-        <div class="response-content">
-            ${content.split('\n').map(line => `<p>${line}</p>`).join('')}
-        </div>
-    </div>
-</body>
-</html>`;
-
-        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        showNotification(`Saved as ${filename}`);
-    }
-
-    // Related Topics Display
-    function displayRelatedTopics(topics) {
-        const topicChips = document.querySelector('.topic-chips');
-        topicChips.innerHTML = '';
-        
-        topics.forEach(topic => {
-            const chip = document.createElement('div');
-            chip.className = 'chip';
-            chip.textContent = topic;
-            chip.addEventListener('click', () => {
-                queryInput.value = `Tell me about ${topic}`;
-                searchForm.dispatchEvent(new Event('submit'));
-            });
-            topicChips.appendChild(chip);
-        });
-    }
-
-    // Suggested Queries Display
-    function displaySuggestedQueries(queries) {
-        const queryList = document.querySelector('.query-list');
-        queryList.innerHTML = '';
-        
-        queries.forEach(query => {
-            const li = document.createElement('li');
-            li.textContent = query;
-            li.addEventListener('click', () => {
-                queryInput.value = query;
-                searchForm.dispatchEvent(new Event('submit'));
-            });
-            queryList.appendChild(li);
-        });
-    }
-
-    // Error Display
+    // Error display
     function displayError(message) {
         const errorMessage = errorDiv.querySelector('.error-message');
-        const errorSuggestions = errorDiv.querySelector('.error-suggestions');
-        
         errorMessage.textContent = message;
-        errorSuggestions.innerHTML = `
-            <p>Suggestions:</p>
-            <ul>
-                <li>Try rephrasing your query</li>
-                <li>Check for spelling mistakes</li>
-                <li>Use more specific terms</li>
-            </ul>
-        `;
-        
         errorDiv.classList.remove('hidden');
         resultsDiv.classList.add('hidden');
     }
 
-    // History Management
-    function addToSearchHistory(entry) {
-        searchHistory.unshift(entry);
-        if (searchHistory.length > 50) searchHistory.pop();
-        localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
-    }
-
-    function displaySearchHistory() {
-        const historyList = document.querySelector('.history-list');
-        historyList.innerHTML = '';
-        
-        searchHistory.forEach(entry => {
-            const historyItem = document.createElement('div');
-            historyItem.className = 'history-item';
-            historyItem.innerHTML = `
-                <h3>${entry.query}</h3>
-                <p>${new Date(entry.timestamp).toLocaleString()}</p>
-                <button class="rerun-btn">Re-run Query</button>
-            `;
-            
-            historyItem.querySelector('.rerun-btn').addEventListener('click', () => {
-                queryInput.value = entry.query;
-                navButtons.find(btn => btn.dataset.view === 'search').click();
-                searchForm.dispatchEvent(new Event('submit'));
-            });
-            
-            historyList.appendChild(historyItem);
-        });
-    }
-
     // Set initial tab
     switchTab('en');
-
-    // Utility Functions
-    function showNotification(message) {
-        const notification = document.createElement('div');
-        notification.className = 'notification';
-        notification.textContent = message;
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-    }
-
-    // Tutorial Content
-    function loadTutorial() {
-        const tutorialSteps = document.querySelector('.tutorial-steps');
-        const tutorialExamples = document.querySelector('.tutorial-examples');
-        
-        tutorialSteps.innerHTML = `
-            <div class="tutorial-step">
-                <h3>1. Enter Your Query</h3>
-                <p>Type your question in English or Arabic. The system supports both languages!</p>
-            </div>
-            <div class="tutorial-step">
-                <h3>2. Explore Results</h3>
-                <p>Review the answers in both English and Arabic.</p>
-            </div>
-            <div class="tutorial-step">
-                <h3>3. Check Sources</h3>
-                <p>Review sources and evidence, explore related topics to deepen your understanding.</p>
-            </div>
-        `;
-        
-        tutorialExamples.innerHTML = `
-            <h3>Example Queries:</h3>
-            <ul>
-                <li>"What are the main causes of climate change?"</li>
-                <li>"Explain the theory of relativity"</li>
-                <li>"Compare different types of renewable energy"</li>
-            </ul>
-        `;
-    }
 });

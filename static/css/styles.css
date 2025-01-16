@@ -260,6 +260,12 @@ textarea:focus {
     background: var(--secondary-color);
 }
 
+@font-face {
+    font-family: 'Noto Naskh Arabic';
+    src: url('/static/assets/fonts/NotoNaskhArabic-Regular.ttf') format('truetype');
+    font-display: swap;
+}
+
 .response-content {
     white-space: pre-line;
     line-height: 1.8;
@@ -269,6 +275,22 @@ textarea:focus {
 .response-content strong {
     color: var(--primary-color);
     font-weight: 600;
+}
+
+#arabicResponse .response-content {
+    font-family: 'Noto Naskh Arabic', Arial, sans-serif;
+    direction: rtl;
+    text-align: right;
+    line-height: 2;
+    font-size: 1.1em;
+}
+
+#arabicResponse.response-section {
+    direction: rtl;
+}
+
+#arabicResponse .save-controls {
+    text-align: left;
 }
 
 .response-metadata {

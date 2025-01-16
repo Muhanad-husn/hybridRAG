@@ -19,57 +19,79 @@
         }
 
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
+            font-family: 'Georgia', serif;
+            line-height: 1.8;
             color: var(--primary-color);
-            margin: 0;
-            padding: 20px;
+            margin: 0 auto;
+            padding: 40px;
             background-color: var(--background-color);
             max-width: 800px;
-            margin: 0 auto;
         }
 
         .arabic {
             font-family: 'Noto Naskh Arabic', Arial, sans-serif !important;
             direction: rtl;
             text-align: right;
+            line-height: 2;
+            font-size: 1.1em;
         }
 
         .english {
             direction: ltr;
             text-align: left;
+            font-size: 1.1em;
+        }
+
+        .content {
+            margin: 25px 0;
+            text-align: justify;
+            line-height: 1.8;
+            font-size: 1.1em;
+        }
+
+        .content p {
+            margin: 1.5em 0;
         }
 
         .header {
             text-align: center;
-            padding: 20px;
-            margin-bottom: 30px;
-            border-bottom: 2px solid var(--border-color);
+            padding: 30px 20px;
+            margin-bottom: 40px;
+            border-bottom: 3px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            color: var(--primary-color);
+            margin: 0;
+            font-weight: normal;
         }
 
         .timestamp {
             color: var(--secondary-color);
             font-size: 0.9em;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
+            margin: 30px 0;
+            padding: 15px 0;
             border-bottom: 1px solid var(--border-color);
+            font-style: italic;
         }
 
         .section {
-            margin: 20px 0;
-            padding: 20px;
+            margin: 30px 0;
+            padding: 30px;
             background-color: var(--section-bg);
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
         }
 
         .section-title {
-            font-weight: bold;
-            margin-bottom: 15px;
+            font-family: 'Georgia', serif;
+            font-weight: normal;
+            margin-bottom: 20px;
             color: var(--primary-color);
-            font-size: 1.2em;
-            padding-bottom: 5px;
-            border-bottom: 1px solid var(--border-color);
+            font-size: 1.4em;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
         }
 
         .content {
@@ -79,49 +101,71 @@
         }
 
         .sources {
-            margin-top: 30px;
-            padding: 20px;
+            margin-top: 40px;
+            padding: 30px;
             background-color: var(--section-bg);
-            border-radius: 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
         }
 
         .source-item {
-            margin: 10px 0;
-            padding: 5px 0;
-            line-height: 1.4;
+            margin: 12px 0;
+            padding: 8px 0;
+            line-height: 1.6;
+            color: var(--secondary-color);
+            font-size: 0.95em;
         }
 
         /* Responsive Design */
         @media screen and (max-width: 600px) {
             body {
-                padding: 10px;
+                padding: 20px;
             }
 
             .section {
-                padding: 15px;
-                margin: 15px 0;
+                padding: 20px;
+                margin: 20px 0;
             }
 
             .header {
-                padding: 15px;
-                margin-bottom: 20px;
+                padding: 20px;
+                margin-bottom: 30px;
             }
         }
 
         /* Print styles */
         @media print {
             body {
-                padding: 20mm;
+                padding: 0;
+                max-width: none;
+                font-size: 11pt;
+            }
+
+            .header {
+                padding: 0 0 20pt;
+                margin-bottom: 30pt;
             }
 
             .section {
                 break-inside: avoid;
                 page-break-inside: avoid;
-                border: 1px solid #eee;
+                border: none;
+                padding: 0;
+                margin: 24pt 0;
+                background: none;
+                box-shadow: none;
             }
 
             .sources {
                 break-before: page;
+                background: none;
+                border: none;
+                padding: 0;
+            }
+
+            .content {
+                text-align: justify;
+                line-height: 1.5;
             }
         }
     </style>
