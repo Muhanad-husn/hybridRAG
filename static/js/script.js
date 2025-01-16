@@ -409,26 +409,61 @@ document.addEventListener('DOMContentLoaded', function() {
         doc.text(englishLines, 20, currentY);
         currentY += (englishLines.length * 7) + 20;
         
-        // Add Arabic content if available
-        if (isArabicQuery) {
-            // Add new page if needed
-            if (currentY > 250) {
-                doc.addPage();
-                currentY = 20;
-            }
+        // Always add Arabic content on a new page if available
+        if (arabicContent.trim()) {
+            // Start new page for Arabic content
+            doc.addPage();
             
+            // Add Arabic title and metadata
+            doc.setFontSize(16);
+            doc.setR2L(true);
+            doc.text('نتيجة البحث', 190, 20, { align: 'right' });
+            
+            doc.setFontSize(12);
+            doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 30, { align: 'right' });
+            
+            // Add Arabic query
             doc.setFontSize(14);
-            doc.text('Arabic Answer:', 20, currentY);
+            doc.text(':السؤال', 190, 45, { align: 'right' });
+            doc.setFontSize(12);
+            const arabicQueryLines = doc.splitTextToSize(query, 170);
+            doc.text(arabicQueryLines, 190, 55, { align: 'right' });
+            
+            // Add Arabic answer
+            doc.setFontSize(14);
+            doc.text(':الإجابة', 190, 85, { align: 'right' });
             doc.setFontSize(12);
             const arabicLines = doc.splitTextToSize(arabicContent, 170);
-            currentY += 10;
+            doc.text(arabicLines, 190, 95, { align: 'right' });
             
-            // Set RTL for Arabic text
-            doc.setR2L(true);
-            doc.text(arabicLines, 190, currentY); // Align to right margin
+            // Add Arabic sources if available
+            if (sources.length > 0) {
+                let sourceY = 95 + (arabicLines.length * 7) + 20;
+                
+                // Add new page if needed
+                if (sourceY > 250) {
+                    doc.addPage();
+                    sourceY = 20;
+                }
+                
+                doc.setFontSize(14);
+                doc.text(':المصادر', 190, sourceY, { align: 'right' });
+                doc.setFontSize(12);
+                
+                sources.forEach((source, index) => {
+                    sourceY += 10;
+                    const arabicSourceLine = `${source} -`;
+                    doc.text(arabicSourceLine, 190, sourceY, { align: 'right' });
+                    
+                    if (sourceY > 280) {
+                        doc.addPage();
+                        sourceY = 20;
+                    }
+                });
+            }
+            
+            // Reset RTL setting
             doc.setR2L(false);
-            
-            currentY += (arabicLines.length * 7) + 20;
         }
         
         if (sources.length > 0) {
