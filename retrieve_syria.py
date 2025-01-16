@@ -159,6 +159,14 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             context_parts.append(formatted)
         
         context = "\n\n".join(context_parts)
+
+        # Store the raw input data used for LLM
+        llm_input_data = {
+            'context_parts': context_parts,
+            'combined_context': context,
+            'query': query,
+            'original_query': original_query
+        }
         
         # Extract sources using regex
         import re
@@ -329,8 +337,11 @@ Please provide a clear and accurate answer based solely on the information provi
             "english_file": None,
             "arabic_file": None,
             "confidence": confidence,
-            "vector_data": vector_data,
-            "graph_data": graph_data
+            "llm_input": {
+                "context": context,
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt
+            }
         }
 
         # Add English file if available

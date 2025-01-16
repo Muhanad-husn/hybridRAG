@@ -605,9 +605,36 @@ footer {
 .raw-data-pane pre {
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 0.9em;
-    line-height: 1.4;
+    line-height: 1.6;
     white-space: pre-wrap;
-    word-break: break-all;
+    word-break: break-word;
+}
+
+.code-block {
+    background: var(--background-color);
+    padding: 15px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--text-secondary);
+    overflow-y: auto;
+    max-height: calc(100% - 60px);
+}
+
+.code-block::-webkit-scrollbar {
+    width: 8px;
+}
+
+.code-block::-webkit-scrollbar-track {
+    background: var(--background-color);
+    border-radius: 4px;
+}
+
+.code-block::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+.code-block::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
 }
 
 .vector-content, .graph-content {

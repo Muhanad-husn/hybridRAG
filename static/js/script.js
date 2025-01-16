@@ -433,52 +433,48 @@ document.addEventListener('DOMContentLoaded', function() {
         const graphContent = document.querySelector('.graph-content');
         
         console.log('Raw data received:', {
-            hasVectorData: Boolean(data.vector_data),
-            vectorDataLength: data.vector_data?.length,
-            hasGraphData: Boolean(data.graph_data),
-            graphDataLength: data.graph_data?.length
+            hasLLMInput: Boolean(data.llm_input),
+            inputKeys: data.llm_input ? Object.keys(data.llm_input) : []
         });
 
-        // Handle vector data
-        if (vectorContent) {
+        // Update pane titles
+        const vectorPane = vectorContent?.parentElement;
+        const graphPane = graphContent?.parentElement;
+        if (vectorPane) vectorPane.querySelector('h3').textContent = 'Context & Prompts';
+        if (graphPane) graphPane.querySelector('h3').textContent = 'System Configuration';
+
+        // Handle LLM input data
+        if (vectorContent && data.llm_input) {
             try {
-                if (Array.isArray(data.vector_data) && data.vector_data.length > 0) {
-                    const formattedVectors = data.vector_data
-                        .filter(vector => vector && Array.isArray(vector.values))
-                        .map(vector => {
-                            const values = vector.values.map(v =>
-                                typeof v === 'number' ? v.toFixed(6) : v
-                            ).join(' ');
-                            const score = vector.score ? `\nScore: ${vector.score.toFixed(4)}` : '';
-                            return `${values}${score}`;
-                        })
-                        .join('\n\n');
-                    vectorContent.textContent = formattedVectors || 'No vector data available';
-                } else {
-                    vectorContent.textContent = 'No vector data available';
-                }
+                const formattedInput = [
+                    '=== Context ===',
+                    data.llm_input.context || 'No context available',
+                    '\n=== User Prompt ===',
+                    data.llm_input.user_prompt || 'No user prompt available'
+                ].join('\n\n');
+                vectorContent.textContent = formattedInput;
             } catch (error) {
-                console.error('Error formatting vector data:', error);
-                vectorContent.textContent = 'Error displaying vector data';
+                console.error('Error formatting LLM input:', error);
+                vectorContent.textContent = 'Error displaying LLM input data';
             }
+        } else {
+            vectorContent.textContent = 'No LLM input data available';
         }
         
-        // Handle graph data
-        if (graphContent) {
+        // Handle system configuration
+        if (graphContent && data.llm_input) {
             try {
-                if (Array.isArray(data.graph_data) && data.graph_data.length > 0) {
-                    const formattedGraph = data.graph_data
-                        .filter(triple => triple && triple.subject && triple.predicate && triple.object)
-                        .map(triple => `${triple.subject} -> ${triple.predicate} -> ${triple.object}`)
-                        .join('\n');
-                    graphContent.textContent = formattedGraph || 'No graph data available';
-                } else {
-                    graphContent.textContent = 'No graph data available';
-                }
+                const formattedSystem = [
+                    '=== System Prompt ===',
+                    data.llm_input.system_prompt || 'No system prompt available'
+                ].join('\n\n');
+                graphContent.textContent = formattedSystem;
             } catch (error) {
-                console.error('Error formatting graph data:', error);
-                graphContent.textContent = 'Error displaying graph data';
+                console.error('Error formatting system config:', error);
+                graphContent.textContent = 'Error displaying system configuration';
             }
+        } else {
+            graphContent.textContent = 'No system configuration available';
         }
 
         // Display sources
