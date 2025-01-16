@@ -388,13 +388,6 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             console.log('Starting PDF generation process...');
             showNotification(`Preparing to save ${lang === 'ar' ? 'Arabic' : 'English'} content...`);
-            
-            if (!window.jspdf) {
-                console.error('jsPDF library not found in window object');
-                showNotification('PDF library not loaded. Please try again.');
-                return;
-            }
-            console.log('jsPDF library found');
 
             // Get content based on language
             const contentElement = lang === 'ar' ?
@@ -406,120 +399,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 showNotification(`No ${lang === 'ar' ? 'Arabic' : 'English'} content available to save.`);
                 return;
             }
+
             const content = contentElement.textContent;
-            console.log(`${lang} content length:`, content.length);
-
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
-            console.log('Number of sources:', sources.length);
-
-            // Initialize PDF with Unicode support
-            console.log('Initializing PDF document with Unicode support...');
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4',
-                putOnlyUsedFonts: true,
-                compress: true
+            
+            console.log('Sending request to generate PDF...');
+            const response = await fetch('/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: content,
+                    query: queryInput.value,
+                    sources: sources,
+                    isArabic: lang === 'ar'
+                })
             });
 
-            // Configure for Unicode and RTL if Arabic
-            if (lang === 'ar') {
-                console.log('Configuring PDF for Arabic text...');
-                doc.setLanguage("ar");
-                doc.setR2L(true);
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to generate PDF');
             }
 
-            try {
-                // Configure PDF settings
-                console.log('Setting up PDF...');
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(12);
+            // Get the PDF blob
+            const blob = await response.blob();
+            
+            // Create a link to download the PDF
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = response.headers.get('content-disposition')?.split('filename=')[1] ||
+                        `HybridRAG_Result_${lang === 'ar' ? 'Arabic' : 'English'}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
 
-                // Common settings
-                const margin = 20;
-                const pageWidth = doc.internal.pageSize.width;
-                let currentY = margin;
-
-                // Configure text rendering options
-                const textOptions = {
-                    align: lang === 'ar' ? 'right' : 'left',
-                    renderingMode: 'fill',
-                    maxWidth: pageWidth - 2 * margin
-                };
-
-                // Add metadata
-                doc.text('Generated: ' + new Date().toLocaleString(), margin, currentY, textOptions);
-                currentY += 15;
-
-                // Add query
-                doc.text(lang === 'ar' ? 'السؤال:' : 'Query:', margin, currentY, textOptions);
-                currentY += 10;
-                const queryLines = doc.splitTextToSize(queryInput.value, pageWidth - 2 * margin);
-                doc.text(queryLines, lang === 'ar' ? pageWidth - margin : margin, currentY, textOptions);
-                currentY += queryLines.length * 7 + 10;
-
-                // Add answer
-                doc.text(lang === 'ar' ? 'الإجابة:' : 'Answer:', margin, currentY, textOptions);
-                currentY += 10;
-                const contentLines = doc.splitTextToSize(content, pageWidth - 2 * margin);
-                doc.text(contentLines, lang === 'ar' ? pageWidth - margin : margin, currentY, textOptions);
-                currentY += contentLines.length * 7 + 10;
-
-                // Add sources if available
-                if (sources.length > 0) {
-                    if (currentY > doc.internal.pageSize.height - margin) {
-                        doc.addPage();
-                        currentY = margin;
-                    }
-                    doc.text(lang === 'ar' ? 'المصادر:' : 'Sources:', margin, currentY, textOptions);
-                    currentY += 10;
-                    sources.forEach((source, i) => {
-                        const sourceText = lang === 'ar' ?
-                            `${source} .${i + 1}` :
-                            `${i + 1}. ${source}`;
-                        const sourceLines = doc.splitTextToSize(sourceText, pageWidth - 2 * margin);
-                        
-                        if (currentY + (sourceLines.length * 7) > doc.internal.pageSize.height - margin) {
-                            doc.addPage();
-                            currentY = margin;
-                        }
-                        
-                        doc.text(sourceLines, lang === 'ar' ? pageWidth - margin : margin, currentY, textOptions);
-                        currentY += sourceLines.length * 7;
-                    });
-                }
-
-                console.log('Content added to PDF successfully');
-
-                // Save with language-specific filename
-                const langSuffix = lang === 'ar' ? 'Arabic' : 'English';
-                const filename = `HybridRAG_Result_${langSuffix}_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
-                console.log('Saving PDF as:', filename);
-                doc.save(filename);
-                console.log('PDF saved successfully');
-                showNotification(`${langSuffix} result saved as PDF!`);
-            } catch (error) {
-                console.error('Error adding content to PDF:', error);
-                throw error;
-            }
+            console.log('PDF downloaded successfully');
+            showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as PDF!`);
         } catch (error) {
             console.error('PDF generation error:', error);
-            console.error('Error stack:', error.stack);
-            
-            // Provide more specific error messages based on the error type
-            let errorMessage = 'Error saving PDF. ';
-            if (error.message.includes('font')) {
-                errorMessage += 'Font loading failed. Please try again.';
-            } else if (error.message.includes('VFS')) {
-                errorMessage += 'Font system initialization failed.';
-            } else if (error.message.includes('rendering')) {
-                errorMessage += 'Text rendering failed. Please check the content.';
-            } else {
-                errorMessage += 'Please try again or contact support if the issue persists.';
-            }
-            
-            showNotification(errorMessage);
+            showNotification('Error generating PDF: ' + error.message);
         }
     }
 
