@@ -397,13 +397,16 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('jsPDF library found');
 
             // Get content based on language
-            const response = lang === 'ar' ? data.arabic_answer : data.answer;
-            if (!response || !response.trim()) {
+            const contentElement = lang === 'ar' ?
+                arabicResponse.querySelector('.response-content') :
+                englishResponse.querySelector('.response-content');
+
+            if (!contentElement || !contentElement.textContent.trim()) {
                 console.error(`No ${lang} content available`);
                 showNotification(`No ${lang === 'ar' ? 'Arabic' : 'English'} content available to save.`);
                 return;
             }
-            const content = response;
+            const content = contentElement.textContent;
             console.log(`${lang} content length:`, content.length);
 
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
