@@ -338,8 +338,7 @@ Please provide a clear and accurate answer based solely on the information provi
             "arabic_file": None,
             "confidence": confidence,
             "llm_input": {
-                "context": context,
-                "user_prompt": user_prompt
+                "context": context
             }
         }
 

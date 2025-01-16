@@ -439,12 +439,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Handle LLM input data
         if (vectorContent && data.llm_input) {
             try {
-                const formattedInput = [
-                    '=== Context ===',
-                    data.llm_input.context || 'No context available',
-                    '\n=== User Prompt ===',
-                    data.llm_input.user_prompt || 'No user prompt available'
-                ].join('\n\n');
+                // Extract only the context section
+                const context = data.llm_input.context || 'No context available';
+                const formattedInput = context.split('\n')
+                    .filter(line => line.trim()) // Remove empty lines
+                    .join('\n');
                 vectorContent.textContent = formattedInput;
             } catch (error) {
                 console.error('Error formatting LLM input:', error);
