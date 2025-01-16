@@ -400,28 +400,37 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     async function saveResult(lang) {
+        console.log(`saveResult called with lang: ${lang}`);
         try {
+            console.log('Starting PDF generation process...');
             showNotification(`Preparing to save ${lang === 'ar' ? 'Arabic' : 'English'} content...`);
             
             if (!window.jspdf) {
+                console.error('jsPDF library not found in window object');
                 showNotification('PDF library not loaded. Please try again.');
                 return;
             }
+            console.log('jsPDF library found');
 
             // Get content element based on language
             const contentElement = lang === 'ar' ?
                 arabicResponse.querySelector('.response-content') :
                 englishResponse.querySelector('.response-content');
 
+            console.log('Content element found:', !!contentElement);
+
             if (!contentElement) {
+                console.error(`Could not find ${lang} content element`);
                 showNotification(`Could not find ${lang === 'ar' ? 'Arabic' : 'English'} content element.`);
                 return;
             }
 
             if (!contentElement.textContent.trim()) {
+                console.error(`No ${lang} content available`);
                 showNotification(`No ${lang === 'ar' ? 'Arabic' : 'English'} content available to save.`);
                 return;
             }
+            console.log('Content validation passed');
             const { jsPDF } = window.jspdf;
             const timestamp = new Date().toLocaleString();
             const query = queryInput.value;
@@ -452,19 +461,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Configure for Arabic if needed
             if (lang === 'ar') {
+                console.log('Configuring Arabic PDF settings...');
                 // Enable right-to-left mode
                 doc.setR2L(true);
+                console.log('RTL mode enabled');
+                
                 // Use local Noto Naskh Arabic font for consistent Arabic support
                 try {
-                    // Use pre-loaded font data
-                    if (!window.arabicFontData) {
-                        throw new Error('Arabic font data not available');
+                    console.log('Starting font loading process...');
+                    const fontResponse = await fetch('static/assets/fonts/NotoNaskhArabic-Regular.ttf');
+                    if (!fontResponse.ok) {
+                        console.error('Font fetch failed:', fontResponse.status, fontResponse.statusText);
+                        throw new Error('Failed to load Arabic font file');
                     }
+                    console.log('Font file fetched successfully');
+                    
+                    const fontArrayBuffer = await fontResponse.arrayBuffer();
+                    console.log('Font data loaded, size:', fontArrayBuffer.byteLength, 'bytes');
                     
                     // Add the font to the PDF
-                    doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', window.arabicFontData);
+                    console.log('Adding font to VFS...');
+                    doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', fontArrayBuffer);
+                    console.log('Adding font to document...');
                     doc.addFont('NotoNaskhArabic-Regular.ttf', 'NotoNaskh', 'normal');
+                    console.log('Setting font as active...');
                     doc.setFont('NotoNaskh', 'normal');
+                    console.log('Arabic font setup completed');
                 } catch (fontError) {
                     console.error('Font loading error:', fontError);
                     showNotification('Error loading Arabic font: ' + fontError.message);
@@ -473,18 +495,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Verify font was loaded correctly
                 try {
+                    console.log('Verifying font setup...');
                     const currentFont = doc.getFont();
+                    console.log('Current font:', currentFont ? currentFont.fontName : 'not set');
+                    
                     if (!currentFont) {
                         throw new Error('Font not set after loading');
                     }
+                    
                     // Test font by measuring text
                     const testText = 'اختبار';
+                    console.log('Testing text rendering with:', testText);
                     const textWidth = doc.getTextWidth(testText);
+                    console.log('Test text width:', textWidth);
+                    
                     if (textWidth <= 0) {
+                        console.error('Text width is invalid:', textWidth);
                         throw new Error('Font not rendering correctly');
                     }
+                    console.log('Font verification successful');
                 } catch (verifyError) {
                     console.error('Font verification error:', verifyError);
+                    console.error('Error details:', verifyError.stack);
                     showNotification('Error verifying Arabic font: ' + verifyError.message);
                     return;
                 }
@@ -497,20 +529,40 @@ document.addEventListener('DOMContentLoaded', function() {
                     renderingMode: 'fill'
                 };
 
-                // Add content in Arabic with proper text settings
-                doc.text('نتيجة البحث', 190, 20, textOptions);
-                doc.setFontSize(12);
-                doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 35, textOptions);
-                doc.text(':السؤال', 190, 50, textOptions);
-                
-                // Add query with proper text settings
-                const queryLines = doc.splitTextToSize(query, 140);
-                doc.text(queryLines, 190, 60, textOptions);
-                
-                // Add answer with proper text settings
-                doc.text(':الإجابة', 190, 85, textOptions);
-                const contentLines = doc.splitTextToSize(content, 140);
-                doc.text(contentLines, 190, 95, textOptions);
+                console.log('Starting Arabic text rendering...');
+                try {
+                    // Add content in Arabic with proper text settings
+                    console.log('Adding title...');
+                    doc.text('نتيجة البحث', 190, 20, textOptions);
+                    
+                    console.log('Adding timestamp...');
+                    doc.setFontSize(12);
+                    doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 35, textOptions);
+                    
+                    console.log('Adding query label...');
+                    doc.text(':السؤال', 190, 50, textOptions);
+                    
+                    // Add query with proper text settings
+                    console.log('Processing query text...');
+                    const queryLines = doc.splitTextToSize(query, 140);
+                    console.log('Query lines count:', queryLines.length);
+                    doc.text(queryLines, 190, 60, textOptions);
+                    
+                    // Add answer with proper text settings
+                    console.log('Adding answer label...');
+                    doc.text(':الإجابة', 190, 85, textOptions);
+                    
+                    console.log('Processing answer text...');
+                    const contentLines = doc.splitTextToSize(content, 140);
+                    console.log('Content lines count:', contentLines.length);
+                    doc.text(contentLines, 190, 95, textOptions);
+                    
+                    console.log('Arabic text rendering completed successfully');
+                } catch (renderError) {
+                    console.error('Error during Arabic text rendering:', renderError);
+                    console.error('Error stack:', renderError.stack);
+                    throw new Error('Failed to render Arabic text: ' + renderError.message);
+                }
                 
                 // Add sources with proper text settings
                 let yPos = 95 + (contentLines.length * 8);
