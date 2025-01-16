@@ -12,12 +12,6 @@ import arabic_reshaper
 from bidi.algorithm import get_display
 from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
-from src.utils.logger import setup_logger
-
-import sys
-import logging
-from retrieve_syria import run_hybrid_search
-from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
 
 # Initialize Flask app
@@ -27,47 +21,26 @@ app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON res
 # Initialize logger
 setup_logger()  # This will set up the root logger with config
 logger = get_logger(__name__)  # Get a logger for this module
-app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
+
+# Initialize translator
 translator = Translator()
 
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-@app.route('/search', methods=['POST'])
-def search():
+def register_font():
     try:
-        data = request.get_json()
-        query = data.get('query', '').strip()
+        font_path = os.path.join(os.path.dirname(__file__), 'static', 'assets', 'fonts', 'NotoNaskhArabic-Regular.ttf')
+        logger.info(f"Attempting to load font from: {font_path}")
         
-        if not query:
-            return jsonify({'error': 'Query cannot be empty'}), 400
-
-        # Detect if query is Arabic
-        is_arabic = translator.is_arabic(query)
-        
-        if is_arabic:
-            logger.info(f"Processing Arabic query: {query}")
-            # Translate query to English
-            english_query = translator.translate(query, source_lang='ar', target_lang='en')
-            logger.info(f"Translated to English: {english_query}")
-            result = run_hybrid_search(english_query, original_lang='ar', original_query=query)
-        else:
-            logger.info(f"Processing English query: {query}")
-            result = run_hybrid_search(query)
-        
-        logger.debug("Response data: %s", result)
-        logger.debug("Response keys: %s", result.keys())
-        logger.debug("Language: %s", result.get('language'))
+        if not os.path.exists(font_path):
+            raise FileNotFoundError(f"Font file not found at {font_path}")
             
-        return jsonify(result)
-        
+        pdfmetrics.registerFont(TTFont('NotoNaskh', font_path))
+        logger.info("Arabic font registered successfully")
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Failed to register Arabic font: {str(e)}")
+        raise
 
-# Register Arabic font
-font_path = os.path.join(app.static_folder, 'assets', 'fonts', 'NotoNaskhArabic-Regular.ttf')
-pdfmetrics.registerFont(TTFont('NotoNaskh', font_path))
+# Register font
+register_font()
 
 def create_pdf(content, query, sources, is_arabic=False):
     buffer = io.BytesIO()
@@ -142,6 +115,41 @@ def create_pdf(content, query, sources, is_arabic=False):
     buffer.seek(0)
     return buffer
 
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/search', methods=['POST'])
+def search():
+    try:
+        data = request.get_json()
+        query = data.get('query', '').strip()
+        
+        if not query:
+            return jsonify({'error': 'Query cannot be empty'}), 400
+
+        # Detect if query is Arabic
+        is_arabic = translator.is_arabic(query)
+        
+        if is_arabic:
+            logger.info(f"Processing Arabic query: {query}")
+            # Translate query to English
+            english_query = translator.translate(query, source_lang='ar', target_lang='en')
+            logger.info(f"Translated to English: {english_query}")
+            result = run_hybrid_search(english_query, original_lang='ar', original_query=query)
+        else:
+            logger.info(f"Processing English query: {query}")
+            result = run_hybrid_search(query)
+        
+        logger.debug("Response data: %s", result)
+        logger.debug("Response keys: %s", result.keys())
+        logger.debug("Language: %s", result.get('language'))
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/generate-pdf', methods=['POST'])
 def generate_pdf():
     try:
@@ -173,8 +181,7 @@ def generate_pdf():
 
 if __name__ == '__main__':
     try:
-        translator = Translator()
         app.run(debug=True, port=5000)
     except Exception as e:
-        logger.error(f"Failed to initialize translator: {str(e)}")
+        logger.error(f"Failed to start application: {str(e)}")
         raise
