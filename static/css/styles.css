@@ -188,6 +188,46 @@ textarea:focus {
     color: var(--primary-color);
 }
 
+/* Confidence Indicator */
+.confidence-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 20px;
+    margin: 10px 0;
+    background-color: var(--card-background);
+    border: 1px solid var(--primary-color);
+    border-radius: var(--border-radius);
+}
+
+.confidence-label {
+    color: var(--primary-color);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.confidence-progress {
+    flex: 1;
+    height: 8px;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.confidence-fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--success-color);
+    transition: width 0.3s ease-in-out;
+}
+
+.confidence-percentage {
+    min-width: 48px;
+    text-align: right;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
 .response-panels {
     background: var(--card-background);
     border: 1px solid var(--primary-color);
@@ -301,54 +341,6 @@ textarea:focus {
     padding: 15px 0;
     border-top: 1px solid #eee;
     box-shadow: 0 -4px 6px rgba(0,0,0,0.05);
-}
-
-.confidence-score {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 40px 0 15px 0;
-    padding: 10px;
-    background: var(--background-color);
-    border-radius: var(--border-radius);
-}
-
-.confidence-score label {
-    font-weight: bold;
-    color: var(--primary-color);
-    min-width: 140px;
-}
-
-.score-container {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.score-bar {
-    flex: 1;
-    height: 12px;
-    background: #eee;
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--primary-color);
-}
-
-.score-bar::after {
-    content: '';
-    display: block;
-    height: 100%;
-    background: var(--success-color);
-    width: var(--score, 0%);
-    transition: width var(--transition-speed);
-}
-
-.score-value {
-    min-width: 45px;
-    font-weight: bold;
-    color: var(--primary-color);
-    text-align: right;
 }
 
 /* Sources Section */

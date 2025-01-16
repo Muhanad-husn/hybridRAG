@@ -267,6 +267,13 @@ Please provide a clear and accurate answer based solely on the information provi
                 # Don't fallback to English for Arabic answer
                 arabic_answer = None
         
+        # Calculate confidence score based on search result scores
+        confidence = 0
+        if results:
+            # Get average score of top results, normalize to 0-100 range
+            avg_score = sum(float(r.get('score', 0.0)) for r in results[:5]) / 5
+            confidence = min(int(avg_score * 100), 100)  # Cap at 100%
+
         # Prepare base response
         response = {
             "query": query,
@@ -278,7 +285,8 @@ Please provide a clear and accurate answer based solely on the information provi
             "sources": sources,
             "language": original_lang or 'en',
             "english_file": None,
-            "arabic_file": None
+            "arabic_file": None,
+            "confidence": confidence
         }
 
         # Add English file if available

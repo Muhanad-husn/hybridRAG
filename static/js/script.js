@@ -207,6 +207,16 @@ document.addEventListener('DOMContentLoaded', function() {
             arabicLength: data.arabic_answer?.length
         });
 
+        // Update confidence indicator
+        const confidenceFill = document.querySelector('.confidence-fill');
+        const confidencePercentage = document.querySelector('.confidence-percentage');
+        if (confidenceFill && confidencePercentage) {
+            const confidence = data.confidence || 0;
+            confidenceFill.style.width = `${confidence}%`;
+            confidencePercentage.textContent = `${confidence}%`;
+            console.log('Confidence updated:', confidence);
+        }
+
         // Display English response
         const englishContent = document.querySelector('#englishResponse .response-content');
         if (englishContent && data.answer) {
