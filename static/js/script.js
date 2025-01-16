@@ -120,12 +120,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Results Display
     function displayResults(data) {
+        console.log('Displaying results:', data);
+        console.log('Response type:', typeof data);
+        console.log('Has answer:', 'answer' in data);
+        console.log('Has english_answer:', 'english_answer' in data);
+        console.log('Language:', data.language);
+
         // Clear previous results
         englishResponse.querySelector('.response-content').textContent = '';
         arabicResponse.querySelector('.response-content').textContent = '';
         sourcesList.innerHTML = '';
 
+        // Show results container
+        resultsDiv.classList.remove('hidden');
+
         if (data.error) {
+            console.log('Error in response:', data.error);
             displayError(data.error);
             return;
         }
@@ -148,42 +158,79 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('[data-lang="ar"]').style.display = 'block';
         document.querySelector('[data-lang="en"]').style.display = 'block';
 
+        // Make sure response sections are visible
+        englishResponse.classList.remove('hidden');
+        arabicResponse.classList.remove('hidden');
+
         // Handle responses based on language
         if (data.language === 'ar') {
+            console.log('Setting Arabic response content');
             // For Arabic queries:
             // - english_answer contains the English translation
             // - answer contains the Arabic translation
-            englishResponse.querySelector('.response-content').textContent = data.english_answer;
+            const englishContent = englishResponse.querySelector('.response-content');
             const arabicContent = arabicResponse.querySelector('.response-content');
-            arabicContent.textContent = data.answer;
+            
+            englishContent.textContent = data.english_answer || '';
+            arabicContent.textContent = data.answer || '';
             arabicContent.setAttribute('dir', 'rtl');
+            
+            console.log('English content set:', englishContent.textContent);
+            console.log('Arabic content set:', arabicContent.textContent);
+            
             // Set Arabic tab as active
-            document.querySelector('[data-lang="ar"]').click();
+            const arabicTab = document.querySelector('[data-lang="ar"]');
+            arabicTab.style.display = 'block';
+            arabicTab.click();
         } else {
+            console.log('Setting English response content');
             // For English queries:
             // - answer contains the English response
-            englishResponse.querySelector('.response-content').textContent = data.answer;
+            const englishContent = englishResponse.querySelector('.response-content');
+            englishContent.textContent = data.answer || '';
             arabicResponse.querySelector('.response-content').textContent = '';
+            
+            console.log('English content set:', englishContent.textContent);
+            
             // Set English tab as active
-            document.querySelector('[data-lang="en"]').click();
+            const englishTab = document.querySelector('[data-lang="en"]');
+            englishTab.style.display = 'block';
+            englishTab.click();
         }
 
-        // Initialize language tabs
+        // Ensure results container is visible
+        resultsDiv.classList.remove('hidden');
+
+        // Remove previous tab click handlers
         langTabs.forEach(tab => {
+            const newTab = tab.cloneNode(true);
+            tab.parentNode.replaceChild(newTab, tab);
+        });
+
+        // Re-initialize language tabs with debug logging
+        document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
             tab.addEventListener('click', () => {
-                // Update active states
-                langTabs.forEach(t => t.classList.remove('active'));
+                console.log('Tab clicked:', tab.dataset.lang);
+                
+                // Update active states for tabs
+                document.querySelectorAll('.response-tabs .tab-btn').forEach(t => {
+                    t.classList.remove('active');
+                });
                 tab.classList.add('active');
                 
-                // Show selected language content
+                // Show/hide content sections
                 const lang = tab.dataset.lang;
-                const sections = document.querySelectorAll('.response-section');
-                sections.forEach(section => {
-                    section.classList.toggle('active',
-                        (lang === 'en' && section.id === 'englishResponse') ||
-                        (lang === 'ar' && section.id === 'arabicResponse')
-                    );
-                });
+                if (lang === 'en') {
+                    console.log('Showing English content');
+                    englishResponse.classList.add('active');
+                    englishResponse.classList.remove('hidden');
+                    arabicResponse.classList.remove('active');
+                } else {
+                    console.log('Showing Arabic content');
+                    arabicResponse.classList.add('active');
+                    arabicResponse.classList.remove('hidden');
+                    englishResponse.classList.remove('active');
+                }
             });
         });
 
