@@ -91,11 +91,44 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Load saved results
-    function loadSavedResults() {
-        const savedResultsGrid = document.querySelector('.saved-results-grid');
-        if (savedResultsGrid) {
-            // This would typically load from localStorage or a backend endpoint
-            savedResultsGrid.innerHTML = '<p>Feature coming soon: Save and manage your search results.</p>';
+    async function loadSavedResults() {
+        try {
+            const response = await fetch('/saved-results');
+            const data = await response.json();
+            
+            const savedResultsGrid = document.querySelector('.saved-results-grid');
+            if (savedResultsGrid) {
+                savedResultsGrid.innerHTML = '';
+                
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(filename => {
+                        const resultCard = document.createElement('div');
+                        resultCard.className = 'saved-result-card';
+                        
+                        const title = document.createElement('h3');
+                        title.textContent = decodeURIComponent(filename.replace('.html', ''));
+                        
+                        const openButton = document.createElement('button');
+                        openButton.className = 'open-result-btn';
+                        openButton.textContent = 'Open Result';
+                        openButton.onclick = () => {
+                            window.location.href = `/results/${filename}`;
+                        };
+                        
+                        resultCard.appendChild(title);
+                        resultCard.appendChild(openButton);
+                        savedResultsGrid.appendChild(resultCard);
+                    });
+                } else {
+                    savedResultsGrid.innerHTML = '<p>No saved results yet.</p>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading saved results:', error);
+            const savedResultsGrid = document.querySelector('.saved-results-grid');
+            if (savedResultsGrid) {
+                savedResultsGrid.innerHTML = '<p>Error loading saved results.</p>';
+            }
         }
     }
 
@@ -209,25 +242,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 newBtn.disabled = false;
                 newBtn.title = lang === 'en' ? "Click to download HTML file" : "انقر للتحميل بصيغة HTML";
                 
-                newBtn.addEventListener('click', (e) => {
+                newBtn.addEventListener('click', async (e) => {
                     e.preventDefault();
                     console.log('\nSave button clicked:');
                     console.log('Language:', lang);
                     console.log('Filename:', filename);
-                    console.log('Button state:', {
-                        disabled: newBtn.disabled,
-                        dataset: newBtn.dataset,
-                        title: newBtn.title
-                    });
-                    
-                    const downloadUrl = `/results/${filename}`;
-                    console.log('Download URL:', downloadUrl);
                     
                     try {
+                        // First save the result to our saved results list
+                        const saveResponse = await fetch('/save-result', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ filename })
+                        });
+                        
+                        if (!saveResponse.ok) {
+                            throw new Error('Failed to save result');
+                        }
+                        
+                        // Then initiate the download
+                        const downloadUrl = `/results/${filename}`;
                         window.location.href = downloadUrl;
-                        console.log('Download initiated');
+                        console.log('Result saved and download initiated');
+                        
+                        // Show success message
+                        const successMessage = document.createElement('div');
+                        successMessage.className = 'success-message';
+                        successMessage.textContent = 'Result saved successfully';
+                        document.body.appendChild(successMessage);
+                        
+                        setTimeout(() => {
+                            successMessage.remove();
+                        }, 3000);
+                        
                     } catch (error) {
-                        console.error('Error initiating download:', error);
+                        console.error('Error saving/downloading result:', error);
+                        const errorMessage = document.createElement('div');
+                        errorMessage.className = 'error-message';
+                        errorMessage.textContent = 'Failed to save result';
+                        document.body.appendChild(errorMessage);
+                        
+                        setTimeout(() => {
+                            errorMessage.remove();
+                        }, 3000);
                     }
                 });
                 

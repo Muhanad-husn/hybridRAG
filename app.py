@@ -35,9 +35,10 @@ logger = setup_utf8_logger()
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 
-# Initialize translator and search history
+# Initialize translator, search history, and saved results
 translator = Translator()
 search_history = []  # List to store unique search queries
+saved_results = []  # List to store saved result filenames
 translator = Translator()
 
 def verify_font():
@@ -116,6 +117,29 @@ def home():
 @app.route('/search-history', methods=['GET'])
 def get_search_history():
     return jsonify({'history': search_history})
+
+@app.route('/saved-results', methods=['GET'])
+def get_saved_results():
+    return jsonify({'results': saved_results})
+
+@app.route('/save-result', methods=['POST'])
+def save_result():
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        
+        if not filename:
+            return jsonify({'error': 'Filename is required'}), 400
+            
+        # Add to saved results (maintain uniqueness and limit to 25)
+        if filename not in saved_results:
+            if len(saved_results) >= 25:
+                saved_results.pop()  # Remove oldest entry
+            saved_results.insert(0, filename)  # Add new entry at the beginning
+            
+        return jsonify({'message': 'Result saved successfully', 'saved_results': saved_results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/search', methods=['POST'])
 def search():
