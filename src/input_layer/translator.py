@@ -47,19 +47,30 @@ class Translator:
             # Map direction to correct model name
             model_mapping = {
                 "ar_to_en": "Helsinki-NLP/opus-mt-ar-en",
-                "en_to_ar": "Helsinki-NLP/opus-mt-tc-big-en-ar"  # Using the bigger model for better quality
+                "en_to_ar": "Helsinki-NLP/opus-mt-tc-big-en-ar"
             }
             
             model_name = model_mapping[direction]
-            self.logger.info(f"Loading translation model: {model_name}")
+            local_path = model_config["path"]
             
-            # Load tokenizer and model with error details
+            self.logger.info(f"Loading translation model from {local_path} or {model_name}")
+            
+            # Try loading from local path first
             try:
-                tokenizer = MarianTokenizer.from_pretrained(model_name)
-                model = MarianMTModel.from_pretrained(model_name)
-            except Exception as e:
-                self.logger.error(f"Failed to load model {model_name}: {str(e)}")
-                raise
+                tokenizer = MarianTokenizer.from_pretrained(local_path)
+                model = MarianMTModel.from_pretrained(local_path)
+            except Exception as local_error:
+                self.logger.warning(f"Could not load from local path: {str(local_error)}")
+                # If local loading fails, try downloading from HuggingFace
+                try:
+                    tokenizer = MarianTokenizer.from_pretrained(model_name)
+                    model = MarianMTModel.from_pretrained(model_name)
+                    # Save for future use
+                    tokenizer.save_pretrained(local_path)
+                    model.save_pretrained(local_path)
+                except Exception as remote_error:
+                    self.logger.error(f"Failed to load model from both local and remote: {str(remote_error)}")
+                    raise
             
             # Set device
             device = model_config["device"]
