@@ -34,11 +34,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     section.classList.toggle('hidden', !isActive);
                 });
 
-                // Update current type
+                // Update current language if it's a language tab
                 if (type === 'en' || type === 'ar') {
                     currentLanguage = type;
-                } else {
-                    currentResultType = type;
                 }
             }
         });
@@ -193,18 +191,11 @@ document.addEventListener('DOMContentLoaded', function() {
             confidenceScore.classList.remove('hidden');
         }
 
-        // Show the current result type and language
+        // Show English response by default
         document.querySelectorAll('.response-section').forEach(section => {
-            section.classList.toggle('active', section.id === `${currentResultType}Response`);
+            section.classList.toggle('active', section.id === 'englishResponse');
+            section.classList.toggle('hidden', section.id !== 'englishResponse');
         });
-
-        const currentResultSection = document.querySelector(`#${currentResultType}Response`);
-        if (currentResultSection) {
-            currentResultSection.querySelectorAll('.language-section').forEach(section => {
-                section.classList.toggle('active',
-                    section.id === `${currentResultType}${currentLanguage === 'en' ? 'English' : 'Arabic'}Response`);
-            });
-        }
 
         // Show results container
         resultsDiv.classList.remove('hidden');
