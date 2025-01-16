@@ -169,9 +169,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const tabs = document.querySelectorAll('.response-tabs .tab-btn');
         const englishSection = document.getElementById('englishResponse');
         const arabicSection = document.getElementById('arabicResponse');
+        const rawDataSection = document.getElementById('rawDataResponse');
         
         function switchTab(type) {
-            if (type !== 'en' && type !== 'ar') return;
+            if (!['en', 'ar', 'raw'].includes(type)) return;
             
             console.log(`Switching to ${type} tab`);
             
@@ -183,13 +184,15 @@ document.addEventListener('DOMContentLoaded', function() {
             englishSection.classList.toggle('active', type === 'en');
             arabicSection.classList.toggle('hidden', type !== 'ar');
             arabicSection.classList.toggle('active', type === 'ar');
+            rawDataSection.classList.toggle('hidden', type !== 'raw');
+            rawDataSection.classList.toggle('active', type === 'raw');
             
-            // Update RTL/LTR
+            // Update RTL/LTR and styles
             if (type === 'ar') {
                 arabicSection.dir = 'rtl';
                 arabicSection.style.textAlign = 'right';
                 arabicSection.querySelector('.response-content').style.fontFamily = "'Noto Naskh Arabic', Arial, sans-serif";
-            } else {
+            } else if (type === 'en') {
                 englishSection.dir = 'ltr';
                 englishSection.style.textAlign = 'left';
             }
@@ -424,6 +427,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Setup save buttons with file information
         setupSaveButtons(data);
+
+        // Display raw data
+        const vectorContent = document.querySelector('.vector-content');
+        const graphContent = document.querySelector('.graph-content');
+        
+        if (vectorContent && data.vector_data) {
+            // Format vector data as space-separated arrays
+            const formattedVectors = data.vector_data.map(vector =>
+                vector.values.map(v => v.toFixed(6)).join(' ')
+            ).join('\n\n');
+            vectorContent.textContent = formattedVectors || 'No vector data available';
+        }
+        
+        if (graphContent && data.graph_data) {
+            // Format graph relationships as subject-predicate-object triples
+            const formattedGraph = data.graph_data.map(triple =>
+                `${triple.subject} -> ${triple.predicate} -> ${triple.object}`
+            ).join('\n');
+            graphContent.textContent = formattedGraph || 'No graph data available';
+        }
 
         // Display sources
         if (data.sources && data.sources.length > 0) {

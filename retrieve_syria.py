@@ -274,6 +274,29 @@ Please provide a clear and accurate answer based solely on the information provi
             avg_score = sum(float(r.get('score', 0.0)) for r in results[:5]) / 5
             confidence = min(int(avg_score * 100), 100)  # Cap at 100%
 
+        # Extract vector data from results
+        vector_data = []
+        for result in results:
+            if 'vector' in result and result['vector'] is not None:
+                vector_data.append({
+                    'values': result['vector'].tolist() if hasattr(result['vector'], 'tolist') else result['vector'],
+                    'score': result.get('score', 0.0)
+                })
+
+        # Extract graph relationships
+        graph_data = []
+        for result in results:
+            if result.get('meta') == 'graph_relationships' and 'content' in result:
+                relationships = result['content'].split('\n')
+                for rel in relationships:
+                    parts = rel.strip().split(' -> ')
+                    if len(parts) == 3:
+                        graph_data.append({
+                            'subject': parts[0],
+                            'predicate': parts[1],
+                            'object': parts[2]
+                        })
+
         # Prepare base response
         response = {
             "query": query,
@@ -286,7 +309,9 @@ Please provide a clear and accurate answer based solely on the information provi
             "language": original_lang or 'en',
             "english_file": None,
             "arabic_file": None,
-            "confidence": confidence
+            "confidence": confidence,
+            "vector_data": vector_data,
+            "graph_data": graph_data
         }
 
         # Add English file if available

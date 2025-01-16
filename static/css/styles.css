@@ -579,6 +579,46 @@ footer {
     display: none !important;
 }
 
+/* Raw Data Panel */
+.raw-data-container {
+    display: flex;
+    gap: 20px;
+    height: 100%;
+}
+
+.raw-data-pane {
+    flex: 1;
+    background: var(--background-color);
+    border: 1px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.raw-data-pane h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--primary-color);
+}
+
+.raw-data-pane pre {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.vector-content, .graph-content {
+    background: var(--card-background);
+    padding: 10px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--text-secondary);
+    height: calc(100% - 60px);
+    overflow-y: auto;
+}
+
 /* RTL Support */
 [dir="rtl"] {
     text-align: right;
