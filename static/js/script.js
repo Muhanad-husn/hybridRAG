@@ -14,11 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchMode = document.getElementById('searchMode');
     const langTabs = document.querySelectorAll('.response-tabs .tab-btn');
     const processSteps = document.querySelectorAll('.process-steps .step');
-    const saveResultBtn = document.getElementById('saveResult');
 
     // State Management
     let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
-    let savedResults = JSON.parse(localStorage.getItem('savedResults') || '[]');
     
     // Navigation Handler
     navButtons.forEach(button => {
@@ -214,15 +212,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     englishResponse.classList.remove('hidden');
                     arabicResponse.classList.remove('active');
                     arabicResponse.classList.add('hidden');
+                    console.log('Switched to English tab');
                 } else {
                     arabicResponse.classList.add('active');
                     arabicResponse.classList.remove('hidden');
                     englishResponse.classList.remove('active');
                     englishResponse.classList.add('hidden');
+                    console.log('Switched to Arabic tab');
                 }
                 
-                // Reinitialize save buttons when switching tabs
-                initializeSaveButtons();
+                // Reinitialize save buttons when switching tabs with a small delay
+                setTimeout(() => {
+                    initializeSaveButtons();
+                    console.log('Save buttons reinitialized after tab switch');
+                }, 100);
             });
         });
 
@@ -262,8 +265,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update stats
         updateStats(data.stats);
 
-        // Reinitialize save buttons after displaying results
-        initializeSaveButtons();
+        // Reinitialize save buttons after displaying results with a small delay
+        setTimeout(() => {
+            initializeSaveButtons();
+            console.log('Save buttons reinitialized after displaying results');
+            
+            // Verify buttons are properly initialized
+            const saveEnglishBtn = document.getElementById('saveEnglishResult');
+            const saveArabicBtn = document.getElementById('saveArabicResult');
+            console.log('Save buttons found:', {
+                english: !!saveEnglishBtn,
+                arabic: !!saveArabicBtn
+            });
+        }, 100);
     }
 
     // Related Topics Display
@@ -350,25 +364,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Save Result Handlers
     function initializeSaveButtons() {
+        // Remove any existing event listeners
+        document.querySelectorAll('.control-btn').forEach(btn => {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+        });
+
+        // Add new event listeners
         const saveEnglishBtn = document.getElementById('saveEnglishResult');
         const saveArabicBtn = document.getElementById('saveArabicResult');
         
         if (saveEnglishBtn) {
             saveEnglishBtn.addEventListener('click', () => {
+                console.log('English save button clicked');
                 saveResult('en');
             });
         }
         
         if (saveArabicBtn) {
             saveArabicBtn.addEventListener('click', () => {
+                console.log('Arabic save button clicked');
                 saveResult('ar');
             });
         }
     }
 
-    // Initialize save buttons when DOM is loaded and after displaying results
-    initializeSaveButtons();
+    // Initialize save buttons when DOM is loaded
     document.addEventListener('DOMContentLoaded', initializeSaveButtons);
+    
+    // Re-initialize save buttons after displaying results and when switching tabs
+    document.querySelectorAll('.tab-btn').forEach(tab => {
+        tab.addEventListener('click', () => {
+            setTimeout(initializeSaveButtons, 100); // Small delay to ensure DOM is updated
+        });
+    });
 
     async function saveResult(lang) {
         try {
