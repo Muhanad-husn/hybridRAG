@@ -404,45 +404,76 @@ document.addEventListener('DOMContentLoaded', function() {
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
             
             console.log('Sending request to generate PDF...');
-            const response = await fetch('/generate-pdf', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    content: content,
-                    query: queryInput.value,
-                    sources: sources,
-                    isArabic: lang === 'ar'
-                })
+            // Get both English and Arabic content if available
+            const englishContent = englishResponse.querySelector('.response-content').textContent;
+            const arabicContent = arabicResponse.querySelector('.response-content').textContent;
+            
+            // Get the query in both languages if available
+            const originalQuery = queryInput.value;
+            const translatedQuery = lang === 'ar' ? englishContent.split('\n')[0] : arabicContent.split('\n')[0];
+
+            console.log('Sending PDF generation request with:', {
+                content: content,
+                query: originalQuery,
+                translatedQuery: translatedQuery,
+                sources: sources,
+                isArabic: lang === 'ar'
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to generate PDF');
-            }
+            try {
+                const response = await fetch('/generate-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        query: originalQuery,
+                        translatedQuery: translatedQuery,
+                        sources: sources,
+                        isArabic: lang === 'ar'
+                    })
+                });
 
-            // Get the PDF blob
-            const blob = await response.blob();
-            
-            // Create a link to download the PDF
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none'; // Hide the element
-            a.href = url;
-            a.download = response.headers.get('content-disposition')?.split('filename=')[1] ||
-                        `HybridRAG_Result_${lang === 'ar' ? 'Arabic' : 'English'}.pdf`;
-            
-            // Use a single click event
-            a.addEventListener('click', () => {
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.details || error.error || 'Failed to generate PDF');
+                }
+
+                // Get the PDF blob
+                const blob = await response.blob();
+                if (blob.size === 0) {
+                    throw new Error('Generated PDF is empty');
+                }
+                
+                // Create a unique filename with timestamp
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `HybridRAG_Result_${lang === 'ar' ? 'Arabic' : 'English'}_${timestamp}.pdf`;
+                
+                // Create a link to download the PDF
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                
+                // Add to document and click
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
                 setTimeout(() => {
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
                 }, 100);
-            }, { once: true }); // Ensure the event only fires once
-            
-            document.body.appendChild(a);
-            a.click();
+
+                console.log('PDF downloaded successfully');
+                showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as PDF!`);
+            } catch (pdfError) {
+                console.error('PDF generation error:', pdfError);
+                showNotification('Error generating PDF: ' + pdfError.message);
+                throw pdfError;
+            }
 
             console.log('PDF downloaded successfully');
             showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as PDF!`);
