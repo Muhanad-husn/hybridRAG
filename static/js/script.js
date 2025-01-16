@@ -212,20 +212,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     englishResponse.classList.remove('hidden');
                     arabicResponse.classList.remove('active');
                     arabicResponse.classList.add('hidden');
-                    console.log('Switched to English tab');
                 } else {
                     arabicResponse.classList.add('active');
                     arabicResponse.classList.remove('hidden');
                     englishResponse.classList.remove('active');
                     englishResponse.classList.add('hidden');
-                    console.log('Switched to Arabic tab');
                 }
                 
-                // Reinitialize save buttons when switching tabs with a small delay
-                setTimeout(() => {
-                    initializeSaveButtons();
-                    console.log('Save buttons reinitialized after tab switch');
-                }, 100);
+                // Reinitialize save buttons when switching tabs
+                initializeSaveButtons();
             });
         });
 
@@ -265,19 +260,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update stats
         updateStats(data.stats);
 
-        // Reinitialize save buttons after displaying results with a small delay
-        setTimeout(() => {
-            initializeSaveButtons();
-            console.log('Save buttons reinitialized after displaying results');
-            
-            // Verify buttons are properly initialized
-            const saveEnglishBtn = document.getElementById('saveEnglishResult');
-            const saveArabicBtn = document.getElementById('saveArabicResult');
-            console.log('Save buttons found:', {
-                english: !!saveEnglishBtn,
-                arabic: !!saveArabicBtn
-            });
-        }, 100);
+        // Reinitialize save buttons after displaying results
+        initializeSaveButtons();
     }
 
     // Related Topics Display
@@ -412,224 +396,95 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             console.log('jsPDF library found');
 
-            // Get content element based on language
-            const contentElement = lang === 'ar' ?
-                arabicResponse.querySelector('.response-content') :
-                englishResponse.querySelector('.response-content');
-
-            console.log('Content element found:', !!contentElement);
-
-            if (!contentElement) {
-                console.error(`Could not find ${lang} content element`);
-                showNotification(`Could not find ${lang === 'ar' ? 'Arabic' : 'English'} content element.`);
-                return;
-            }
-
-            if (!contentElement.textContent.trim()) {
+            // Get content based on language
+            const response = lang === 'ar' ? data.arabic_answer : data.answer;
+            if (!response || !response.trim()) {
                 console.error(`No ${lang} content available`);
                 showNotification(`No ${lang === 'ar' ? 'Arabic' : 'English'} content available to save.`);
                 return;
             }
-            console.log('Content validation passed');
-            const { jsPDF } = window.jspdf;
-            const timestamp = new Date().toLocaleString();
-            const query = queryInput.value;
-            let content;
-            if (lang === 'ar') {
-                const arabicContent = arabicResponse.querySelector('.response-content');
-                if (!arabicContent || !arabicContent.textContent.trim()) {
-                    showNotification('No Arabic content available to save.');
-                    return;
-                }
-                content = arabicContent.textContent;
-            } else {
-                const englishContent = englishResponse.querySelector('.response-content');
-                if (!englishContent || !englishContent.textContent.trim()) {
-                    showNotification('No English content available to save.');
-                    return;
-                }
-                content = englishContent.textContent;
-            }
+            const content = response;
+            console.log(`${lang} content length:`, content.length);
+
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
+            console.log('Number of sources:', sources.length);
 
             // Initialize PDF
+            console.log('Initializing PDF document...');
+            const { jsPDF } = window.jspdf;
             const doc = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
             });
 
-            // Configure for Arabic if needed
-            if (lang === 'ar') {
-                console.log('Configuring Arabic PDF settings...');
-                // Enable right-to-left mode
-                doc.setR2L(true);
-                console.log('RTL mode enabled');
-                
-                // Use local Noto Naskh Arabic font for consistent Arabic support
-                try {
-                    console.log('Starting font loading process...');
-                    const fontResponse = await fetch('static/assets/fonts/NotoNaskhArabic-Regular.ttf');
-                    if (!fontResponse.ok) {
-                        console.error('Font fetch failed:', fontResponse.status, fontResponse.statusText);
-                        throw new Error('Failed to load Arabic font file');
-                    }
-                    console.log('Font file fetched successfully');
-                    
-                    const fontArrayBuffer = await fontResponse.arrayBuffer();
-                    console.log('Font data loaded, size:', fontArrayBuffer.byteLength, 'bytes');
-                    
-                    // Add the font to the PDF
-                    console.log('Adding font to VFS...');
-                    doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', fontArrayBuffer);
-                    console.log('Adding font to document...');
-                    doc.addFont('NotoNaskhArabic-Regular.ttf', 'NotoNaskh', 'normal');
-                    console.log('Setting font as active...');
-                    doc.setFont('NotoNaskh', 'normal');
-                    console.log('Arabic font setup completed');
-                } catch (fontError) {
-                    console.error('Font loading error:', fontError);
-                    showNotification('Error loading Arabic font: ' + fontError.message);
-                    return;
-                }
-
-                // Verify font was loaded correctly
-                try {
-                    console.log('Verifying font setup...');
-                    const currentFont = doc.getFont();
-                    console.log('Current font:', currentFont ? currentFont.fontName : 'not set');
-                    
-                    if (!currentFont) {
-                        throw new Error('Font not set after loading');
-                    }
-                    
-                    // Test font by measuring text
-                    const testText = 'اختبار';
-                    console.log('Testing text rendering with:', testText);
-                    const textWidth = doc.getTextWidth(testText);
-                    console.log('Test text width:', textWidth);
-                    
-                    if (textWidth <= 0) {
-                        console.error('Text width is invalid:', textWidth);
-                        throw new Error('Font not rendering correctly');
-                    }
-                    console.log('Font verification successful');
-                } catch (verifyError) {
-                    console.error('Font verification error:', verifyError);
-                    console.error('Error details:', verifyError.stack);
-                    showNotification('Error verifying Arabic font: ' + verifyError.message);
-                    return;
-                }
-                doc.setFontSize(16);
-
-                // Configure text settings for Arabic
-                const textOptions = {
-                    align: 'right',
-                    charSpace: 0.5,
-                    renderingMode: 'fill'
-                };
-
-                console.log('Starting Arabic text rendering...');
-                try {
-                    // Add content in Arabic with proper text settings
-                    console.log('Adding title...');
-                    doc.text('نتيجة البحث', 190, 20, textOptions);
-                    
-                    console.log('Adding timestamp...');
-                    doc.setFontSize(12);
-                    doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 35, textOptions);
-                    
-                    console.log('Adding query label...');
-                    doc.text(':السؤال', 190, 50, textOptions);
-                    
-                    // Add query with proper text settings
-                    console.log('Processing query text...');
-                    const queryLines = doc.splitTextToSize(query, 140);
-                    console.log('Query lines count:', queryLines.length);
-                    doc.text(queryLines, 190, 60, textOptions);
-                    
-                    // Add answer with proper text settings
-                    console.log('Adding answer label...');
-                    doc.text(':الإجابة', 190, 85, textOptions);
-                    
-                    console.log('Processing answer text...');
-                    const contentLines = doc.splitTextToSize(content, 140);
-                    console.log('Content lines count:', contentLines.length);
-                    doc.text(contentLines, 190, 95, textOptions);
-                    
-                    console.log('Arabic text rendering completed successfully');
-                } catch (renderError) {
-                    console.error('Error during Arabic text rendering:', renderError);
-                    console.error('Error stack:', renderError.stack);
-                    throw new Error('Failed to render Arabic text: ' + renderError.message);
-                }
-                
-                // Add sources with proper text settings
-                let yPos = 95 + (contentLines.length * 8);
-                if (sources.length > 0) {
-                    if (yPos > 250) {
-                        doc.addPage();
-                        yPos = 30;
-                    }
-                    
-                    doc.setFontSize(14);
-                    doc.text(':المصادر', 190, yPos, textOptions);
-                    doc.setFontSize(12);
-                    
-                    sources.forEach((source, i) => {
-                        yPos += 10;
-                        if (yPos > 270) {
-                            doc.addPage();
-                            yPos = 30;
-                        }
-                        doc.text(`${source} •`, 190, yPos, textOptions);
-                    });
-                }
-                
-                // Reset RTL and font settings
-                doc.setR2L(false);
+            try {
+                // Configure PDF settings
+                console.log('Setting up PDF...');
                 doc.setFont('helvetica', 'normal');
-            } else {
-                // English content
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(16);
-                doc.text('HybridRAG Search Result', 20, 20);
                 doc.setFontSize(12);
-                doc.text(`Generated: ${timestamp}`, 20, 30);
-                doc.text('Query:', 20, 45);
-                
-                const queryLines = doc.splitTextToSize(query, 170);
-                doc.text(queryLines, 20, 55);
-                
-                doc.text('Answer:', 20, 75);
-                const contentLines = doc.splitTextToSize(content, 170);
-                doc.text(contentLines, 20, 85);
-                
-                let yPos = 85 + (contentLines.length * 7);
+
+                // Common settings
+                const margin = 20;
+                const pageWidth = doc.internal.pageSize.width;
+                let currentY = margin;
+
+                // Add metadata
+                doc.text('Generated: ' + new Date().toLocaleString(), margin, currentY);
+                currentY += 15;
+
+                // Add query
+                doc.text('Query:', margin, currentY);
+                currentY += 10;
+                const queryLines = doc.splitTextToSize(queryInput.value, pageWidth - 2 * margin);
+                doc.text(queryLines, margin, currentY);
+                currentY += queryLines.length * 7 + 10;
+
+                // Add answer
+                doc.text('Answer:', margin, currentY);
+                currentY += 10;
+                const contentLines = doc.splitTextToSize(content, pageWidth - 2 * margin);
+                doc.text(contentLines, margin, currentY);
+                currentY += contentLines.length * 7 + 10;
+
+                // Add sources if available
                 if (sources.length > 0) {
-                    if (yPos > 250) {
+                    if (currentY > doc.internal.pageSize.height - margin) {
                         doc.addPage();
-                        yPos = 20;
+                        currentY = margin;
                     }
-                    doc.text('Sources:', 20, yPos);
+                    doc.text('Sources:', margin, currentY);
+                    currentY += 10;
                     sources.forEach((source, i) => {
-                        yPos += 7;
-                        if (yPos > 280) {
+                        const sourceText = `${i + 1}. ${source}`;
+                        const sourceLines = doc.splitTextToSize(sourceText, pageWidth - 2 * margin);
+                        
+                        if (currentY + (sourceLines.length * 7) > doc.internal.pageSize.height - margin) {
                             doc.addPage();
-                            yPos = 20;
+                            currentY = margin;
                         }
-                        doc.text(`${i + 1}. ${source}`, 20, yPos);
+                        
+                        doc.text(sourceLines, margin, currentY);
+                        currentY += sourceLines.length * 7;
                     });
                 }
-            }
 
-            // Save with language-specific filename
-            const langSuffix = lang === 'ar' ? 'Arabic' : 'English';
-            const filename = `HybridRAG_Result_${langSuffix}_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
-            doc.save(filename);
-            showNotification(`${langSuffix} result saved as PDF!`);
+                console.log('Content added to PDF successfully');
+
+                // Save with language-specific filename
+                const langSuffix = lang === 'ar' ? 'Arabic' : 'English';
+                const filename = `HybridRAG_Result_${langSuffix}_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
+                console.log('Saving PDF as:', filename);
+                doc.save(filename);
+                console.log('PDF saved successfully');
+                showNotification(`${langSuffix} result saved as PDF!`);
+            } catch (error) {
+                console.error('Error adding content to PDF:', error);
+                throw error;
+            }
         } catch (error) {
             console.error('PDF generation error:', error);
+            console.error('Error stack:', error.stack);
             
             // Provide more specific error messages based on the error type
             let errorMessage = 'Error saving PDF. ';
