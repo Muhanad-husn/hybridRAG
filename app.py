@@ -79,8 +79,7 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
         
         # Clean the title for filename
         safe_title = ''.join(c for c in title if c.isalnum() or c in (' ', '-', '_'))[:50]
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{safe_title}_{timestamp_str}.html"
+        filename = f"{safe_title}.html"
         
         # Render HTML template
         html = render_template(
