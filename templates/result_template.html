@@ -150,18 +150,6 @@
         <div class="content {{ 'arabic' if is_arabic else 'english' }}">
             {{ query }}
         </div>
-        {% if translated_query %}
-            <div class="section-title {{ 'english' if is_arabic else 'arabic' }}">
-                {% if is_arabic %}
-                    English Query:
-                {% else %}
-                    الترجمة:
-                {% endif %}
-            </div>
-            <div class="content {{ 'english' if is_arabic else 'arabic' }}">
-                {{ translated_query }}
-            </div>
-        {% endif %}
     </div>
 
     <div class="section">

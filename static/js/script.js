@@ -408,9 +408,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const englishContent = englishResponse.querySelector('.response-content').textContent;
             const arabicContent = arabicResponse.querySelector('.response-content').textContent;
             
-            // Get the query in both languages if available
+            // Only use original query, no translation needed
             const originalQuery = queryInput.value;
-            const translatedQuery = lang === 'ar' ? englishContent.split('\n')[0] : arabicContent.split('\n')[0];
 
             try {
                 const response = await fetch('/generate-result', {
@@ -421,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({
                         content: content,
                         query: originalQuery,
-                        translatedQuery: translatedQuery,
+                        translatedQuery: '', // No translation needed
                         sources: sources,
                         isArabic: lang === 'ar'
                     })

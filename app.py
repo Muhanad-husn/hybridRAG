@@ -107,9 +107,10 @@ def search():
         
         if is_arabic:
             logger.info(f"Processing Arabic query: {query}")
-            # Translate query to English
+            # Translate query to English for internal processing only
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
-            logger.info(f"Translated to English: {english_query}")
+            logger.info(f"Translated to English for processing: {english_query}")
+            # Pass original query without translation
             result = run_hybrid_search(english_query, original_lang='ar', original_query=query)
         else:
             logger.info(f"Processing English query: {query}")
