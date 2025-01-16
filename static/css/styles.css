@@ -216,12 +216,50 @@ textarea:focus {
     color: white;
 }
 
-.response-section {
+.responses-container {
     background: var(--card-background);
-    padding: 20px;
     border-radius: var(--border-radius);
-    margin-bottom: 20px;
     box-shadow: var(--shadow-sm);
+    margin-bottom: 20px;
+}
+
+.response-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--primary-color);
+    padding: 0 20px;
+}
+
+.response-tabs .tab-btn {
+    padding: 12px 24px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: all var(--transition-speed);
+}
+
+.response-tabs .tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--accent-color);
+    font-weight: bold;
+}
+
+.response-panels {
+    padding: 20px;
+}
+
+.response-section {
+    display: none;
+    background: var(--card-background);
+    border-radius: var(--border-radius);
+}
+
+.response-section.active {
+    display: block;
 }
 
 .response-content {

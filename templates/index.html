@@ -27,11 +27,6 @@
                         <option value="dense">Dense Vector Search Only</option>
                         <option value="graph">Knowledge Graph Only</option>
                     </select>
-                    <div class="language-toggle">
-                        <label>
-                            <input type="checkbox" id="bilingualMode"> Show Bilingual Results
-                        </label>
-                    </div>
                 </div>
 
                 <form id="searchForm" class="search-form">
@@ -68,23 +63,30 @@
                         </button>
                     </div>
 
-                    <div id="englishResponse" class="response-section">
-                        <h2>English Response</h2>
-                        <div class="response-content"></div>
-                        <div class="response-metadata">
-                            <div class="confidence-score">
-                                <label>Answer Confidence:</label>
-                                <div class="score-container">
-                                    <div class="score-bar"></div>
-                                    <span class="score-value">0%</span>
+                    <div class="responses-container">
+                        <div class="response-tabs">
+                            <button class="tab-btn active" data-lang="en">English</button>
+                            <button class="tab-btn" data-lang="ar">عربي</button>
+                        </div>
+                        
+                        <div class="response-panels">
+                            <div id="englishResponse" class="response-section active">
+                                <div class="response-content"></div>
+                                <div class="response-metadata">
+                                    <div class="confidence-score">
+                                        <label>Answer Confidence:</label>
+                                        <div class="score-container">
+                                            <div class="score-bar"></div>
+                                            <span class="score-value">0%</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <div id="arabicResponse" class="response-section hidden">
-                        <h2>Arabic Response</h2>
-                        <div class="response-content"></div>
+                            <div id="arabicResponse" class="response-section">
+                                <div class="response-content"></div>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="sources" class="sources-section">

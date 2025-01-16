@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const navButtons = document.querySelectorAll('.nav-btn');
     const views = document.querySelectorAll('.view');
     const searchMode = document.getElementById('searchMode');
-    const bilingualMode = document.getElementById('bilingualMode');
+    const langTabs = document.querySelectorAll('.response-tabs .tab-btn');
     const processSteps = document.querySelectorAll('.process-steps .step');
     const saveResultBtn = document.getElementById('saveResult');
 
@@ -70,8 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     query: query,
-                    mode: searchMode.value,
-                    bilingual: bilingualMode.checked
+                    mode: searchMode.value
                 })
             });
 
@@ -145,16 +144,36 @@ document.addEventListener('DOMContentLoaded', function() {
             confidenceScore.classList.add('hidden');
         }
 
-        // Display responses based on language and bilingual mode
+        // Display responses in both languages
         englishResponse.querySelector('.response-content').innerHTML = data.answer;
         
-        if (bilingualMode.checked && data.arabic_answer) {
-            arabicResponse.querySelector('.response-content').textContent = data.arabic_answer;
-            arabicResponse.classList.remove('hidden');
-            arabicResponse.querySelector('.response-content').setAttribute('dir', 'rtl');
+        if (data.arabic_answer) {
+            const arabicContent = arabicResponse.querySelector('.response-content');
+            arabicContent.innerHTML = data.arabic_answer;
+            arabicContent.setAttribute('dir', 'rtl');
+            document.querySelector('[data-lang="ar"]').style.display = 'block';
         } else {
-            arabicResponse.classList.add('hidden');
+            document.querySelector('[data-lang="ar"]').style.display = 'none';
         }
+
+        // Initialize language tabs
+        langTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active states
+                langTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show selected language content
+                const lang = tab.dataset.lang;
+                const sections = document.querySelectorAll('.response-section');
+                sections.forEach(section => {
+                    section.classList.toggle('active',
+                        (lang === 'en' && section.id === 'englishResponse') ||
+                        (lang === 'ar' && section.id === 'arabicResponse')
+                    );
+                });
+            });
+        });
 
         // Display sources
         if (data.sources && data.sources.length > 0) {
