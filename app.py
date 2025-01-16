@@ -1,8 +1,12 @@
 from flask import Flask, render_template, request, jsonify
 import sys
+import logging
 from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
+from src.utils.logger import setup_logger
 
+# Initialize logger
+logger = setup_logger(__name__)
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 translator = Translator()
@@ -24,20 +28,18 @@ def search():
         is_arabic = translator.is_arabic(query)
         
         if is_arabic:
-            print(f"Processing Arabic query: {query}")
+            logger.info(f"Processing Arabic query: {query}")
             # Translate query to English
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
-            print(f"Translated to English: {english_query}")
+            logger.info(f"Translated to English: {english_query}")
             result = run_hybrid_search(english_query, original_lang='ar', original_query=query)
         else:
-            print(f"Processing English query: {query}")
+            logger.info(f"Processing English query: {query}")
             result = run_hybrid_search(query)
         
-        print("Response data:", result)
-        print("Response keys:", result.keys())
-        print("Language:", result.get('language'))
-        print("Has answer:", 'answer' in result)
-        print("Has english_answer:", 'english_answer' in result)
+        logger.debug("Response data: %s", result)
+        logger.debug("Response keys: %s", result.keys())
+        logger.debug("Language: %s", result.get('language'))
             
         return jsonify(result)
         
@@ -49,5 +51,5 @@ if __name__ == '__main__':
         translator = Translator()
         app.run(debug=True, port=5000)
     except Exception as e:
-        print(f"Failed to initialize translator: {str(e)}")
+        logger.error(f"Failed to initialize translator: {str(e)}")
         raise

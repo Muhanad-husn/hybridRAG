@@ -120,12 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Results Display
     function displayResults(data) {
-        console.log('Displaying results:', data);
-        console.log('Response type:', typeof data);
-        console.log('Has answer:', 'answer' in data);
-        console.log('Has english_answer:', 'english_answer' in data);
-        console.log('Language:', data.language);
-
         // Clear previous results
         englishResponse.querySelector('.response-content').textContent = '';
         arabicResponse.querySelector('.response-content').textContent = '';
@@ -135,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsDiv.classList.remove('hidden');
 
         if (data.error) {
-            console.log('Error in response:', data.error);
             displayError(data.error);
             return;
         }
@@ -175,12 +168,6 @@ document.addEventListener('DOMContentLoaded', function() {
         englishContent.textContent = '';
         arabicContent.textContent = '';
 
-        console.log('Response data:', {
-            language: data.language,
-            hasEnglishAnswer: Boolean(data.english_answer),
-            hasAnswer: Boolean(data.answer)
-        });
-
         // Always set English content
         englishContent.textContent = data.answer;
         englishResponse.classList.remove('hidden');
@@ -205,31 +192,15 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelector('[data-lang="en"]').click();
         }
 
-        console.log('Content set:', {
-            english: englishContent.textContent.substring(0, 50) + '...',
-            arabic: arabicContent.textContent.substring(0, 50) + '...'
-        });
-
-        // Double-check visibility
-        console.log('Final visibility state:', {
-            resultsVisible: !resultsDiv.classList.contains('hidden'),
-            englishActive: englishResponse.classList.contains('active'),
-            arabicActive: arabicResponse.classList.contains('active'),
-            englishContent: englishContent.textContent.length > 0,
-            arabicContent: arabicContent.textContent.length > 0
-        });
-
         // Remove previous tab click handlers
         langTabs.forEach(tab => {
             const newTab = tab.cloneNode(true);
             tab.parentNode.replaceChild(newTab, tab);
         });
 
-        // Re-initialize language tabs with debug logging
+        // Re-initialize language tabs
         document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
             tab.addEventListener('click', () => {
-                console.log('Tab clicked:', tab.dataset.lang);
-                
                 // Update active states for tabs
                 document.querySelectorAll('.response-tabs .tab-btn').forEach(t => {
                     t.classList.remove('active');
@@ -239,12 +210,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show/hide content sections
                 const lang = tab.dataset.lang;
                 if (lang === 'en') {
-                    console.log('Showing English content');
                     englishResponse.classList.add('active');
                     englishResponse.classList.remove('hidden');
                     arabicResponse.classList.remove('active');
                 } else {
-                    console.log('Showing Arabic content');
                     arabicResponse.classList.add('active');
                     arabicResponse.classList.remove('hidden');
                     englishResponse.classList.remove('active');
@@ -372,22 +341,46 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Save Result Handlers
-    document.getElementById('saveEnglishResult').addEventListener('click', () => {
-        saveResult('en');
-    });
-
-    document.getElementById('saveArabicResult').addEventListener('click', () => {
-        saveResult('ar');
-    });
+    const saveEnglishBtn = document.getElementById('saveEnglishResult');
+    const saveArabicBtn = document.getElementById('saveArabicResult');
+    
+    if (saveEnglishBtn) {
+        saveEnglishBtn.addEventListener('click', () => {
+            saveResult('en');
+        });
+    }
+    
+    if (saveArabicBtn) {
+        saveArabicBtn.addEventListener('click', () => {
+            saveResult('ar');
+        });
+    }
 
     async function saveResult(lang) {
         try {
+            if (!window.jspdf) {
+                showNotification('PDF library not loaded. Please try again.');
+                return;
+            }
             const { jsPDF } = window.jspdf;
             const timestamp = new Date().toLocaleString();
             const query = queryInput.value;
-            const content = lang === 'ar'
-                ? arabicResponse.querySelector('.response-content').textContent
-                : englishResponse.querySelector('.response-content').textContent;
+            let content;
+            if (lang === 'ar') {
+                const arabicContent = arabicResponse.querySelector('.response-content');
+                if (!arabicContent || !arabicContent.textContent.trim()) {
+                    showNotification('No Arabic content available to save.');
+                    return;
+                }
+                content = arabicContent.textContent;
+            } else {
+                const englishContent = englishResponse.querySelector('.response-content');
+                if (!englishContent || !englishContent.textContent.trim()) {
+                    showNotification('No English content available to save.');
+                    return;
+                }
+                content = englishContent.textContent;
+            }
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
 
             // Initialize PDF
@@ -401,46 +394,63 @@ document.addEventListener('DOMContentLoaded', function() {
             if (lang === 'ar') {
                 // Enable right-to-left mode
                 doc.setR2L(true);
-                // Use Arial for better Arabic support
-                doc.setFont('arial', 'normal');
+                // Use local Noto Naskh Arabic font for consistent Arabic support
+                try {
+                    doc.addFont('/static/assets/fonts/NotoNaskhArabic-Regular.ttf', 'NotoNaskh', 'normal');
+                    doc.setFont('NotoNaskh', 'normal');
+                    
+                    // Verify font was set correctly
+                    const currentFont = doc.getFont();
+                    if (!currentFont || currentFont.fontName !== 'NotoNaskh') {
+                        throw new Error('Failed to set Arabic font');
+                    }
+                } catch (fontError) {
+                    showNotification('Error loading Arabic font. Please try again.');
+                    return;
+                }
                 doc.setFontSize(16);
 
-                // Add content in Arabic with increased spacing
-                doc.text('نتيجة البحث', 190, 20, { align: 'right', charSpace: 0.5 });
+                // Configure text settings for Arabic
+                const textOptions = {
+                    align: 'right',
+                    charSpace: 0.5,
+                    renderingMode: 'fill'
+                };
+
+                // Add content in Arabic with proper text settings
+                doc.text('نتيجة البحث', 190, 20, textOptions);
                 doc.setFontSize(12);
-                doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 35, { align: 'right', charSpace: 0.5 });
-                doc.text(':السؤال', 190, 50, { align: 'right', charSpace: 0.5 });
+                doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 35, textOptions);
+                doc.text(':السؤال', 190, 50, textOptions);
                 
-                // Add query with proper spacing and margins
-                const queryLines = doc.splitTextToSize(query, 140); // Reduced width for better Arabic text flow
-                doc.text(queryLines, 190, 60, { align: 'right', charSpace: 0.5 });
+                // Add query with proper text settings
+                const queryLines = doc.splitTextToSize(query, 140);
+                doc.text(queryLines, 190, 60, textOptions);
                 
-                // Add answer with increased line height
-                doc.text(':الإجابة', 190, 85, { align: 'right', charSpace: 0.5 });
+                // Add answer with proper text settings
+                doc.text(':الإجابة', 190, 85, textOptions);
                 const contentLines = doc.splitTextToSize(content, 140);
-                doc.text(contentLines, 190, 95, { align: 'right', charSpace: 0.5 });
+                doc.text(contentLines, 190, 95, textOptions);
                 
-                // Add sources with improved spacing
-                let yPos = 95 + (contentLines.length * 8); // Increased line height
+                // Add sources with proper text settings
+                let yPos = 95 + (contentLines.length * 8);
                 if (sources.length > 0) {
-                    // Add new page if close to bottom
                     if (yPos > 250) {
                         doc.addPage();
                         yPos = 30;
                     }
                     
                     doc.setFontSize(14);
-                    doc.text(':المصادر', 190, yPos, { align: 'right', charSpace: 0.5 });
+                    doc.text(':المصادر', 190, yPos, textOptions);
                     doc.setFontSize(12);
                     
                     sources.forEach((source, i) => {
-                        yPos += 10; // Increased spacing between sources
+                        yPos += 10;
                         if (yPos > 270) {
                             doc.addPage();
                             yPos = 30;
                         }
-                        // Add bullet point and proper spacing
-                        doc.text(`${source} •`, 190, yPos, { align: 'right', charSpace: 0.5 });
+                        doc.text(`${source} •`, 190, yPos, textOptions);
                     });
                 }
                 
@@ -487,7 +497,6 @@ document.addEventListener('DOMContentLoaded', function() {
             doc.save(filename);
             showNotification(`${langSuffix} result saved as PDF!`);
         } catch (error) {
-            console.error('Error saving PDF:', error);
             showNotification('Error saving PDF. Please try again.');
         }
     }
