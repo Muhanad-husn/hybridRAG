@@ -100,22 +100,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Process Animation
     function startProcessAnimation() {
-        let currentStep = 0;
         processSteps.forEach(step => step.classList.remove('active'));
         
-        const animateSteps = () => {
-            processSteps.forEach((step, index) => {
-                step.classList.toggle('active', index === currentStep);
-            });
-            currentStep = (currentStep + 1) % processSteps.length;
-        };
-
-        window.processInterval = setInterval(animateSteps, 1000);
-        animateSteps();
+        // First step starts immediately
+        processSteps[0].classList.add('active');
+        
+        // Second step starts after 1.5 seconds
+        window.stepTimeout = setTimeout(() => {
+            processSteps[0].classList.remove('active');
+            processSteps[1].classList.add('active');
+        }, 1500);
     }
 
     function stopProcessAnimation() {
-        clearInterval(window.processInterval);
+        if (window.stepTimeout) {
+            clearTimeout(window.stepTimeout);
+        }
         processSteps.forEach(step => step.classList.remove('active'));
     }
 
