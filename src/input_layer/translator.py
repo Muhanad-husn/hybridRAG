@@ -35,10 +35,36 @@ class Translator:
         """Load translation configuration."""
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f)
+                config = yaml.safe_load(f)
+                # Ensure UTF-8 encoding for text processing
+                if 'text_processing' not in config:
+                    config['text_processing'] = {}
+                config['text_processing'].update({
+                    'encoding': 'utf-8',
+                    'normalize_unicode': True,  # Normalize Unicode characters
+                    'handle_rtl': True,  # Handle right-to-left text
+                })
+                return config
         except Exception as e:
             self.logger.error(f"Error loading translation config: {str(e)}")
             raise
+
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text using UTF-8 encoding and Unicode normalization."""
+        import unicodedata
+        try:
+            # Ensure text is UTF-8 encoded
+            if not isinstance(text, str):
+                text = text.decode('utf-8')
+            
+            if self.config['text_processing']['normalize_unicode']:
+                # Apply Unicode normalization (NFKC for compatibility)
+                text = unicodedata.normalize('NFKC', text)
+            
+            return text
+        except Exception as e:
+            self.logger.warning(f"Text normalization failed: {str(e)}")
+            return text
             
     def _load_model(self, direction: str) -> tuple[MarianMTModel, MarianTokenizer]:
         """Load translation model and tokenizer for specified direction."""
@@ -150,12 +176,18 @@ class Translator:
             else:
                 raise ValueError(f"Unsupported language pair: {source_lang} to {target_lang}")
                 
-            # Prepare text
+            # Normalize and prepare text
+            text = self._normalize_text(text)
+            
+            # Additional Arabic-specific normalization if needed
             if self.config["text_processing"]["normalize_arabic"] and source_lang == 'ar':
-                # Add Arabic text normalization if needed
-                pass
-                
-            # Split text into paragraphs
+                import re
+                # Normalize Arabic-specific characters (like different forms of alef)
+                text = re.sub('[إأٱآا]', 'ا', text)  # Normalize alef
+                text = re.sub('ى', 'ي', text)  # Normalize ya
+                text = re.sub('ة', 'ه', text)  # Normalize ta marbuta
+            
+            # Split text into paragraphs with UTF-8 awareness
             paragraphs = text.split('\n\n')
             translated_paragraphs = []
             

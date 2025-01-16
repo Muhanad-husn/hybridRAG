@@ -4,6 +4,7 @@ from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 translator = Translator()
 
 @app.route('/')

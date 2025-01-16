@@ -374,7 +374,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save Result Handler
     saveResultBtn.addEventListener('click', () => {
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+        // Initialize PDF with UTF-8 encoding support
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            putOnlyUsedFonts: true,
+            floatPrecision: 16 // For better text positioning
+        });
         
         // Get content
         const query = queryInput.value;
