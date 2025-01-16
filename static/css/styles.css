@@ -224,6 +224,16 @@ textarea:focus {
     box-shadow: var(--shadow-sm);
 }
 
+.response-content {
+    white-space: pre-line;
+    line-height: 1.8;
+}
+
+.response-content strong {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
 .response-metadata {
     margin-top: 15px;
     padding-top: 15px;

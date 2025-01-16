@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Display responses based on language and bilingual mode
-        englishResponse.querySelector('.response-content').textContent = data.answer;
+        englishResponse.querySelector('.response-content').innerHTML = data.answer;
         
         if (bilingualMode.checked && data.arabic_answer) {
             arabicResponse.querySelector('.response-content').textContent = data.arabic_answer;
