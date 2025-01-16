@@ -220,7 +220,6 @@ Please provide a clear and accurate answer based solely on the information provi
                     query=query,
                     translated_query="",
                     sources=sources,
-                    confidence=confidence,
                     is_arabic=False
                 )
                 logger.info(f"English response saved to: {english_filepath}")
@@ -248,7 +247,6 @@ Please provide a clear and accurate answer based solely on the information provi
                         query=original_query or query,
                         translated_query=query if original_query else "",
                         sources=sources,
-                        confidence=confidence,
                         is_arabic=True
                     )
                     logger.info(f"Arabic response saved to: {arabic_filepath}")
