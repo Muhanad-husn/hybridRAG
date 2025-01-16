@@ -427,16 +427,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 doc.setR2L(true);
                 // Use local Noto Naskh Arabic font for consistent Arabic support
                 try {
-                    doc.addFont('/static/assets/fonts/NotoNaskhArabic-Regular.ttf', 'NotoNaskh', 'normal');
-                    doc.setFont('NotoNaskh', 'normal');
-                    
-                    // Verify font was set correctly
-                    const currentFont = doc.getFont();
-                    if (!currentFont || currentFont.fontName !== 'NotoNaskh') {
-                        throw new Error('Failed to set Arabic font');
+                    // Use pre-loaded font data
+                    if (!window.arabicFontData) {
+                        throw new Error('Arabic font data not available');
                     }
+                    
+                    // Add the font to the PDF
+                    doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', window.arabicFontData);
+                    doc.addFont('NotoNaskhArabic-Regular.ttf', 'NotoNaskh', 'normal');
+                    doc.setFont('NotoNaskh', 'normal');
                 } catch (fontError) {
-                    showNotification('Error loading Arabic font. Please try again.');
+                    console.error('Font loading error:', fontError);
+                    showNotification('Error loading Arabic font: ' + fontError.message);
+                    return;
+                }
+
+                // Verify font was loaded correctly
+                try {
+                    const currentFont = doc.getFont();
+                    if (!currentFont) {
+                        throw new Error('Font not set after loading');
+                    }
+                    // Test font by measuring text
+                    const testText = 'اختبار';
+                    const textWidth = doc.getTextWidth(testText);
+                    if (textWidth <= 0) {
+                        throw new Error('Font not rendering correctly');
+                    }
+                } catch (verifyError) {
+                    console.error('Font verification error:', verifyError);
+                    showNotification('Error verifying Arabic font: ' + verifyError.message);
                     return;
                 }
                 doc.setFontSize(16);
@@ -528,7 +548,21 @@ document.addEventListener('DOMContentLoaded', function() {
             doc.save(filename);
             showNotification(`${langSuffix} result saved as PDF!`);
         } catch (error) {
-            showNotification('Error saving PDF. Please try again.');
+            console.error('PDF generation error:', error);
+            
+            // Provide more specific error messages based on the error type
+            let errorMessage = 'Error saving PDF. ';
+            if (error.message.includes('font')) {
+                errorMessage += 'Font loading failed. Please try again.';
+            } else if (error.message.includes('VFS')) {
+                errorMessage += 'Font system initialization failed.';
+            } else if (error.message.includes('rendering')) {
+                errorMessage += 'Text rendering failed. Please check the content.';
+            } else {
+                errorMessage += 'Please try again or contact support if the issue persists.';
+            }
+            
+            showNotification(errorMessage);
         }
     }
 
