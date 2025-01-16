@@ -3,57 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HybridRAG Search Interface</title>
+    <title>Educational HybridRAG Interface</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>HybridRAG Search</h1>
-            <p>Enter your query in English or Arabic</p>
+            <h1>Educational HybridRAG Search</h1>
+            <nav class="main-nav">
+                <button class="nav-btn active" data-view="search">Search</button>
+                <button class="nav-btn" data-view="history">Search History</button>
+                <button class="nav-btn" data-view="saved">Saved Results</button>
+                <button class="nav-btn" data-view="tutorial">Tutorial</button>
+            </nav>
         </header>
 
         <main>
-            <form id="searchForm" class="search-form">
-                <div class="input-group">
-                    <textarea 
-                        id="queryInput" 
-                        name="query" 
-                        placeholder="Enter your query here..."
-                        rows="3"
-                        required></textarea>
-                    <button type="submit" id="searchButton">Search</button>
+            <!-- Search View -->
+            <div id="searchView" class="view active">
+                <div class="search-options">
+                    <select id="searchMode" class="search-select">
+                        <option value="hybrid">Hybrid Search (Graph + Dense)</option>
+                        <option value="dense">Dense Vector Search Only</option>
+                        <option value="graph">Knowledge Graph Only</option>
+                    </select>
+                    <div class="language-toggle">
+                        <label>
+                            <input type="checkbox" id="bilingualMode"> Show Bilingual Results
+                        </label>
+                    </div>
                 </div>
-            </form>
 
-            <div id="loadingIndicator" class="loading hidden">
-                <div class="spinner"></div>
-                <p>Processing your query...</p>
+                <form id="searchForm" class="search-form">
+                    <div class="input-group">
+                        <div class="query-builder">
+                            <textarea 
+                                id="queryInput" 
+                                name="query" 
+                                placeholder="Enter your query here..."
+                                rows="3"
+                                required></textarea>
+                            <div class="query-suggestions hidden">
+                                <h3>Query Suggestions:</h3>
+                                <div class="suggestion-chips"></div>
+                            </div>
+                        </div>
+                        <button type="submit" id="searchButton">Search</button>
+                    </div>
+                </form>
+
+                <div id="loadingIndicator" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Processing your query...</p>
+                    <div class="process-steps">
+                        <div class="step">Document Processing</div>
+                        <div class="step">Embedding Generation</div>
+                        <div class="step">Knowledge Graph Analysis</div>
+                        <div class="step">Response Generation</div>
+                    </div>
+                </div>
+
+                <div id="results" class="results hidden">
+                    <div class="result-controls">
+                        <button id="saveResult" class="control-btn">
+                            <span class="icon">📥</span> Save Result
+                        </button>
+                    </div>
+
+                    <div id="englishResponse" class="response-section">
+                        <h2>English Response</h2>
+                        <div class="response-content"></div>
+                        <div class="response-metadata">
+                            <div class="confidence-score">
+                                <label>Answer Confidence:</label>
+                                <div class="score-bar"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="arabicResponse" class="response-section hidden">
+                        <h2>Arabic Response</h2>
+                        <div class="response-content"></div>
+                    </div>
+
+                    <div id="sources" class="sources-section">
+                        <h2>Sources & Evidence</h2>
+                        <ul class="sources-list"></ul>
+                    </div>
+
+                    <div class="learning-resources hidden">
+                        <h3>Related Topics</h3>
+                        <div class="topic-chips"></div>
+                        <div class="suggested-queries">
+                            <h4>Explore Further:</h4>
+                            <ul class="query-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="error" class="error hidden">
+                    <p class="error-message"></p>
+                    <div class="error-suggestions"></div>
+                </div>
             </div>
 
-            <div id="results" class="results hidden">
-                <div id="englishResponse" class="response-section">
-                    <h2>English Response</h2>
-                    <div class="response-content"></div>
+            <!-- History View -->
+            <div id="historyView" class="view hidden">
+                <h2>Search History</h2>
+                <div class="history-filters">
+                    <input type="text" placeholder="Filter history..." class="history-search">
+                    <select class="history-sort">
+                        <option value="date">Date</option>
+                        <option value="relevance">Relevance</option>
+                    </select>
                 </div>
-
-                <div id="arabicResponse" class="response-section hidden">
-                    <h2>Arabic Response</h2>
-                    <div class="response-content"></div>
-                </div>
-
-                <div id="sources" class="sources-section">
-                    <h2>Sources</h2>
-                    <ul class="sources-list"></ul>
-                </div>
+                <div class="history-list"></div>
             </div>
 
-            <div id="error" class="error hidden">
-                <p class="error-message"></p>
+            <!-- Saved Results View -->
+            <div id="savedView" class="view hidden">
+                <h2>Saved Results</h2>
+                <div class="saved-results-grid"></div>
+            </div>
+
+            <!-- Tutorial View -->
+            <div id="tutorialView" class="view hidden">
+                <h2>How to Use HybridRAG</h2>
+                <div class="tutorial-steps"></div>
+                <div class="tutorial-examples"></div>
             </div>
         </main>
+
+        <footer>
+            <div class="stats">
+                <span>Documents Processed: <span id="docCount">0</span></span>
+                <span>Knowledge Graph Nodes: <span id="nodeCount">0</span></span>
+            </div>
+        </footer>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
