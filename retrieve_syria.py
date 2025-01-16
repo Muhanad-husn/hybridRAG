@@ -276,26 +276,45 @@ Please provide a clear and accurate answer based solely on the information provi
 
         # Extract vector data from results
         vector_data = []
-        for result in results:
-            if 'vector' in result and result['vector'] is not None:
-                vector_data.append({
-                    'values': result['vector'].tolist() if hasattr(result['vector'], 'tolist') else result['vector'],
-                    'score': result.get('score', 0.0)
-                })
+        try:
+            for result in results:
+                if isinstance(result, dict):  # Ensure result is a dictionary
+                    vector = result.get('vector')
+                    if vector is not None:
+                        # Handle different vector formats
+                        if hasattr(vector, 'tolist'):
+                            values = vector.tolist()
+                        elif isinstance(vector, (list, tuple)):
+                            values = list(vector)
+                        else:
+                            continue  # Skip if vector is in unexpected format
+                            
+                        vector_data.append({
+                            'values': values,
+                            'score': float(result.get('score', 0.0))
+                        })
+        except Exception as e:
+            logger.error(f"Error extracting vector data: {str(e)}")
 
         # Extract graph relationships
         graph_data = []
-        for result in results:
-            if result.get('meta') == 'graph_relationships' and 'content' in result:
-                relationships = result['content'].split('\n')
-                for rel in relationships:
-                    parts = rel.strip().split(' -> ')
-                    if len(parts) == 3:
-                        graph_data.append({
-                            'subject': parts[0],
-                            'predicate': parts[1],
-                            'object': parts[2]
-                        })
+        try:
+            for result in results:
+                if isinstance(result, dict) and result.get('meta') == 'graph_relationships':
+                    content = result.get('content', '')
+                    if isinstance(content, str):
+                        relationships = content.split('\n')
+                        for rel in relationships:
+                            if ' -> ' in rel:
+                                parts = rel.strip().split(' -> ')
+                                if len(parts) == 3:
+                                    graph_data.append({
+                                        'subject': parts[0],
+                                        'predicate': parts[1],
+                                        'object': parts[2]
+                                    })
+        except Exception as e:
+            logger.error(f"Error extracting graph data: {str(e)}")
 
         # Prepare base response
         response = {

@@ -432,20 +432,53 @@ document.addEventListener('DOMContentLoaded', function() {
         const vectorContent = document.querySelector('.vector-content');
         const graphContent = document.querySelector('.graph-content');
         
-        if (vectorContent && data.vector_data) {
-            // Format vector data as space-separated arrays
-            const formattedVectors = data.vector_data.map(vector =>
-                vector.values.map(v => v.toFixed(6)).join(' ')
-            ).join('\n\n');
-            vectorContent.textContent = formattedVectors || 'No vector data available';
+        console.log('Raw data received:', {
+            hasVectorData: Boolean(data.vector_data),
+            vectorDataLength: data.vector_data?.length,
+            hasGraphData: Boolean(data.graph_data),
+            graphDataLength: data.graph_data?.length
+        });
+
+        // Handle vector data
+        if (vectorContent) {
+            try {
+                if (Array.isArray(data.vector_data) && data.vector_data.length > 0) {
+                    const formattedVectors = data.vector_data
+                        .filter(vector => vector && Array.isArray(vector.values))
+                        .map(vector => {
+                            const values = vector.values.map(v =>
+                                typeof v === 'number' ? v.toFixed(6) : v
+                            ).join(' ');
+                            const score = vector.score ? `\nScore: ${vector.score.toFixed(4)}` : '';
+                            return `${values}${score}`;
+                        })
+                        .join('\n\n');
+                    vectorContent.textContent = formattedVectors || 'No vector data available';
+                } else {
+                    vectorContent.textContent = 'No vector data available';
+                }
+            } catch (error) {
+                console.error('Error formatting vector data:', error);
+                vectorContent.textContent = 'Error displaying vector data';
+            }
         }
         
-        if (graphContent && data.graph_data) {
-            // Format graph relationships as subject-predicate-object triples
-            const formattedGraph = data.graph_data.map(triple =>
-                `${triple.subject} -> ${triple.predicate} -> ${triple.object}`
-            ).join('\n');
-            graphContent.textContent = formattedGraph || 'No graph data available';
+        // Handle graph data
+        if (graphContent) {
+            try {
+                if (Array.isArray(data.graph_data) && data.graph_data.length > 0) {
+                    const formattedGraph = data.graph_data
+                        .filter(triple => triple && triple.subject && triple.predicate && triple.object)
+                        .map(triple => `${triple.subject} -> ${triple.predicate} -> ${triple.object}`)
+                        .join('\n');
+                    graphContent.textContent = formattedGraph || 'No graph data available';
+                } else {
+                    graphContent.textContent = 'No graph data available';
+                }
+            } catch (error) {
+                console.error('Error formatting graph data:', error);
+                graphContent.textContent = 'Error displaying graph data';
+            }
         }
 
         // Display sources
