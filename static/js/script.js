@@ -131,13 +131,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Always show confidence for hybrid mode with a default of 85%
-        const confidenceBar = englishResponse.querySelector('.score-bar');
+        // Handle confidence score display
+        const confidenceScore = englishResponse.querySelector('.confidence-score');
+        const confidenceBar = confidenceScore.querySelector('.score-bar');
+        const confidenceValue = confidenceScore.querySelector('.score-value');
+        
         if (searchMode.value === 'hybrid') {
-            confidenceBar.style.setProperty('--score', '85%');
-            confidenceBar.parentElement.classList.remove('hidden');
+            const score = '85%'; // Default confidence score
+            confidenceBar.style.setProperty('--score', score);
+            confidenceValue.textContent = score;
+            confidenceScore.classList.remove('hidden');
         } else {
-            confidenceBar.parentElement.classList.add('hidden');
+            confidenceScore.classList.add('hidden');
         }
 
         // Display responses based on language and bilingual mode

@@ -242,6 +242,13 @@ textarea:focus {
     min-width: 140px;
 }
 
+.score-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .score-bar {
     flex: 1;
     height: 12px;
@@ -258,6 +265,13 @@ textarea:focus {
     background: var(--success-color);
     width: var(--score, 0%);
     transition: width var(--transition-speed);
+}
+
+.score-value {
+    min-width: 45px;
+    font-weight: bold;
+    color: var(--primary-color);
+    text-align: right;
 }
 
 
