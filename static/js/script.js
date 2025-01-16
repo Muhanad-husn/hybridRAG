@@ -213,11 +213,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     englishResponse.classList.add('active');
                     englishResponse.classList.remove('hidden');
                     arabicResponse.classList.remove('active');
+                    arabicResponse.classList.add('hidden');
                 } else {
                     arabicResponse.classList.add('active');
                     arabicResponse.classList.remove('hidden');
                     englishResponse.classList.remove('active');
+                    englishResponse.classList.add('hidden');
                 }
+                
+                // Reinitialize save buttons when switching tabs
+                initializeSaveButtons();
             });
         });
 
@@ -256,6 +261,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Update stats
         updateStats(data.stats);
+
+        // Reinitialize save buttons after displaying results
+        initializeSaveButtons();
     }
 
     // Related Topics Display
@@ -341,25 +349,48 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Save Result Handlers
-    const saveEnglishBtn = document.getElementById('saveEnglishResult');
-    const saveArabicBtn = document.getElementById('saveArabicResult');
-    
-    if (saveEnglishBtn) {
-        saveEnglishBtn.addEventListener('click', () => {
-            saveResult('en');
-        });
+    function initializeSaveButtons() {
+        const saveEnglishBtn = document.getElementById('saveEnglishResult');
+        const saveArabicBtn = document.getElementById('saveArabicResult');
+        
+        if (saveEnglishBtn) {
+            saveEnglishBtn.addEventListener('click', () => {
+                saveResult('en');
+            });
+        }
+        
+        if (saveArabicBtn) {
+            saveArabicBtn.addEventListener('click', () => {
+                saveResult('ar');
+            });
+        }
     }
-    
-    if (saveArabicBtn) {
-        saveArabicBtn.addEventListener('click', () => {
-            saveResult('ar');
-        });
-    }
+
+    // Initialize save buttons when DOM is loaded and after displaying results
+    initializeSaveButtons();
+    document.addEventListener('DOMContentLoaded', initializeSaveButtons);
 
     async function saveResult(lang) {
         try {
+            showNotification(`Preparing to save ${lang === 'ar' ? 'Arabic' : 'English'} content...`);
+            
             if (!window.jspdf) {
                 showNotification('PDF library not loaded. Please try again.');
+                return;
+            }
+
+            // Get content element based on language
+            const contentElement = lang === 'ar' ?
+                arabicResponse.querySelector('.response-content') :
+                englishResponse.querySelector('.response-content');
+
+            if (!contentElement) {
+                showNotification(`Could not find ${lang === 'ar' ? 'Arabic' : 'English'} content element.`);
+                return;
+            }
+
+            if (!contentElement.textContent.trim()) {
+                showNotification(`No ${lang === 'ar' ? 'Arabic' : 'English'} content available to save.`);
                 return;
             }
             const { jsPDF } = window.jspdf;
