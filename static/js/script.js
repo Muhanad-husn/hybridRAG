@@ -9,6 +9,127 @@ document.addEventListener('DOMContentLoaded', function() {
     const arabicResponse = document.getElementById('arabicResponse');
     const errorDiv = document.getElementById('error');
     const sourcesList = document.querySelector('.sources-list');
+    const historyList = document.querySelector('.history-list');
+    const historySearch = document.querySelector('.history-search');
+    const historySort = document.querySelector('.history-sort');
+
+    // View switching
+    const navButtons = document.querySelectorAll('.nav-btn');
+    const views = document.querySelectorAll('.view');
+
+    navButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const viewName = button.dataset.view;
+            
+            // Update navigation buttons
+            navButtons.forEach(btn => btn.classList.toggle('active', btn === button));
+            
+            // Update views
+            views.forEach(view => {
+                view.classList.toggle('active', view.id === `${viewName}View`);
+                view.classList.toggle('hidden', view.id !== `${viewName}View`);
+            });
+
+            // Load view-specific content
+            if (viewName === 'history') {
+                loadSearchHistory();
+            } else if (viewName === 'saved') {
+                loadSavedResults();
+            } else if (viewName === 'tutorial') {
+                loadTutorial();
+            }
+        });
+    });
+
+    // Load and display search history
+    async function loadSearchHistory() {
+        try {
+            const response = await fetch('/search-history');
+            const data = await response.json();
+            
+            if (historyList) {
+                historyList.innerHTML = '';
+                data.history.forEach(query => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    
+                    const queryText = document.createElement('span');
+                    queryText.className = 'query-text';
+                    queryText.textContent = query;
+                    
+                    const rerunButton = document.createElement('button');
+                    rerunButton.className = 'rerun-btn';
+                    rerunButton.textContent = 'Rerun';
+                    rerunButton.onclick = () => {
+                        queryInput.value = query;
+                        searchForm.dispatchEvent(new Event('submit'));
+                        // Switch to search view
+                        document.querySelector('[data-view="search"]').click();
+                    };
+                    
+                    item.appendChild(queryText);
+                    item.appendChild(rerunButton);
+                    historyList.appendChild(item);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading search history:', error);
+        }
+    }
+
+    // Filter history based on search input
+    if (historySearch) {
+        historySearch.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const historyItems = document.querySelectorAll('.history-item');
+            
+            historyItems.forEach(item => {
+                const queryText = item.querySelector('.query-text').textContent.toLowerCase();
+                item.style.display = queryText.includes(searchTerm) ? 'flex' : 'none';
+            });
+        });
+    }
+
+    // Load saved results
+    function loadSavedResults() {
+        const savedResultsGrid = document.querySelector('.saved-results-grid');
+        if (savedResultsGrid) {
+            // This would typically load from localStorage or a backend endpoint
+            savedResultsGrid.innerHTML = '<p>Feature coming soon: Save and manage your search results.</p>';
+        }
+    }
+
+    // Load tutorial content
+    function loadTutorial() {
+        const tutorialSteps = document.querySelector('.tutorial-steps');
+        const tutorialExamples = document.querySelector('.tutorial-examples');
+        
+        if (tutorialSteps && tutorialExamples) {
+            tutorialSteps.innerHTML = `
+                <div class="tutorial-step">
+                    <h3>1. Enter Your Query</h3>
+                    <p>Type your question or search query in English or Arabic.</p>
+                </div>
+                <div class="tutorial-step">
+                    <h3>2. Review Results</h3>
+                    <p>View responses in both languages and check sources.</p>
+                </div>
+                <div class="tutorial-step">
+                    <h3>3. Save and Share</h3>
+                    <p>Download results as HTML files for future reference.</p>
+                </div>
+            `;
+
+            tutorialExamples.innerHTML = `
+                <h3>Example Queries:</h3>
+                <ul>
+                    <li>What are the main causes of the Syrian conflict?</li>
+                    <li>How has the conflict affected education in Syria?</li>
+                    <li>What humanitarian aid efforts are ongoing in Syria?</li>
+                </ul>
+            `;
+        }
+    }
 
     // Initialize response tabs
     function initializeResponseTabs() {

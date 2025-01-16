@@ -4,6 +4,7 @@ import logging
 import io
 import os
 from datetime import datetime
+from collections import deque
 from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
@@ -30,12 +31,13 @@ def setup_utf8_logger():
 
 # Initialize logger with UTF-8 support
 logger = setup_utf8_logger()
-
 # Initialize Flask app
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 
-# Initialize translator
+# Initialize translator and search history
+translator = Translator()
+search_history = []  # List to store unique search queries
 translator = Translator()
 
 def verify_font():
@@ -111,6 +113,10 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
 def home():
     return render_template('index.html')
 
+@app.route('/search-history', methods=['GET'])
+def get_search_history():
+    return jsonify({'history': search_history})
+
 @app.route('/search', methods=['POST'])
 def search():
     try:
@@ -119,6 +125,12 @@ def search():
         
         if not query:
             return jsonify({'error': 'Query cannot be empty'}), 400
+
+        # Update search history (maintain uniqueness and limit to 25)
+        if query not in search_history:
+            if len(search_history) >= 25:
+                search_history.pop()  # Remove oldest entry
+            search_history.insert(0, query)  # Add new query at the beginning
 
         # Detect if query is Arabic
         is_arabic = translator.is_arabic(query)
