@@ -190,13 +190,17 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelector('[data-lang="en"]').click();
         }
 
-        // Remove previous tab click handlers
-        langTabs.forEach(tab => {
-            const newTab = tab.cloneNode(true);
-            tab.parentNode.replaceChild(newTab, tab);
+        // Re-initialize language tabs more safely
+        const tabButtons = document.querySelectorAll('.response-tabs .tab-btn');
+        tabButtons.forEach(tab => {
+            // Remove old event listeners by cloning and replacing
+            if (tab && tab.parentNode) {
+                const newTab = tab.cloneNode(true);
+                tab.parentNode.replaceChild(newTab, tab);
+            }
         });
 
-        // Re-initialize language tabs
+        // Add new event listeners
         document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
             tab.addEventListener('click', () => {
                 // Update active states for tabs
