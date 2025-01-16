@@ -4,87 +4,9 @@ import logging
 import io
 import os
 from datetime import datetime
-from fpdf import FPDF
-from fpdf.enums import XPos, YPos
-import arabic_reshaper
-from bidi.algorithm import get_display
 from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
-
-# Custom PDF class with Arabic support
-class PDF(FPDF):
-    def __init__(self):
-        super().__init__()
-        self.add_font('NotoNaskh', '', 'static/assets/fonts/NotoNaskhArabic-Regular.ttf', uni=True)
-        self.margin = 20
-        self.effective_page_width = 210 - 2 * self.margin  # A4 width = 210mm
-        
-    def add_arabic_text(self, x, y, txt, align='R'):
-        try:
-            if not txt:
-                return y
-            reshaped_text = arabic_reshaper.reshape(txt)
-            bidi_text = get_display(reshaped_text)
-            
-            # Calculate position based on alignment
-            if align == 'R':
-                x = 210 - self.margin - self.get_string_width(bidi_text)  # A4 width = 210mm
-            elif align == 'C':
-                x = (210 - self.get_string_width(bidi_text)) / 2
-            
-            self.text(x, y, bidi_text)
-            return y + self.font_size * 1.5
-        except Exception as e:
-            logger.error(f"Error adding Arabic text: {str(e)}")
-            raise
-
-    def add_wrapped_text(self, text, y, is_arabic=False, align='L'):
-        try:
-            if not text:
-                return y
-            
-            # Split text into words
-            words = text.split()
-            line = []
-            for word in words:
-                line.append(word)
-                test_line = ' '.join(line)
-                
-                # For Arabic text, reshape and calculate width
-                if is_arabic:
-                    test_line = get_display(arabic_reshaper.reshape(test_line))
-                
-                # Check if line exceeds width
-                if self.get_string_width(test_line) > self.effective_page_width:
-                    line.pop()  # Remove last word
-                    # Print current line
-                    current_line = ' '.join(line)
-                    if is_arabic:
-                        y = self.add_arabic_text(self.margin, y, current_line, align)
-                    else:
-                        self.text(self.margin, y, current_line)
-                        y += self.font_size * 1.5
-                    line = [word]  # Start new line with current word
-                    
-                    # Check if we need a new page
-                    if y > 277:  # A4 height = 297mm, leave 20mm margin
-                        self.add_page()
-                        y = self.margin
-            
-            # Print remaining words
-            if line:
-                current_line = ' '.join(line)
-                if is_arabic:
-                    y = self.add_arabic_text(self.margin, y, current_line, align)
-                else:
-                    self.text(self.margin, y, current_line)
-                    y += self.font_size * 1.5
-            
-            return y
-        except Exception as e:
-            logger.error(f"Error in text wrapping: {str(e)}")
-            raise
 
 # Configure logging with UTF-8 support
 def setup_utf8_logger():
@@ -124,15 +46,6 @@ def verify_font():
         if not os.path.exists(font_path):
             raise FileNotFoundError(f"Font file not found at {font_path}")
             
-        # Test font loading with FPDF
-        test_pdf = PDF()
-        test_pdf.add_page()
-        test_pdf.set_font('NotoNaskh', '', 14)
-        
-        # Test Arabic text rendering
-        test_text = "اختبار"
-        test_pdf.add_arabic_text(10, 10, test_text)
-        
         logger.info("Arabic font verified successfully")
     except Exception as e:
         logger.error(f"Font verification failed: {str(e)}")
@@ -141,94 +54,39 @@ def verify_font():
 # Verify font
 verify_font()
 
-def create_pdf(content, query, translated_query, sources, is_arabic=False):
+def create_result_html(content, query, translated_query, sources, is_arabic=False):
     try:
-        # Initialize PDF
-        pdf = PDF()
-        pdf.add_page()
-        
-        # Set initial font and size
-        font_size = 12
-        pdf.set_font('NotoNaskh' if is_arabic else 'Arial', '', font_size)
-        
-        # Start position
-        y = pdf.margin
-        
-        # Add timestamp
+        # Create timestamp
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        timestamp_text = "تم إنشاؤه في: " + timestamp if is_arabic else f"Generated: {timestamp}"
-        if is_arabic:
-            y = pdf.add_arabic_text(pdf.margin, y, timestamp_text)
-        else:
-            pdf.text(pdf.margin, y, timestamp_text)
-            y += font_size * 1.5
         
-        y += font_size  # Add spacing
+        # Render HTML template
+        html = render_template(
+            'result_template.html',
+            content=content,
+            query=query,
+            translated_query=translated_query,
+            sources=sources,
+            is_arabic=is_arabic,
+            timestamp=timestamp
+        )
         
-        # Add query section
-        if is_arabic:
-            # Add Arabic query
-            y = pdf.add_arabic_text(pdf.margin, y, "السؤال:")
-            y = pdf.add_wrapped_text(query, y, is_arabic=True, align='R')
+        # Create results directory if it doesn't exist
+        results_dir = os.path.join(os.path.dirname(__file__), 'results')
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Create filename with timestamp
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"HybridRAG_Result_{'Arabic' if is_arabic else 'English'}_{timestamp_str}.html"
+        filepath = os.path.join(results_dir, filename)
+        
+        # Save HTML file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html)
             
-            if translated_query:
-                y += font_size
-                pdf.set_font('Arial', '', font_size)
-                pdf.text(pdf.margin, y, "English Query:")
-                y += font_size * 1.5
-                y = pdf.add_wrapped_text(translated_query, y)
-                pdf.set_font('NotoNaskh', '', font_size)
-        else:
-            # Add English query
-            pdf.text(pdf.margin, y, "Query:")
-            y += font_size * 1.5
-            y = pdf.add_wrapped_text(query, y)
-            
-            if translated_query:
-                y += font_size
-                pdf.set_font('NotoNaskh', '', font_size)
-                y = pdf.add_arabic_text(pdf.margin, y, "الترجمة:")
-                y = pdf.add_wrapped_text(translated_query, y, is_arabic=True, align='R')
-                pdf.set_font('Arial', '', font_size)
-        
-        y += font_size  # Add spacing
-        
-        # Add content section
-        if is_arabic:
-            y = pdf.add_arabic_text(pdf.margin, y, "الإجابة:")
-            y = pdf.add_wrapped_text(content, y, is_arabic=True, align='R')
-        else:
-            pdf.text(pdf.margin, y, "Answer:")
-            y += font_size * 1.5
-            y = pdf.add_wrapped_text(content, y)
-        
-        # Add sources section
-        if sources:
-            y += font_size * 2  # Add extra spacing before sources
-            
-            if is_arabic:
-                y = pdf.add_arabic_text(pdf.margin, y, "المصادر:")
-                y += font_size * 1.5
-                for i, source in enumerate(sources, 1):
-                    bullet_text = f"●  {source}"
-                    y = pdf.add_wrapped_text(bullet_text, y, is_arabic=True, align='R')
-                    y += font_size * 0.5  # Add small spacing between sources
-            else:
-                pdf.text(pdf.margin, y, "Sources:")
-                y += font_size * 1.5
-                for i, source in enumerate(sources, 1):
-                    source_text = f"{i}. {source}"
-                    y = pdf.add_wrapped_text(source_text, y)
-                    y += font_size * 0.5  # Add small spacing between sources
-        
-        # Save to buffer
-        buffer = io.BytesIO()
-        pdf.output(buffer)
-        buffer.seek(0)
-        return buffer
+        return filepath
         
     except Exception as e:
-        logger.error(f"Error generating PDF: {str(e)}")
+        logger.error(f"Error generating HTML: {str(e)}")
         raise
 
 @app.route('/')
@@ -266,8 +124,8 @@ def search():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/generate-pdf', methods=['POST'])
-def generate_pdf():
+@app.route('/generate-result', methods=['POST'])
+def generate_result():
     try:
         # Get request data
         data = request.get_json()
@@ -286,37 +144,27 @@ def generate_pdf():
         is_arabic = data.get('isArabic', False)
 
         # Log basic info without Arabic text to avoid encoding issues
-        logger.info(f"Starting PDF generation - Language: {'Arabic' if is_arabic else 'English'}")
+        logger.info(f"Starting HTML generation - Language: {'Arabic' if is_arabic else 'English'}")
         logger.info(f"Content length: {len(content)}")
         logger.info(f"Number of sources: {len(sources)}")
 
         try:
-            # Generate PDF
-            pdf_buffer = create_pdf(content, query, translated_query, sources, is_arabic)
+            # Generate HTML file
+            filepath = create_result_html(content, query, translated_query, sources, is_arabic)
 
-            # Create filename with unique timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            filename = f"HybridRAG_Result_{'Arabic' if is_arabic else 'English'}_{timestamp}.pdf"
-
-            # Return PDF file with cache prevention headers
-            response = send_file(
-                pdf_buffer,
-                mimetype='application/pdf',
+            # Return HTML file
+            return send_file(
+                filepath,
+                mimetype='text/html',
                 as_attachment=True,
-                download_name=filename
+                download_name=os.path.basename(filepath)
             )
-            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
 
-            logger.info("PDF generated successfully")
-            return response
-
-        except Exception as pdf_error:
-            logger.error(f"PDF generation failed: {str(pdf_error)}")
+        except Exception as html_error:
+            logger.error(f"HTML generation failed: {str(html_error)}")
             return jsonify({
-                'error': 'Failed to generate PDF',
-                'details': str(pdf_error)
+                'error': 'Failed to generate HTML',
+                'details': str(html_error)
             }), 500
 
     except Exception as e:

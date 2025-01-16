@@ -22,41 +22,28 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
-.env
+env/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-.project
-.pydevproject
-.settings/
 
-# Logs and databases
-*.log
-*.sqlite
-*.db
-
-# Generated data
-data/embeddings/
-data/processed_chunks/
-data/graphs/
-data/cache/
-models/
-
-# OS-specific
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Project-specific
-instruction_files/
+# Logs
 logs/
-config/*.yaml
-!config/config.yaml.example
-!config/translation_config.yaml.example
-src/processing_layer/graph_constructor.py.bak
-HybridRAG_Result_2025-01-16T00-58-35-591Z.pdf
+*.log
+
+# Cache
+data/cache/
+data/embeddings/
+data/graphs/
+data/processed_chunks/
+
+# Results
+results/
+
+# Test files
+test_*.pdf
+test_*.py

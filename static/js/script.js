@@ -386,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function saveResult(lang) {
         console.log(`saveResult called with lang: ${lang}`);
         try {
-            console.log('Starting PDF generation process...');
+            console.log('Starting HTML generation process...');
             showNotification(`Preparing to save ${lang === 'ar' ? 'Arabic' : 'English'} content...`);
 
             // Get content based on language
@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const content = contentElement.textContent;
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
             
-            console.log('Sending request to generate PDF...');
+            console.log('Sending request to generate HTML...');
             // Get both English and Arabic content if available
             const englishContent = englishResponse.querySelector('.response-content').textContent;
             const arabicContent = arabicResponse.querySelector('.response-content').textContent;
@@ -412,16 +412,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const originalQuery = queryInput.value;
             const translatedQuery = lang === 'ar' ? englishContent.split('\n')[0] : arabicContent.split('\n')[0];
 
-            console.log('Sending PDF generation request with:', {
-                content: content,
-                query: originalQuery,
-                translatedQuery: translatedQuery,
-                sources: sources,
-                isArabic: lang === 'ar'
-            });
-
             try {
-                const response = await fetch('/generate-pdf', {
+                const response = await fetch('/generate-result', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -437,20 +429,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.details || error.error || 'Failed to generate PDF');
+                    throw new Error(error.details || error.error || 'Failed to generate HTML');
                 }
 
-                // Get the PDF blob
+                // Get the HTML blob
                 const blob = await response.blob();
                 if (blob.size === 0) {
-                    throw new Error('Generated PDF is empty');
+                    throw new Error('Generated HTML is empty');
                 }
                 
                 // Create a unique filename with timestamp
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `HybridRAG_Result_${lang === 'ar' ? 'Arabic' : 'English'}_${timestamp}.pdf`;
+                const filename = `HybridRAG_Result_${lang === 'ar' ? 'Arabic' : 'English'}_${timestamp}.html`;
                 
-                // Create a link to download the PDF
+                // Create a link to download the HTML
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
@@ -467,19 +459,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.body.removeChild(a);
                 }, 100);
 
-                console.log('PDF downloaded successfully');
-                showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as PDF!`);
-            } catch (pdfError) {
-                console.error('PDF generation error:', pdfError);
-                showNotification('Error generating PDF: ' + pdfError.message);
-                throw pdfError;
+                console.log('HTML downloaded successfully');
+                showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as HTML!`);
+            } catch (htmlError) {
+                console.error('HTML generation error:', htmlError);
+                showNotification('Error generating HTML: ' + htmlError.message);
+                throw htmlError;
             }
-
-            console.log('PDF downloaded successfully');
-            showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as PDF!`);
         } catch (error) {
-            console.error('PDF generation error:', error);
-            showNotification('Error generating PDF: ' + error.message);
+            console.error('Save error:', error);
+            showNotification('Error saving result: ' + error.message);
         }
     }
 

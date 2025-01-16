@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HybridRAG Result</title>
+    <style>
+        @font-face {
+            font-family: 'Noto Naskh Arabic';
+            src: url('/static/assets/fonts/NotoNaskhArabic-Regular.ttf') format('truetype');
+        }
+
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --background-color: #ffffff;
+            --border-color: #bdc3c7;
+            --section-bg: #f8f9fa;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--primary-color);
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background-color);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .arabic {
+            font-family: 'Noto Naskh Arabic', Arial, sans-serif !important;
+            direction: rtl;
+            text-align: right;
+        }
+
+        .english {
+            direction: ltr;
+            text-align: left;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .timestamp {
+            color: var(--secondary-color);
+            font-size: 0.9em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: var(--section-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+            font-size: 1.2em;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .content {
+            margin: 15px 0;
+            text-align: justify;
+            line-height: 1.8;
+        }
+
+        .sources {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: var(--section-bg);
+            border-radius: 8px;
+        }
+
+        .source-item {
+            margin: 10px 0;
+            padding: 5px 0;
+            line-height: 1.4;
+        }
+
+        /* Responsive Design */
+        @media screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .section {
+                padding: 15px;
+                margin: 15px 0;
+            }
+
+            .header {
+                padding: 15px;
+                margin-bottom: 20px;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                padding: 20mm;
+            }
+
+            .section {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                border: 1px solid #eee;
+            }
+
+            .sources {
+                break-before: page;
+            }
+        }
+    </style>
+</head>
+<body class="{{ 'arabic' if is_arabic else 'english' }}">
+    <div class="header">
+        <h1>HybridRAG Result</h1>
+    </div>
+
+    <div class="timestamp {{ 'arabic' if is_arabic else 'english' }}">
+        {% if is_arabic %}
+            تم إنشاؤه في: {{ timestamp }}
+        {% else %}
+            Generated: {{ timestamp }}
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <div class="section-title {{ 'arabic' if is_arabic else 'english' }}">
+            {% if is_arabic %}
+                السؤال:
+            {% else %}
+                Query:
+            {% endif %}
+        </div>
+        <div class="content {{ 'arabic' if is_arabic else 'english' }}">
+            {{ query }}
+        </div>
+        {% if translated_query %}
+            <div class="section-title {{ 'english' if is_arabic else 'arabic' }}">
+                {% if is_arabic %}
+                    English Query:
+                {% else %}
+                    الترجمة:
+                {% endif %}
+            </div>
+            <div class="content {{ 'english' if is_arabic else 'arabic' }}">
+                {{ translated_query }}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <div class="section-title {{ 'arabic' if is_arabic else 'english' }}">
+            {% if is_arabic %}
+                الإجابة:
+            {% else %}
+                Answer:
+            {% endif %}
+        </div>
+        <div class="content {{ 'arabic' if is_arabic else 'english' }}">
+            {{ content }}
+        </div>
+    </div>
+
+    {% if sources %}
+        <div class="sources">
+            <div class="section-title {{ 'arabic' if is_arabic else 'english' }}">
+                {% if is_arabic %}
+                    المصادر:
+                {% else %}
+                    Sources:
+                {% endif %}
+            </div>
+            {% for source in sources %}
+                <div class="source-item {{ 'arabic' if is_arabic else 'english' }}">
+                    {% if is_arabic %}
+                        ●  {{ source }}
+                    {% else %}
+                        {{ loop.index }}. {{ source }}
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</body>
+</html>
