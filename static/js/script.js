@@ -144,12 +144,12 @@ document.addEventListener('DOMContentLoaded', function() {
             confidenceScore.classList.add('hidden');
         }
 
-        // Display responses in both languages
-        englishResponse.querySelector('.response-content').innerHTML = data.answer;
+        // Display responses in both languages, preserving original form
+        englishResponse.querySelector('.response-content').textContent = data.answer;
         
         if (data.arabic_answer) {
             const arabicContent = arabicResponse.querySelector('.response-content');
-            arabicContent.innerHTML = data.arabic_answer;
+            arabicContent.textContent = data.arabic_answer;
             arabicContent.setAttribute('dir', 'rtl');
             document.querySelector('[data-lang="ar"]').style.display = 'block';
         } else {
