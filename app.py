@@ -5,9 +5,20 @@ from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger
 
-# Initialize logger
-logger = setup_logger(__name__)
+from flask import Flask, render_template, request, jsonify
+import sys
+import logging
+from retrieve_syria import run_hybrid_search
+from src.input_layer.translator import Translator
+from src.utils.logger import setup_logger, get_logger
+
+# Initialize Flask app
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
+
+# Initialize logger
+setup_logger()  # This will set up the root logger with config
+logger = get_logger(__name__)  # Get a logger for this module
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 translator = Translator()
 
