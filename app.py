@@ -56,10 +56,10 @@ verify_font()
 
 def create_result_html(content, query, translated_query, sources, is_arabic=False):
     try:
-        # Create timestamp
+        # Create timestamp for display
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Format content - split into paragraphs and handle apostrophes
+        # Format content and extract title
         def format_content(text):
             # Replace HTML entities with actual characters
             text = text.replace('&#39;', "'")
@@ -68,13 +68,24 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
             # Split into paragraphs and filter out empty ones
             paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
             
+            # Extract first line as title
+            title = paragraphs[0] if paragraphs else "Untitled"
+            
             # Join with double newlines for proper paragraph spacing
-            return '\n\n'.join(paragraphs)
+            return title, '\n\n'.join(paragraphs)
+        
+        # Format content and get title
+        title, formatted_content = format_content(content)
+        
+        # Clean the title for filename
+        safe_title = ''.join(c for c in title if c.isalnum() or c in (' ', '-', '_'))[:50]
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{safe_title}_{timestamp_str}.html"
         
         # Render HTML template
         html = render_template(
             'result_template.html',
-            content=format_content(content),
+            content=formatted_content,
             query=query,
             translated_query=translated_query,
             sources=sources,
@@ -83,16 +94,8 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
         )
         
         # Create results directory if it doesn't exist
-        results_dir = os.path.join(os.path.dirname(__file__), 'results')
+        results_dir = os.path.join(os.path.dirname(__file__), 'docs')
         os.makedirs(results_dir, exist_ok=True)
-        
-        # Extract first line of content for filename
-        first_line = content.split('\n')[0].strip()
-        # Clean the filename by removing special characters and limiting length
-        safe_filename = ''.join(c for c in first_line if c.isalnum() or c in (' ', '-', '_'))[:50]
-        # Create filename with first line and timestamp
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{safe_filename}_{timestamp_str}.html"
         filepath = os.path.join(results_dir, filename)
         
         # Save HTML file
@@ -136,20 +139,14 @@ def search():
         logger.debug("Response keys: %s", result.keys())
         logger.debug("Language: %s", result.get('language'))
 
-        # Get the most recent HTML files from results directory
-        results_dir = os.path.join(os.path.dirname(__file__), 'results')
-        html_files = [f for f in os.listdir(results_dir) if f.endswith('.html')]
-        html_files.sort(key=lambda x: os.path.getmtime(os.path.join(results_dir, x)), reverse=True)
+        # Get the most recent HTML files from docs directory
+        docs_dir = os.path.join(os.path.dirname(__file__), 'docs')
+        html_files = [f for f in os.listdir(docs_dir) if f.endswith('.html')]
+        html_files.sort(key=lambda x: os.path.getmtime(os.path.join(docs_dir, x)), reverse=True)
 
-        # Get the latest English and Arabic files
-        latest_english = next((f for f in html_files if 'English' in f), None)
-        latest_arabic = next((f for f in html_files if 'Arabic' in f), None)
-
-        # Add file paths to result
-        if latest_english:
-            result['english_file'] = latest_english
-        if latest_arabic:
-            result['arabic_file'] = latest_arabic
+        # Get the latest file
+        if html_files:
+            result['result_file'] = html_files[0]
             
         return jsonify(result)
         
@@ -159,8 +156,8 @@ def search():
 @app.route('/results/<path:filename>')
 def serve_result(filename):
     try:
-        results_dir = os.path.join(os.path.dirname(__file__), 'results')
-        filepath = os.path.join(results_dir, filename)
+        docs_dir = os.path.join(os.path.dirname(__file__), 'docs')
+        filepath = os.path.join(docs_dir, filename)
         
         print(f"\nServing result file:")
         print(f"Filename requested: {filename}")
