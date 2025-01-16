@@ -60,7 +60,7 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         # Format content and extract title
-        def format_content(text, confidence=0):
+        def format_content(text):
             # Replace HTML entities with actual characters
             text = text.replace('&#39;', "'")
             text = text.replace('&quot;', '"')
@@ -71,11 +71,8 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
             # Extract first line as title
             title = paragraphs[0] if paragraphs else "Untitled"
             
-            # Add confidence score at the end
-            confidence_text = f"\n\nAnswer Confidence: {confidence}%" if not is_arabic else f"\n\nمستوى الثقة في الإجابة: {confidence}%"
-            
             # Join with double newlines for proper paragraph spacing
-            return title, '\n\n'.join(paragraphs) + confidence_text
+            return title, '\n\n'.join(paragraphs)
         
         # Format content and get title
         title, formatted_content = format_content(content)
