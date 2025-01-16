@@ -11,24 +11,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const sourcesList = document.querySelector('.sources-list');
     const navButtons = document.querySelectorAll('.nav-btn');
     const views = document.querySelectorAll('.view');
-    const searchModeTabs = document.querySelectorAll('.search-mode-tabs .tab-btn');
     const langTabs = document.querySelectorAll('.response-tabs .tab-btn');
     const processSteps = document.querySelectorAll('.process-steps .step');
 
     // State Management
     let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
-    let currentSearchMode = 'hybrid';
-    let currentResultType = 'hybrid';
     let currentLanguage = 'en';
-
-    // Initialize search mode tabs
-    searchModeTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            searchModeTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            currentSearchMode = tab.dataset.mode;
-        });
-    });
 
     // Initialize response tabs
     document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
@@ -106,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     query: query,
-                    mode: currentSearchMode
+                    mode: 'hybrid'  // Always use hybrid mode
                 })
             });
 
