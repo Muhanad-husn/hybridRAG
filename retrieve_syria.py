@@ -207,26 +207,28 @@ Please provide a clear and accurate answer based solely on the information provi
         english_answer = llm_response.get("content", "")
         error = llm_response.get("error")
         
-        # Initialize answer as English
+        # Always keep English answer
         answer = english_answer
-        
-        # Translate to Arabic if needed
-        if original_lang == 'ar' and english_answer:
+
+        # Always translate to Arabic
+        arabic_answer = None
+        if english_answer:
             try:
                 translator = get_translator()
                 logger.info("Translating LLM response to Arabic...")
-                answer = translator.translate(english_answer, source_lang='en', target_lang='ar')
+                arabic_answer = translator.translate(english_answer, source_lang='en', target_lang='ar')
                 logger.info("Translation completed")
             except Exception as e:
                 logger.error(f"Error translating response to Arabic: {str(e)}")
-                answer = english_answer  # Fallback to English if translation fails
+                # Don't fallback to English for Arabic answer
         
-        # Return results
+        # Return results with both languages
         return {
             "query": query,
-            "original_query": original_query or query,  # Use original query if available
-            "answer": answer,
-            "english_answer": english_answer if original_lang == 'ar' else answer,
+            "original_query": original_query or query,
+            "answer": english_answer,  # Original English answer
+            "arabic_answer": arabic_answer,  # Arabic translation
+            "english_answer": english_answer,  # Always include English
             "error": error,
             "sources": sources,
             "language": original_lang or 'en'

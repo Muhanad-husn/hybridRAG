@@ -158,48 +158,66 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('[data-lang="ar"]').style.display = 'block';
         document.querySelector('[data-lang="en"]').style.display = 'block';
 
-        // Make sure response sections are visible
+        // Show results container first
+        resultsDiv.classList.remove('hidden');
+
+        // Show both response sections and tabs
         englishResponse.classList.remove('hidden');
         arabicResponse.classList.remove('hidden');
+        document.querySelector('[data-lang="en"]').style.display = 'block';
+        document.querySelector('[data-lang="ar"]').style.display = 'block';
 
-        // Handle responses based on language
-        if (data.language === 'ar') {
-            console.log('Setting Arabic response content');
-            // For Arabic queries:
-            // - english_answer contains the English translation
-            // - answer contains the Arabic translation
-            const englishContent = englishResponse.querySelector('.response-content');
-            const arabicContent = arabicResponse.querySelector('.response-content');
-            
-            englishContent.textContent = data.english_answer || '';
-            arabicContent.textContent = data.answer || '';
+        // Get content elements
+        const englishContent = englishResponse.querySelector('.response-content');
+        const arabicContent = arabicResponse.querySelector('.response-content');
+
+        // Clear previous content
+        englishContent.textContent = '';
+        arabicContent.textContent = '';
+
+        console.log('Response data:', {
+            language: data.language,
+            hasEnglishAnswer: Boolean(data.english_answer),
+            hasAnswer: Boolean(data.answer)
+        });
+
+        // Always set English content
+        englishContent.textContent = data.answer;
+        englishResponse.classList.remove('hidden');
+        englishResponse.classList.add('active');
+        
+        // Set Arabic content if available
+        if (data.arabic_answer) {
+            arabicContent.textContent = data.arabic_answer;
             arabicContent.setAttribute('dir', 'rtl');
-            
-            console.log('English content set:', englishContent.textContent);
-            console.log('Arabic content set:', arabicContent.textContent);
-            
-            // Set Arabic tab as active
-            const arabicTab = document.querySelector('[data-lang="ar"]');
-            arabicTab.style.display = 'block';
-            arabicTab.click();
+            arabicResponse.classList.remove('hidden');
+            arabicResponse.classList.add('active');
+        }
+        
+        // Always show both tabs
+        document.querySelector('[data-lang="en"]').style.display = 'block';
+        document.querySelector('[data-lang="ar"]').style.display = 'block';
+        
+        // Set active tab based on query language
+        if (data.language === 'ar') {
+            document.querySelector('[data-lang="ar"]').click();
         } else {
-            console.log('Setting English response content');
-            // For English queries:
-            // - answer contains the English response
-            const englishContent = englishResponse.querySelector('.response-content');
-            englishContent.textContent = data.answer || '';
-            arabicResponse.querySelector('.response-content').textContent = '';
-            
-            console.log('English content set:', englishContent.textContent);
-            
-            // Set English tab as active
-            const englishTab = document.querySelector('[data-lang="en"]');
-            englishTab.style.display = 'block';
-            englishTab.click();
+            document.querySelector('[data-lang="en"]').click();
         }
 
-        // Ensure results container is visible
-        resultsDiv.classList.remove('hidden');
+        console.log('Content set:', {
+            english: englishContent.textContent.substring(0, 50) + '...',
+            arabic: arabicContent.textContent.substring(0, 50) + '...'
+        });
+
+        // Double-check visibility
+        console.log('Final visibility state:', {
+            resultsVisible: !resultsDiv.classList.contains('hidden'),
+            englishActive: englishResponse.classList.contains('active'),
+            arabicActive: arabicResponse.classList.contains('active'),
+            englishContent: englishContent.textContent.length > 0,
+            arabicContent: arabicContent.textContent.length > 0
+        });
 
         // Remove previous tab click handlers
         langTabs.forEach(tab => {
