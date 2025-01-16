@@ -528,16 +528,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         tutorialSteps.innerHTML = `
             <div class="tutorial-step">
-                <h3>1. Choose Your Search Mode</h3>
-                <p>Select between Hybrid, Dense Vector, or Knowledge Graph search modes for different types of queries.</p>
-            </div>
-            <div class="tutorial-step">
-                <h3>2. Enter Your Query</h3>
+                <h3>1. Enter Your Query</h3>
                 <p>Type your question in English or Arabic. The system supports both languages!</p>
             </div>
             <div class="tutorial-step">
-                <h3>3. Explore Results</h3>
-                <p>Review the answer, check sources, and explore related topics to deepen your understanding.</p>
+                <h3>2. Explore Results</h3>
+                <p>Review the answers in different formats: English, Arabic, Dense Vector, and Knowledge Graph representations.</p>
+            </div>
+            <div class="tutorial-step">
+                <h3>3. Check Sources</h3>
+                <p>Review sources and evidence, explore related topics to deepen your understanding.</p>
             </div>
         `;
         
