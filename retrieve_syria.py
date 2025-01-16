@@ -339,7 +339,6 @@ Please provide a clear and accurate answer based solely on the information provi
             "confidence": confidence,
             "llm_input": {
                 "context": context,
-                "system_prompt": system_prompt,
                 "user_prompt": user_prompt
             }
         }

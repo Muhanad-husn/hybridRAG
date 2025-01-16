@@ -430,18 +430,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Display raw data
         const vectorContent = document.querySelector('.vector-content');
-        const graphContent = document.querySelector('.graph-content');
         
         console.log('Raw data received:', {
             hasLLMInput: Boolean(data.llm_input),
             inputKeys: data.llm_input ? Object.keys(data.llm_input) : []
         });
-
-        // Update pane titles
-        const vectorPane = vectorContent?.parentElement;
-        const graphPane = graphContent?.parentElement;
-        if (vectorPane) vectorPane.querySelector('h3').textContent = 'Context & Prompts';
-        if (graphPane) graphPane.querySelector('h3').textContent = 'System Configuration';
 
         // Handle LLM input data
         if (vectorContent && data.llm_input) {
@@ -459,22 +452,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else {
             vectorContent.textContent = 'No LLM input data available';
-        }
-        
-        // Handle system configuration
-        if (graphContent && data.llm_input) {
-            try {
-                const formattedSystem = [
-                    '=== System Prompt ===',
-                    data.llm_input.system_prompt || 'No system prompt available'
-                ].join('\n\n');
-                graphContent.textContent = formattedSystem;
-            } catch (error) {
-                console.error('Error formatting system config:', error);
-                graphContent.textContent = 'Error displaying system configuration';
-            }
-        } else {
-            graphContent.textContent = 'No system configuration available';
         }
 
         // Display sources
