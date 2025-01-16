@@ -11,12 +11,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const sourcesList = document.querySelector('.sources-list');
     const navButtons = document.querySelectorAll('.nav-btn');
     const views = document.querySelectorAll('.view');
-    const searchMode = document.getElementById('searchMode');
+    const searchModeTabs = document.querySelectorAll('.search-mode-tabs .tab-btn');
     const langTabs = document.querySelectorAll('.response-tabs .tab-btn');
     const processSteps = document.querySelectorAll('.process-steps .step');
 
     // State Management
     let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+    let currentSearchMode = 'hybrid';
+    let currentResultType = 'hybrid';
+    let currentLanguage = 'en';
+
+    // Initialize search mode tabs
+    searchModeTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            searchModeTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentSearchMode = tab.dataset.mode;
+        });
+    });
+
+    // Initialize response tabs
+    document.querySelectorAll('.response-tabs .tab-btn').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update active state for all tabs
+            document.querySelectorAll('.response-tabs .tab-btn').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            const type = tab.dataset.type;
+            // Show corresponding response section
+            document.querySelectorAll('.response-section').forEach(section => {
+                section.classList.toggle('active', section.id === `${type}Response`);
+            });
+        });
+    });
     
     // Navigation Handler
     navButtons.forEach(button => {
@@ -68,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     query: query,
-                    mode: searchMode.value
+                    mode: currentSearchMode
                 })
             });
 
@@ -119,8 +146,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Results Display
     function displayResults(data) {
         // Clear previous results
-        englishResponse.querySelector('.response-content').textContent = '';
-        arabicResponse.querySelector('.response-content').textContent = '';
+        document.querySelectorAll('.response-content').forEach(content => {
+            content.textContent = '';
+        });
         sourcesList.innerHTML = '';
 
         // Show results container
@@ -131,53 +159,57 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Handle confidence score display
-        const confidenceScore = englishResponse.querySelector('.confidence-score');
-        const confidenceBar = confidenceScore.querySelector('.score-bar');
-        const confidenceValue = confidenceScore.querySelector('.score-value');
-        
-        if (searchMode.value === 'hybrid') {
+        // Update English response
+        const englishContent = document.querySelector('#englishResponse .response-content');
+        if (englishContent) {
+            englishContent.textContent = data.answer || '';
+        }
+
+        // Update Arabic response
+        const arabicContent = document.querySelector('#arabicResponse .response-content');
+        if (arabicContent) {
+            arabicContent.textContent = data.arabic_answer || '';
+        }
+
+        // Update Dense Vector response
+        const denseContent = document.querySelector('#denseResponse .response-content');
+        if (denseContent) {
+            denseContent.textContent = data.dense_results || data.dense?.answer || 'No dense vector results available';
+        }
+
+        // Update Knowledge Graph response
+        const graphContent = document.querySelector('#graphResponse .response-content');
+        if (graphContent) {
+            graphContent.textContent = data.graph_results || data.graph?.answer || 'No knowledge graph results available';
+        }
+
+        // Handle confidence score
+        const confidenceScore = document.querySelector('.confidence-score');
+        if (confidenceScore) {
+            const confidenceBar = confidenceScore.querySelector('.score-bar');
+            const confidenceValue = confidenceScore.querySelector('.score-value');
             const score = '85%'; // Default confidence score
             confidenceBar.style.setProperty('--score', score);
             confidenceValue.textContent = score;
             confidenceScore.classList.remove('hidden');
-        } else {
-            confidenceScore.classList.add('hidden');
         }
 
-        // Always show both language tabs
-        document.querySelector('[data-lang="ar"]').style.display = 'block';
-        document.querySelector('[data-lang="en"]').style.display = 'block';
+        // Show the current result type and language
+        document.querySelectorAll('.response-section').forEach(section => {
+            section.classList.toggle('active', section.id === `${currentResultType}Response`);
+        });
 
-        // Show results container first
+        const currentResultSection = document.querySelector(`#${currentResultType}Response`);
+        if (currentResultSection) {
+            currentResultSection.querySelectorAll('.language-section').forEach(section => {
+                section.classList.toggle('active',
+                    section.id === `${currentResultType}${currentLanguage === 'en' ? 'English' : 'Arabic'}Response`);
+            });
+        }
+
+        // Show results container
         resultsDiv.classList.remove('hidden');
-
-        // Show both response sections and tabs
-        englishResponse.classList.remove('hidden');
-        arabicResponse.classList.remove('hidden');
-        document.querySelector('[data-lang="en"]').style.display = 'block';
-        document.querySelector('[data-lang="ar"]').style.display = 'block';
-
-        // Get content elements
-        const englishContent = englishResponse.querySelector('.response-content');
-        const arabicContent = arabicResponse.querySelector('.response-content');
-
-        // Clear previous content
-        englishContent.textContent = '';
-        arabicContent.textContent = '';
-
-        // Always set English content
-        englishContent.textContent = data.answer;
-        englishResponse.classList.remove('hidden');
-        englishResponse.classList.add('active');
-        
-        // Set Arabic content if available
-        if (data.arabic_answer) {
-            arabicContent.textContent = data.arabic_answer;
-            arabicContent.setAttribute('dir', 'rtl');
-            arabicResponse.classList.remove('hidden');
-            arabicResponse.classList.add('active');
-        }
+        errorDiv.classList.add('hidden');
         
         // Always show both tabs
         document.querySelector('[data-lang="en"]').style.display = 'block';
@@ -359,22 +391,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Add new event listeners
-        const saveEnglishBtn = document.getElementById('saveEnglishResult');
-        const saveArabicBtn = document.getElementById('saveArabicResult');
-        
-        if (saveEnglishBtn) {
-            saveEnglishBtn.addEventListener('click', () => {
-                console.log('English save button clicked');
-                saveResult('en');
-            });
-        }
-        
-        if (saveArabicBtn) {
-            saveArabicBtn.addEventListener('click', () => {
-                console.log('Arabic save button clicked');
-                saveResult('ar');
-            });
-        }
+        const types = ['en', 'ar', 'dense', 'graph'];
+        types.forEach(type => {
+            const saveBtn = document.getElementById(`save${type === 'en' ? 'English' : type === 'ar' ? 'Arabic' : type}Result`);
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    console.log(`${type} save button clicked`);
+                    saveResult(type);
+                });
+            }
+        });
     }
 
     // Initialize save buttons when DOM is loaded
@@ -387,20 +413,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    async function saveResult(lang) {
-        console.log(`saveResult called with lang: ${lang}`);
+    async function saveResult(type) {
+        console.log(`saveResult called with type: ${type}`);
         try {
             console.log('Starting HTML generation process...');
-            showNotification(`Preparing to save ${lang === 'ar' ? 'Arabic' : 'English'} content...`);
+            showNotification(`Preparing to save ${type} content...`);
 
-            // Get content based on language
-            const contentElement = lang === 'ar' ?
-                arabicResponse.querySelector('.response-content') :
-                englishResponse.querySelector('.response-content');
+            // Get content based on type
+            const contentElement = document.querySelector(`#${type}Response .response-content`);
 
             if (!contentElement || !contentElement.textContent.trim()) {
-                console.error(`No ${lang} content available`);
-                showNotification(`No ${lang === 'ar' ? 'Arabic' : 'English'} content available to save.`);
+                console.error(`No ${type} content available`);
+                showNotification(`No ${type} content available to save.`);
                 return;
             }
 
@@ -408,9 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const sources = Array.from(sourcesList.children).map(li => li.textContent);
             
             console.log('Sending request to generate HTML...');
-            // Get both English and Arabic content if available
-            const englishContent = englishResponse.querySelector('.response-content').textContent;
-            const arabicContent = arabicResponse.querySelector('.response-content').textContent;
+            const isArabic = type === 'ar';
             
             // Only use original query, no translation needed
             const originalQuery = queryInput.value;
@@ -426,7 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         query: originalQuery,
                         translatedQuery: '', // No translation needed
                         sources: sources,
-                        isArabic: lang === 'ar'
+                        isArabic: type === 'ar'
                     })
                 });
 
@@ -443,7 +465,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Create a unique filename with timestamp
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `HybridRAG_Result_${lang === 'ar' ? 'Arabic' : 'English'}_${timestamp}.html`;
+                // Create a unique filename with timestamp
+                let typeName;
+                switch (type) {
+                    case 'en':
+                        typeName = 'English';
+                        break;
+                    case 'ar':
+                        typeName = 'Arabic';
+                        break;
+                    case 'dense':
+                        typeName = 'DenseVector';
+                        break;
+                    case 'graph':
+                        typeName = 'KnowledgeGraph';
+                        break;
+                }
+                const filename = `HybridRAG_${typeName}_${timestamp}.html`;
                 
                 // Create a link to download the HTML
                 const url = window.URL.createObjectURL(blob);
@@ -463,7 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 100);
 
                 console.log('HTML downloaded successfully');
-                showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as HTML!`);
+                showNotification(`${typeName} result saved as HTML!`);
             } catch (htmlError) {
                 console.error('HTML generation error:', htmlError);
                 showNotification('Error generating HTML: ' + htmlError.message);

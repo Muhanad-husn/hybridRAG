@@ -76,13 +76,40 @@ header h1 {
     margin-bottom: 20px;
 }
 
-.search-select {
-    padding: 10px;
-    border: 2px solid var(--primary-color);
-    border-radius: var(--border-radius);
-    background: var(--card-background);
-    color: var(--text-primary);
+.search-mode-tabs {
+    display: flex;
+    gap: 1px;
+    background: var(--background-color);
+    padding: 10px 20px 0;
+    border-bottom: 1px solid var(--primary-color);
+}
+
+.search-mode-tabs .tab-btn {
+    padding: 12px 30px;
+    background: var(--background-color);
+    border: 1px solid var(--primary-color);
+    border-bottom: none;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    color: var(--text-secondary);
+    cursor: pointer;
     font-size: 1em;
+    font-weight: 500;
+    transition: all var(--transition-speed);
+    position: relative;
+    bottom: -1px;
+}
+
+.search-mode-tabs .tab-btn.active {
+    background: var(--card-background);
+    color: var(--primary-color);
+    font-weight: bold;
+    border-bottom: 1px solid var(--card-background);
+    z-index: 1;
+}
+
+.search-mode-tabs .tab-btn:hover:not(.active) {
+    background: var(--card-background);
+    color: var(--primary-color);
 }
 
 .language-toggle {
@@ -246,6 +273,27 @@ textarea:focus {
     bottom: -1px;
 }
 
+.response-tabs .tab-btn[data-type="dense"],
+.response-tabs .tab-btn[data-type="graph"] {
+    margin-left: 20px;
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.response-tabs .tab-btn[data-type="dense"].active,
+.response-tabs .tab-btn[data-type="graph"].active {
+    background: var(--accent-color);
+    color: var(--card-background);
+    border-color: var(--accent-color);
+}
+
+.response-tabs .tab-btn[data-type="dense"]:hover:not(.active),
+.response-tabs .tab-btn[data-type="graph"]:hover:not(.active) {
+    background: var(--accent-color);
+    color: var(--card-background);
+    opacity: 0.8;
+}
+
 .response-tabs .tab-btn.active {
     background: var(--card-background);
     color: var(--primary-color);
@@ -276,6 +324,15 @@ textarea:focus {
 }
 
 .response-section.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.language-section {
+    display: none;
+}
+
+.language-section.active {
     display: block;
     animation: fadeIn 0.3s ease-in-out;
 }
@@ -329,7 +386,7 @@ textarea:focus {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 15px 0;
+    margin: 40px 0 15px 0;
     padding: 10px;
     background: var(--background-color);
     border-radius: var(--border-radius);

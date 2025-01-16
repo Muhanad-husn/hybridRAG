@@ -22,11 +22,11 @@
             <!-- Search View -->
             <div id="searchView" class="view active">
                 <div class="search-options">
-                    <select id="searchMode" class="search-select">
-                        <option value="hybrid">Hybrid Search (Graph + Dense)</option>
-                        <option value="dense">Dense Vector Search Only</option>
-                        <option value="graph">Knowledge Graph Only</option>
-                    </select>
+                    <div class="search-mode-tabs">
+                        <button class="tab-btn active" data-mode="hybrid">Hybrid Search</button>
+                        <button class="tab-btn" data-mode="dense">Dense Vector</button>
+                        <button class="tab-btn" data-mode="graph">Knowledge Graph</button>
+                    </div>
                 </div>
 
                 <form id="searchForm" class="search-form">
@@ -59,11 +59,14 @@
                 <div id="results" class="results hidden">
                     <div class="responses-container">
                         <div class="response-tabs">
-                            <button class="tab-btn active" data-lang="en">English</button>
-                            <button class="tab-btn" data-lang="ar">عربي</button>
+                            <button class="tab-btn active" data-type="en">English</button>
+                            <button class="tab-btn" data-type="ar">عربي</button>
+                            <button class="tab-btn" data-type="dense">Dense Vector</button>
+                            <button class="tab-btn" data-type="graph">Knowledge Graph</button>
                         </div>
                         
                         <div class="response-panels">
+                            <!-- English Response -->
                             <div id="englishResponse" class="response-section active">
                                 <div class="response-content"></div>
                                 <div class="response-controls">
@@ -82,11 +85,32 @@
                                 </div>
                             </div>
 
-                            <div id="arabicResponse" class="response-section">
+                            <!-- Arabic Response -->
+                            <div id="arabicResponse" class="response-section" dir="rtl">
                                 <div class="response-content"></div>
                                 <div class="response-controls">
                                     <button id="saveArabicResult" class="control-btn">
                                         <span class="icon">📥</span> حفظ النتيجة بالعربية
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Dense Vector Response -->
+                            <div id="denseResponse" class="response-section">
+                                <div class="response-content"></div>
+                                <div class="response-controls">
+                                    <button id="saveDenseResult" class="control-btn">
+                                        <span class="icon">📥</span> Save Dense Vector Result
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Knowledge Graph Response -->
+                            <div id="graphResponse" class="response-section">
+                                <div class="response-content"></div>
+                                <div class="response-controls">
+                                    <button id="saveGraphResult" class="control-btn">
+                                        <span class="icon">📥</span> Save Knowledge Graph Result
                                     </button>
                                 </div>
                             </div>
