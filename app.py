@@ -4,15 +4,23 @@ import logging
 import io
 import os
 from datetime import datetime
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from fpdf import FPDF
 import arabic_reshaper
 from bidi.algorithm import get_display
 from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
+
+# Custom PDF class with Arabic support
+class PDF(FPDF):
+    def __init__(self):
+        super().__init__()
+        self.add_font('NotoNaskh', '', 'static/assets/fonts/NotoNaskhArabic-Regular.ttf', uni=True)
+        
+    def add_arabic_text(self, x, y, txt):
+        reshaped_text = arabic_reshaper.reshape(txt)
+        bidi_text = get_display(reshaped_text)
+        self.text(x, y, bidi_text)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -65,71 +73,101 @@ def register_font():
 register_font()
 
 def create_pdf(content, query, translated_query, sources, is_arabic=False):
-    buffer = io.BytesIO()
-    doc = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    margin = 50
-    y = height - margin
-    
-    # Basic PDF generation with minimal formatting
     try:
-        # Set basic font
-        doc.setFont('Helvetica', 12)
+        # Initialize PDF
+        pdf = PDF()
+        pdf.add_page()
+        margin = 20
+        
+        # Set initial font
+        if is_arabic:
+            pdf.set_font('NotoNaskh', '', 14)
+            pdf.set_right_margin(margin)
+            pdf.set_left_margin(margin)
+        else:
+            pdf.set_font('Arial', '', 12)
+            pdf.set_left_margin(margin)
+            pdf.set_right_margin(margin)
         
         # Add timestamp
-        doc.drawString(margin, y, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        y -= 20
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if is_arabic:
+            pdf.add_arabic_text(190 - pdf.get_string_width("تم إنشاؤه في: " + timestamp), 10, "تم إنشاؤه في: " + timestamp)
+        else:
+            pdf.text(margin, 10, f"Generated: {timestamp}")
         
-        # Add query
-        doc.drawString(margin, y, "Query:")
-        y -= 20
-        doc.drawString(margin, y, query)
-        y -= 20
+        # Add query section
+        y = 30
+        if is_arabic:
+            # Add Arabic query
+            pdf.add_arabic_text(190 - pdf.get_string_width("السؤال:"), y, "السؤال:")
+            y += 10
+            # Word wrap for Arabic query
+            lines = pdf.multi_cell(0, 10, query, split_only=True)
+            for line in lines:
+                pdf.add_arabic_text(190 - pdf.get_string_width(line), y, line)
+                y += 10
+            
+            if translated_query:
+                y += 5
+                pdf.set_font('Arial', '', 12)
+                pdf.text(margin, y, "English Query:")
+                y += 10
+                pdf.multi_cell(0, 10, translated_query)
+                y += 5
+                pdf.set_font('NotoNaskh', '', 14)
+        else:
+            # Add English query
+            pdf.text(margin, y, "Query:")
+            y += 10
+            pdf.multi_cell(0, 10, query)
+            y = pdf.get_y() + 5
+            
+            if translated_query:
+                pdf.set_font('NotoNaskh', '', 14)
+                pdf.add_arabic_text(190 - pdf.get_string_width("الترجمة:"), y, "الترجمة:")
+                y += 10
+                lines = pdf.multi_cell(0, 10, translated_query, split_only=True)
+                for line in lines:
+                    pdf.add_arabic_text(190 - pdf.get_string_width(line), y, line)
+                    y += 10
+                pdf.set_font('Arial', '', 12)
         
-        if translated_query:
-            doc.drawString(margin, y, "Translated Query:")
-            y -= 20
-            doc.drawString(margin, y, translated_query)
-            y -= 20
+        # Add content section
+        y = pdf.get_y() + 10
+        if is_arabic:
+            pdf.add_arabic_text(190 - pdf.get_string_width("الإجابة:"), y, "الإجابة:")
+            y += 10
+            lines = pdf.multi_cell(0, 10, content, split_only=True)
+            for line in lines:
+                pdf.add_arabic_text(190 - pdf.get_string_width(line), y, line)
+                y += 10
+        else:
+            pdf.text(margin, y, "Answer:")
+            y += 10
+            pdf.multi_cell(0, 10, content)
         
-        # Add content
-        doc.drawString(margin, y, "Answer:")
-        y -= 20
-        
-        # Simple text wrapping
-        words = content.split()
-        line = []
-        for word in words:
-            line.append(word)
-            if doc.stringWidth(' '.join(line)) > width - 2 * margin:
-                line.pop()
-                doc.drawString(margin, y, ' '.join(line))
-                y -= 15
-                line = [word]
-                
-                if y < margin:
-                    doc.showPage()
-                    doc.setFont('Helvetica', 12)
-                    y = height - margin
-        
-        if line:
-            doc.drawString(margin, y, ' '.join(line))
-            y -= 20
-        
-        # Add sources
+        # Add sources section
         if sources:
-            doc.drawString(margin, y, "Sources:")
-            y -= 20
-            for i, source in enumerate(sources, 1):
-                if source.strip():
-                    doc.drawString(margin, y, f"{i}. {source}")
-                    y -= 15
-                    if y < margin:
-                        doc.showPage()
-                        doc.setFont('Helvetica', 12)
-                        y = height - margin
+            y = pdf.get_y() + 10
+            if is_arabic:
+                pdf.add_arabic_text(190 - pdf.get_string_width("المصادر:"), y, "المصادر:")
+                y += 10
+                for i, source in enumerate(sources, 1):
+                    bullet = f"●  {source}"
+                    lines = pdf.multi_cell(0, 10, bullet, split_only=True)
+                    for line in lines:
+                        pdf.add_arabic_text(190 - pdf.get_string_width(line), y, line)
+                        y += 10
+            else:
+                pdf.text(margin, y, "Sources:")
+                y += 10
+                for i, source in enumerate(sources, 1):
+                    pdf.multi_cell(0, 10, f"{i}. {source}")
         
-        doc.save()
+        # Save to buffer
+        buffer = io.BytesIO()
+        pdf.output(buffer)
         buffer.seek(0)
         return buffer
         
