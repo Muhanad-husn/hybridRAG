@@ -86,9 +86,13 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
         results_dir = os.path.join(os.path.dirname(__file__), 'results')
         os.makedirs(results_dir, exist_ok=True)
         
-        # Create filename with timestamp
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"HybridRAG_Result_{'Arabic' if is_arabic else 'English'}_{timestamp_str}.html"
+        # Extract first line of content for filename
+        first_line = content.split('\n')[0].strip()
+        # Clean the filename by removing special characters and limiting length
+        safe_filename = ''.join(c for c in first_line if c.isalnum() or c in (' ', '-', '_'))[:50]
+        # Create filename with first line and timestamp
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{safe_filename}_{timestamp_str}.html"
         filepath = os.path.join(results_dir, filename)
         
         # Save HTML file
