@@ -371,140 +371,126 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Save Result Handler
-    saveResultBtn.addEventListener('click', () => {
-        const { jsPDF } = window.jspdf;
-        // Initialize PDF with UTF-8 encoding support
-        const doc = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4',
-            putOnlyUsedFonts: true,
-            floatPrecision: 16 // For better text positioning
-        });
-        
-        // Get content
-        const query = queryInput.value;
-        const englishContent = englishResponse.querySelector('.response-content').textContent;
-        const arabicContent = arabicResponse.querySelector('.response-content').textContent;
-        const sources = Array.from(sourcesList.children).map(li => li.textContent);
-        const timestamp = new Date().toLocaleString();
-        const isArabicQuery = arabicContent.trim().length > 0;
-        
-        // Set up PDF
-        doc.setFontSize(16);
-        doc.text('HybridRAG Search Result', 20, 20);
-        
-        doc.setFontSize(12);
-        doc.text(`Generated: ${timestamp}`, 20, 30);
-        
-        // Add query
-        doc.setFontSize(14);
-        doc.text('Query:', 20, 45);
-        doc.setFontSize(12);
-        const queryLines = doc.splitTextToSize(query, 170);
-        doc.text(queryLines, 20, 55);
-        
-        let currentY = 75;
-        
-        // Add English content
-        doc.setFontSize(14);
-        doc.text('English Answer:', 20, currentY);
-        doc.setFontSize(12);
-        const englishLines = doc.splitTextToSize(englishContent, 170);
-        currentY += 10;
-        doc.text(englishLines, 20, currentY);
-        currentY += (englishLines.length * 7) + 20;
-        
-        // Always add Arabic content on a new page if available
-        if (arabicContent.trim()) {
-            // Start new page for Arabic content
-            doc.addPage();
-            
-            // Add Arabic title and metadata
-            doc.setFontSize(16);
-            doc.setR2L(true);
-            doc.text('نتيجة البحث', 190, 20, { align: 'right' });
-            
-            doc.setFontSize(12);
-            doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 30, { align: 'right' });
-            
-            // Add Arabic query
-            doc.setFontSize(14);
-            doc.text(':السؤال', 190, 45, { align: 'right' });
-            doc.setFontSize(12);
-            const arabicQueryLines = doc.splitTextToSize(query, 170);
-            doc.text(arabicQueryLines, 190, 55, { align: 'right' });
-            
-            // Add Arabic answer
-            doc.setFontSize(14);
-            doc.text(':الإجابة', 190, 85, { align: 'right' });
-            doc.setFontSize(12);
-            const arabicLines = doc.splitTextToSize(arabicContent, 170);
-            doc.text(arabicLines, 190, 95, { align: 'right' });
-            
-            // Add Arabic sources if available
-            if (sources.length > 0) {
-                let sourceY = 95 + (arabicLines.length * 7) + 20;
-                
-                // Add new page if needed
-                if (sourceY > 250) {
-                    doc.addPage();
-                    sourceY = 20;
-                }
-                
-                doc.setFontSize(14);
-                doc.text(':المصادر', 190, sourceY, { align: 'right' });
-                doc.setFontSize(12);
-                
-                sources.forEach((source, index) => {
-                    sourceY += 10;
-                    const arabicSourceLine = `${source} -`;
-                    doc.text(arabicSourceLine, 190, sourceY, { align: 'right' });
-                    
-                    if (sourceY > 280) {
-                        doc.addPage();
-                        sourceY = 20;
-                    }
-                });
-            }
-            
-            // Reset RTL setting
-            doc.setR2L(false);
-        }
-        
-        if (sources.length > 0) {
-            // Add new page if needed
-            if (currentY > 250) {
-                doc.addPage();
-                currentY = 20;
-            }
-            
-            doc.setFontSize(14);
-            doc.text('Sources:', 20, currentY);
-            doc.setFontSize(12);
-            
-            sources.forEach((source, index) => {
-                currentY += 10;
-                const sourceLines = doc.splitTextToSize(`${index + 1}. ${source}`, 170);
-                doc.text(sourceLines, 20, currentY);
-                currentY += (sourceLines.length * 7);
-                
-                // Add new page if needed
-                if (currentY > 280) {
-                    doc.addPage();
-                    currentY = 20;
-                }
-            });
-        }
-        
-        // Generate filename with timestamp
-        const filename = `HybridRAG_Result_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
-        
-        // Save PDF
-        doc.save(filename);
-        showNotification('Result saved as PDF!');
+    // Save Result Handlers
+    document.getElementById('saveEnglishResult').addEventListener('click', () => {
+        saveResult('en');
     });
+
+    document.getElementById('saveArabicResult').addEventListener('click', () => {
+        saveResult('ar');
+    });
+
+    async function saveResult(lang) {
+        try {
+            const { jsPDF } = window.jspdf;
+            const timestamp = new Date().toLocaleString();
+            const query = queryInput.value;
+            const content = lang === 'ar'
+                ? arabicResponse.querySelector('.response-content').textContent
+                : englishResponse.querySelector('.response-content').textContent;
+            const sources = Array.from(sourcesList.children).map(li => li.textContent);
+
+            // Initialize PDF
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Configure for Arabic if needed
+            if (lang === 'ar') {
+                // Enable right-to-left mode
+                doc.setR2L(true);
+                // Use Arial for better Arabic support
+                doc.setFont('arial', 'normal');
+                doc.setFontSize(16);
+
+                // Add content in Arabic with increased spacing
+                doc.text('نتيجة البحث', 190, 20, { align: 'right', charSpace: 0.5 });
+                doc.setFontSize(12);
+                doc.text(`تم إنشاؤه في: ${timestamp}`, 190, 35, { align: 'right', charSpace: 0.5 });
+                doc.text(':السؤال', 190, 50, { align: 'right', charSpace: 0.5 });
+                
+                // Add query with proper spacing and margins
+                const queryLines = doc.splitTextToSize(query, 140); // Reduced width for better Arabic text flow
+                doc.text(queryLines, 190, 60, { align: 'right', charSpace: 0.5 });
+                
+                // Add answer with increased line height
+                doc.text(':الإجابة', 190, 85, { align: 'right', charSpace: 0.5 });
+                const contentLines = doc.splitTextToSize(content, 140);
+                doc.text(contentLines, 190, 95, { align: 'right', charSpace: 0.5 });
+                
+                // Add sources with improved spacing
+                let yPos = 95 + (contentLines.length * 8); // Increased line height
+                if (sources.length > 0) {
+                    // Add new page if close to bottom
+                    if (yPos > 250) {
+                        doc.addPage();
+                        yPos = 30;
+                    }
+                    
+                    doc.setFontSize(14);
+                    doc.text(':المصادر', 190, yPos, { align: 'right', charSpace: 0.5 });
+                    doc.setFontSize(12);
+                    
+                    sources.forEach((source, i) => {
+                        yPos += 10; // Increased spacing between sources
+                        if (yPos > 270) {
+                            doc.addPage();
+                            yPos = 30;
+                        }
+                        // Add bullet point and proper spacing
+                        doc.text(`${source} •`, 190, yPos, { align: 'right', charSpace: 0.5 });
+                    });
+                }
+                
+                // Reset RTL and font settings
+                doc.setR2L(false);
+                doc.setFont('helvetica', 'normal');
+            } else {
+                // English content
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(16);
+                doc.text('HybridRAG Search Result', 20, 20);
+                doc.setFontSize(12);
+                doc.text(`Generated: ${timestamp}`, 20, 30);
+                doc.text('Query:', 20, 45);
+                
+                const queryLines = doc.splitTextToSize(query, 170);
+                doc.text(queryLines, 20, 55);
+                
+                doc.text('Answer:', 20, 75);
+                const contentLines = doc.splitTextToSize(content, 170);
+                doc.text(contentLines, 20, 85);
+                
+                let yPos = 85 + (contentLines.length * 7);
+                if (sources.length > 0) {
+                    if (yPos > 250) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    doc.text('Sources:', 20, yPos);
+                    sources.forEach((source, i) => {
+                        yPos += 7;
+                        if (yPos > 280) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                        doc.text(`${i + 1}. ${source}`, 20, yPos);
+                    });
+                }
+            }
+
+            // Save with language-specific filename
+            const langSuffix = lang === 'ar' ? 'Arabic' : 'English';
+            const filename = `HybridRAG_Result_${langSuffix}_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
+            doc.save(filename);
+            showNotification(`${langSuffix} result saved as PDF!`);
+        } catch (error) {
+            console.error('Error saving PDF:', error);
+            showNotification('Error saving PDF. Please try again.');
+        }
+    }
 
     // Utility Functions
     function showNotification(message) {
