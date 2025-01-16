@@ -313,9 +313,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Get content
         const query = queryInput.value;
-        const answer = englishResponse.querySelector('.response-content').textContent;
+        const englishContent = englishResponse.querySelector('.response-content').textContent;
+        const arabicContent = arabicResponse.querySelector('.response-content').textContent;
         const sources = Array.from(sourcesList.children).map(li => li.textContent);
         const timestamp = new Date().toLocaleString();
+        const isArabicQuery = arabicContent.trim().length > 0;
         
         // Set up PDF
         doc.setFontSize(16);
@@ -324,35 +326,67 @@ document.addEventListener('DOMContentLoaded', function() {
         doc.setFontSize(12);
         doc.text(`Generated: ${timestamp}`, 20, 30);
         
+        // Add query
         doc.setFontSize(14);
         doc.text('Query:', 20, 45);
         doc.setFontSize(12);
         const queryLines = doc.splitTextToSize(query, 170);
         doc.text(queryLines, 20, 55);
         
-        doc.setFontSize(14);
-        doc.text('Answer:', 20, 75);
-        doc.setFontSize(12);
-        const answerLines = doc.splitTextToSize(answer, 170);
-        doc.text(answerLines, 20, 85);
+        let currentY = 75;
         
-        if (sources.length > 0) {
-            let yPosition = 105 + (answerLines.length * 7); // Start after answer with some padding
+        // Add English content
+        doc.setFontSize(14);
+        doc.text('English Answer:', 20, currentY);
+        doc.setFontSize(12);
+        const englishLines = doc.splitTextToSize(englishContent, 170);
+        currentY += 10;
+        doc.text(englishLines, 20, currentY);
+        currentY += (englishLines.length * 7) + 20;
+        
+        // Add Arabic content if available
+        if (isArabicQuery) {
+            // Add new page if needed
+            if (currentY > 250) {
+                doc.addPage();
+                currentY = 20;
+            }
             
             doc.setFontSize(14);
-            doc.text('Sources:', 20, yPosition);
+            doc.text('Arabic Answer:', 20, currentY);
+            doc.setFontSize(12);
+            const arabicLines = doc.splitTextToSize(arabicContent, 170);
+            currentY += 10;
+            
+            // Set RTL for Arabic text
+            doc.setR2L(true);
+            doc.text(arabicLines, 190, currentY); // Align to right margin
+            doc.setR2L(false);
+            
+            currentY += (arabicLines.length * 7) + 20;
+        }
+        
+        if (sources.length > 0) {
+            // Add new page if needed
+            if (currentY > 250) {
+                doc.addPage();
+                currentY = 20;
+            }
+            
+            doc.setFontSize(14);
+            doc.text('Sources:', 20, currentY);
             doc.setFontSize(12);
             
             sources.forEach((source, index) => {
-                yPosition += 10;
+                currentY += 10;
                 const sourceLines = doc.splitTextToSize(`${index + 1}. ${source}`, 170);
-                doc.text(sourceLines, 20, yPosition);
-                yPosition += (sourceLines.length * 7);
+                doc.text(sourceLines, 20, currentY);
+                currentY += (sourceLines.length * 7);
                 
                 // Add new page if needed
-                if (yPosition > 280) {
+                if (currentY > 280) {
                     doc.addPage();
-                    yPosition = 20;
+                    currentY = 20;
                 }
             });
         }
