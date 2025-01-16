@@ -428,13 +428,21 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create a link to download the PDF
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
+            a.style.display = 'none'; // Hide the element
             a.href = url;
             a.download = response.headers.get('content-disposition')?.split('filename=')[1] ||
                         `HybridRAG_Result_${lang === 'ar' ? 'Arabic' : 'English'}.pdf`;
+            
+            // Use a single click event
+            a.addEventListener('click', () => {
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }, 100);
+            }, { once: true }); // Ensure the event only fires once
+            
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
 
             console.log('PDF downloaded successfully');
             showNotification(`${lang === 'ar' ? 'Arabic' : 'English'} result saved as PDF!`);
