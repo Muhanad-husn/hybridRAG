@@ -64,3 +64,4 @@ instruction_files/
 # Test files
 test_*.pdf
 test_*.py
+entity_resolution.docx
