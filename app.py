@@ -8,6 +8,7 @@ from collections import deque
 from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
+from functools import wraps
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -21,6 +22,17 @@ logger = get_logger(__name__)
 translator = Translator()
 search_history = []  # List to store unique search queries
 saved_results = []  # List to store saved result filenames
+
+def log_request(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Add request info to logger
+        logger.info(f"Request received", extra={
+            'request': request,
+            'url': f"{request.method} {request.url}"
+        })
+        return f(*args, **kwargs)
+    return decorated_function
 
 _font_verified = False
 def verify_font():
@@ -98,24 +110,29 @@ def create_result_html(content, query, translated_query, sources, is_arabic=Fals
         raise
 
 @app.route('/')
+@log_request
 def home():
     return render_template('index.html')
 
 @app.route('/search-history', methods=['GET'])
+@log_request
 def get_search_history():
     return jsonify({'history': search_history})
 
 @app.route('/saved-results', methods=['GET'])
+@log_request
 def get_saved_results():
     return jsonify({'results': saved_results})
 
 @app.route('/save-result', methods=['POST'])
+@log_request
 def save_result():
     try:
         data = request.get_json()
         filename = data.get('filename')
         
         if not filename:
+            logger.warning("Save result request missing filename", extra={'request': request})
             return jsonify({'error': 'Filename is required'}), 400
             
         # Add to saved results (maintain uniqueness and limit to 25)
@@ -124,11 +141,14 @@ def save_result():
                 saved_results.pop()  # Remove oldest entry
             saved_results.insert(0, filename)  # Add new entry at the beginning
             
+        logger.info(f"Result saved: {filename}", extra={'request': request})
         return jsonify({'message': 'Result saved successfully', 'saved_results': saved_results})
     except Exception as e:
+        logger.error(f"Error saving result: {str(e)}", extra={'request': request})
         return jsonify({'error': str(e)}), 500
 
 @app.route('/logs', methods=['GET'])
+@log_request
 def get_logs():
     try:
         with open('logs/app.log', 'r', encoding='utf-8') as f:
@@ -143,7 +163,8 @@ def get_logs():
                     'response saved',
                     'Verified',
                     'Adding',
-                    'Confidence'
+                    'Confidence',
+                    'Request received'
                 ]):
                     # Extract timestamp and message
                     parts = line.split(' - ')
@@ -168,16 +189,18 @@ def get_logs():
             
             return jsonify({'logs': unique_logs})
     except Exception as e:
-        logger.error(f"Error reading logs: {str(e)}")
+        logger.error(f"Error reading logs: {str(e)}", extra={'request': request})
         return jsonify({'error': str(e)}), 500
 
 @app.route('/search', methods=['POST'])
+@log_request
 def search():
     try:
         data = request.get_json()
         query = data.get('query', '').strip()
         
         if not query:
+            logger.warning("Empty search query received", extra={'request': request})
             return jsonify({'error': 'Query cannot be empty'}), 400
 
         # Update search history (maintain uniqueness and limit to 25)
@@ -190,13 +213,13 @@ def search():
         is_arabic = translator.is_arabic(query)
         
         if is_arabic:
-            logger.info(f"Processing Arabic query: {query}")
+            logger.info(f"Processing Arabic query: {query}", extra={'request': request})
             # Translate query to English for internal processing only
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
             # Pass original query without translation
             result = run_hybrid_search(english_query, original_lang='ar', original_query=query)
         else:
-            logger.info(f"Processing English query: {query}")
+            logger.info(f"Processing English query: {query}", extra={'request': request})
             result = run_hybrid_search(query)
 
         # Get the most recent HTML files from docs directory
@@ -211,19 +234,21 @@ def search():
         return jsonify(result)
         
     except Exception as e:
+        logger.error(f"Search error: {str(e)}", extra={'request': request})
         return jsonify({'error': str(e)}), 500
 
 @app.route('/results/<path:filename>')
+@log_request
 def serve_result(filename):
     try:
         docs_dir = os.path.join(os.path.dirname(__file__), 'docs')
         filepath = os.path.join(docs_dir, filename)
         
         if not os.path.exists(filepath):
-            logger.error(f"File not found: {filepath}")
+            logger.error(f"File not found: {filepath}", extra={'request': request})
             return jsonify({'error': 'File not found'}), 404
             
-        logger.info(f"Serving file: {filepath}")
+        logger.info(f"Serving file: {filepath}", extra={'request': request})
         
         try:
             response = send_file(
@@ -237,20 +262,23 @@ def serve_result(filename):
             raise serve_error
             
     except Exception as e:
-        logger.error(f"Error serving result file: {str(e)}")
+        logger.error(f"Error serving result file: {str(e)}", extra={'request': request})
         return jsonify({'error': str(e)}), 500
 
 @app.route('/generate-result', methods=['POST'])
+@log_request
 def generate_result():
     try:
         # Get request data
         data = request.get_json()
         if not data:
+            logger.warning("No data provided for result generation", extra={'request': request})
             return jsonify({'error': 'No data provided'}), 400
 
         # Extract and validate content
         content = data.get('content', '').strip()
         if not content:
+            logger.warning("Empty content provided for result generation", extra={'request': request})
             return jsonify({'error': 'Content cannot be empty'}), 400
 
         # Extract other fields with defaults
@@ -260,8 +288,10 @@ def generate_result():
         is_arabic = data.get('isArabic', False)
 
         # Log basic info without Arabic text to avoid encoding issues
-        logger.info(f"Starting HTML generation - Language: {'Arabic' if is_arabic else 'English'}")
-        logger.info(f"Content length: {len(content)}")
+        logger.info(
+            f"Starting HTML generation - Language: {'Arabic' if is_arabic else 'English'}, Content length: {len(content)}",
+            extra={'request': request}
+        )
 
         try:
             # Generate HTML file
@@ -276,14 +306,14 @@ def generate_result():
             )
 
         except Exception as html_error:
-            logger.error(f"HTML generation failed: {str(html_error)}")
+            logger.error(f"HTML generation failed: {str(html_error)}", extra={'request': request})
             return jsonify({
                 'error': 'Failed to generate HTML',
                 'details': str(html_error)
             }), 500
 
     except Exception as e:
-        logger.error(f"Request processing error: {str(e)}")
+        logger.error(f"Request processing error: {str(e)}", extra={'request': request})
         return jsonify({
             'error': 'Failed to process request',
             'details': str(e)

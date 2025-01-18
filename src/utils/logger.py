@@ -3,6 +3,7 @@ from logging.handlers import RotatingFileHandler
 import os
 import yaml
 from typing import Optional
+from datetime import datetime
 
 class DuplicateFilter(logging.Filter):
     """Filter to prevent repeated log messages within a short time window."""
@@ -23,6 +24,30 @@ class DuplicateFilter(logging.Filter):
             
         self.last_log[key] = current_time
         return True
+
+class RequestFormatter(logging.Formatter):
+    """Custom formatter that includes request details when available."""
+    
+    def format(self, record):
+        # Get the original format
+        fmt = self._fmt
+        
+        # If there's request info, add it to the format
+        if hasattr(record, 'request'):
+            req = record.request
+            record.url = f"{req.method} {req.scheme}://{req.host}{req.path}"
+            if req.query_string:
+                record.url += f"?{req.query_string.decode('utf-8')}"
+            record.remote_addr = req.remote_addr
+            fmt = '%(asctime)s - %(levelname)s - [%(url)s] - %(remote_addr)s - %(message)s'
+        elif hasattr(record, 'url'):
+            fmt = '%(asctime)s - %(levelname)s - [%(url)s] - %(message)s'
+            
+        # Set the format and delegate to parent
+        self._fmt = fmt
+        result = super().format(record)
+        self._fmt = self._style._fmt
+        return result
 
 def setup_logger(config_path: str = "config/config.yaml") -> None:
     """
@@ -50,11 +75,11 @@ def setup_logger(config_path: str = "config/config.yaml") -> None:
         root_logger.handlers = []
         
         # Create formatters
-        file_formatter = logging.Formatter(
+        file_formatter = RequestFormatter(
             '%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
-        console_formatter = logging.Formatter(
+        console_formatter = RequestFormatter(
             '%(levelname)s - %(message)s'
         )
         
