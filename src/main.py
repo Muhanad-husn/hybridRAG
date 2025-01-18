@@ -1,6 +1,7 @@
 import os
 import logging
 import shutil
+import asyncio
 from typing import Optional, Any, Dict, List
 from src.input_layer.document_processor import DocumentProcessor
 from src.processing_layer.embedding_generator import EmbeddingGenerator
@@ -71,14 +72,14 @@ class HyperRAG:
             f.write('source_id,target_id,type,properties\n')
 
     @log_errors(logging.getLogger(__name__))
-    def process_documents(
+    async def aprocess_documents(
         self,
         input_dir: str,
         save_chunks: bool = True,
         save_embeddings: bool = True
     ) -> None:
         """
-        Process documents from the input directory.
+        Process documents from the input directory asynchronously.
         
         Args:
             input_dir: Directory containing input documents
@@ -107,7 +108,7 @@ class HyperRAG:
         # Construct knowledge graph if available
         if self.graph_constructor is not None:
             try:
-                self.graph_constructor.construct_graph(documents)
+                await self.graph_constructor.aconstruct_graph(documents)
             except Exception as e:
                 self.logger.warning(f"Graph construction failed: {str(e)}")
             
@@ -160,8 +161,8 @@ class HyperRAG:
         return results
 
 
-def main():
-    """Main entry point for the application."""
+async def amain():
+    """Async main entry point for the application."""
     try:
         # Setup logging
         setup_logger()
@@ -178,7 +179,7 @@ def main():
         input_dir = os.path.join("data", "raw_documents")
         
         # Process documents (this will trigger LLM extraction and graph construction)
-        rag_system.process_documents(
+        await rag_system.aprocess_documents(
             input_dir=input_dir,
             save_chunks=True,
             save_embeddings=True
@@ -210,4 +211,4 @@ def main():
         raise
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(amain())

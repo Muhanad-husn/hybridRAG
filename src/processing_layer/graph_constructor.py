@@ -1,6 +1,7 @@
 import os
 import yaml
 import json
+import asyncio
 import networkx as nx
 import pandas as pd
 from typing import List, Dict, Optional, Any
@@ -303,13 +304,9 @@ class GraphConstructor:
             logger.error(f"Error inserting relationship: {str(e)}")
             raise
 
-    def construct_graph(
-        self,
-        documents: List[Document],
-        batch_size: int = 10
-    ) -> None:
+    async def aconstruct_graph(self, documents: List[Document], batch_size: int = 10) -> None:
         """
-        Construct a knowledge graph from documents using the LLM transformer.
+        Asynchronously construct a knowledge graph from documents using the LLM transformer.
         
         Args:
             documents: List of input documents
@@ -330,14 +327,14 @@ class GraphConstructor:
             total_nodes = 0
             total_relationships = 0
             
-            logger.info(f"Starting graph extraction from {len(documents)} documents in batches of {batch_size}")
+            logger.info(f"Starting async graph extraction from {len(documents)} documents in batches of {batch_size}")
             
             for i in range(0, len(documents), batch_size):
                 batch = documents[i:i + batch_size]
                 logger.info(f"Processing batch {i//batch_size + 1} of {(len(documents)-1)//batch_size + 1}")
                 
-                # Convert batch to graph documents
-                graph_documents = transformer.convert_to_graph_documents(batch)
+                # Convert batch to graph documents using async method
+                graph_documents = await transformer.aconvert_to_graph_documents(batch)
                 
                 # Log extraction details for this batch
                 batch_nodes = sum(len(doc.nodes) for doc in graph_documents)
