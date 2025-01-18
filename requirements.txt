@@ -27,6 +27,8 @@ fastembed==0.5.0
 networkx==3.2.1
 pandas==2.1.4
 scikit-learn==1.4.0
+thefuzz==0.20.0
+python-Levenshtein==0.25.0  # Optional but recommended for better performance with thefuzz
 
 # Ranking and Reranking
 flashrank==0.2.10

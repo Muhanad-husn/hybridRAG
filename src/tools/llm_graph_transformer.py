@@ -1,8 +1,11 @@
 import asyncio
 import json
+import string
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union, cast
+from collections import defaultdict
 import logging
 import re
+from thefuzz import fuzz
 
 from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
 from langchain_core.documents import Document
@@ -150,6 +153,114 @@ def repair_json(text: str) -> str:
             return json.dumps(objects, indent=4)
         else:
             raise ValueError("Failed to parse JSON")
+
+def normalize_label(label: str) -> str:
+    """Normalize entity labels for comparison.
+    
+    Args:
+        label: The entity label to normalize
+        
+    Returns:
+        Normalized version of the label (lowercase, no punctuation, trimmed)
+    """
+    # Lowercase
+    label = label.lower()
+    # Remove punctuation
+    label = label.translate(str.maketrans('', '', string.punctuation))
+    # Trim whitespace
+    label = label.strip()
+    return label
+
+def find_duplicate_nodes(nodes: List[Dict[str, Any]], similarity_threshold: int = 80) -> List[Tuple[int, int]]:
+    """Find potential duplicate nodes using fuzzy matching.
+    
+    Args:
+        nodes: List of node dictionaries with 'id' and 'type' keys
+        similarity_threshold: Minimum similarity score to consider nodes as duplicates
+        
+    Returns:
+        List of tuples containing indices of duplicate node pairs
+    """
+    # Group nodes by type and first 3 letters of normalized label
+    blocks = defaultdict(list)
+    for idx, node in enumerate(nodes):
+        normalized = normalize_label(node['id'])
+        block_key = (node['type'], normalized[:3])
+        blocks[block_key].append(idx)
+    
+    # Find duplicates within each block using fuzzy matching
+    duplicates = []
+    for block_indices in blocks.values():
+        n = len(block_indices)
+        if n < 2:
+            continue
+            
+        for i in range(n):
+            for j in range(i + 1, n):
+                idx_a = block_indices[i]
+                idx_b = block_indices[j]
+                
+                label_a = normalize_label(nodes[idx_a]['id'])
+                label_b = normalize_label(nodes[idx_b]['id'])
+                
+                similarity = fuzz.ratio(label_a, label_b)
+                if similarity >= similarity_threshold:
+                    duplicates.append((idx_a, idx_b))
+    
+    return duplicates
+
+def merge_duplicate_nodes(nodes: List[Dict[str, Any]], relationships: List[Relationship]) -> Tuple[List[Dict[str, Any]], List[Relationship]]:
+    """Merge duplicate nodes and update relationships accordingly.
+    
+    Args:
+        nodes: List of node dictionaries
+        relationships: List of relationships between nodes
+        
+    Returns:
+        Tuple of (deduplicated nodes list, updated relationships list)
+    """
+    # Find duplicates
+    duplicates = find_duplicate_nodes(nodes)
+    if not duplicates:
+        return nodes, relationships
+        
+    # Create merge mapping
+    merge_map = {}  # old_id -> canonical_id
+    for idx_a, idx_b in duplicates:
+        # Use the first occurrence as canonical
+        canonical_node = nodes[idx_a]
+        merged_node = nodes[idx_b]
+        merge_map[merged_node['id']] = canonical_node['id']
+        
+        # Merge properties if they exist
+        if 'properties' in merged_node and 'properties' in canonical_node:
+            for key, value in merged_node['properties'].items():
+                if key not in canonical_node['properties']:
+                    canonical_node['properties'][key] = value
+    
+    # Update relationships
+    updated_relationships = []
+    for rel in relationships:
+        source_id = rel.source.id
+        target_id = rel.target.id
+        
+        # Update source and target if they were merged
+        if source_id in merge_map:
+            rel.source.id = merge_map[source_id]
+        if target_id in merge_map:
+            rel.target.id = merge_map[target_id]
+            
+        updated_relationships.append(rel)
+    
+    # Create final deduplicated node list
+    canonical_nodes = {}
+    for node in nodes:
+        node_id = node['id']
+        if node_id in merge_map:
+            continue  # Skip merged nodes
+        canonical_nodes[node_id] = node
+    
+    return list(canonical_nodes.values()), updated_relationships
 
 def process_json_response(raw_response: str) -> List[Dict[str, str]]:
     """Process raw JSON response from LLM."""
@@ -303,12 +414,40 @@ class LLMGraphTransformer:
                 nodes = []
                 relationships = []
             
-            # Create graph document
-            graph_doc = GraphDocument(
-                nodes=nodes,
-                relationships=relationships,
-                source=document
-            )
+            # Perform node deduplication
+            if nodes and relationships:
+                logger.info("Starting node deduplication...")
+                # Convert Node objects to dictionaries for deduplication
+                node_dicts = [{'id': node.id, 'type': node.type, 'properties': node.properties} for node in nodes]
+                
+                # Deduplicate nodes and update relationships
+                deduplicated_node_dicts, updated_relationships = merge_duplicate_nodes(node_dicts, relationships)
+                
+                # Convert back to Node objects
+                deduplicated_nodes = [
+                    Node(
+                        id=node_dict['id'],
+                        type=node_dict['type'],
+                        properties=node_dict['properties']
+                    )
+                    for node_dict in deduplicated_node_dicts
+                ]
+                
+                logger.info(f"Deduplication complete. Original nodes: {len(nodes)}, Deduplicated nodes: {len(deduplicated_nodes)}")
+                
+                # Create graph document with deduplicated nodes
+                graph_doc = GraphDocument(
+                    nodes=deduplicated_nodes,
+                    relationships=updated_relationships,
+                    source=document
+                )
+            else:
+                # Create empty graph document if no nodes/relationships
+                graph_doc = GraphDocument(
+                    nodes=[],
+                    relationships=[],
+                    source=document
+                )
             
             return graph_doc
             
