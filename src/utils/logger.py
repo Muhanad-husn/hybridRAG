@@ -4,6 +4,26 @@ import os
 import yaml
 from typing import Optional
 
+class DuplicateFilter(logging.Filter):
+    """Filter to prevent repeated log messages within a short time window."""
+    def __init__(self, timeout=1.0):
+        super().__init__()
+        self.timeout = timeout
+        self.last_log = {}
+        
+    def filter(self, record):
+        # Create a key from the log record's essential attributes
+        key = (record.module, record.levelno, record.msg)
+        current_time = record.created
+        
+        # Check if we've seen this message recently
+        if key in self.last_log:
+            if current_time - self.last_log[key] < self.timeout:
+                return False
+            
+        self.last_log[key] = current_time
+        return True
+
 def setup_logger(config_path: str = "config/config.yaml") -> None:
     """
     Setup and configure the application logger.
@@ -21,43 +41,57 @@ def setup_logger(config_path: str = "config/config.yaml") -> None:
             config = yaml.safe_load(f)
         
         log_config = config.get('logging', {})
-        log_level = getattr(
-            logging,
-            log_config.get('log_level', 'INFO').upper()
-        )
-        max_size = log_config.get('max_log_size', 5 * 1024 * 1024)  # 5 MB default
-        backup_count = log_config.get('backup_count', 3)
         
-        # Create root logger
+        # Configure root logger
         root_logger = logging.getLogger()
-        root_logger.setLevel(log_level)
+        root_logger.setLevel(logging.INFO)
         
         # Remove any existing handlers
         root_logger.handlers = []
         
         # Create formatters
         file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            '%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
         )
         console_formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'
+            '%(levelname)s - %(message)s'
         )
         
-        # File handler (with rotation)
+        # Setup file handler with rotation
         file_handler = RotatingFileHandler(
             os.path.join(log_dir, 'app.log'),
-            maxBytes=max_size,
-            backupCount=backup_count
+            maxBytes=log_config.get('max_log_size', 5 * 1024 * 1024),  # 5 MB default
+            backupCount=log_config.get('backup_count', 3),
+            encoding='utf-8'
         )
-        file_handler.setLevel(log_level)
+        file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(file_formatter)
+        file_handler.addFilter(DuplicateFilter(1.0))  # 1 second timeout for duplicates
         root_logger.addHandler(file_handler)
         
-        # Console handler
+        # Setup console handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(console_formatter)
+        console_handler.addFilter(DuplicateFilter(1.0))
         root_logger.addHandler(console_handler)
+        
+        # Configure werkzeug logger to reduce HTTP request logs
+        werkzeug_logger = logging.getLogger('werkzeug')
+        werkzeug_logger.setLevel(logging.WARNING)
+        
+        # Configure Flask logger
+        flask_logger = logging.getLogger('flask')
+        flask_logger.setLevel(logging.INFO)
+        flask_logger.propagate = False
+        
+        # Configure other loggers
+        for logger_name, logger_config in log_config.get('loggers', {}).items():
+            if logger_name != 'root':
+                logger = logging.getLogger(logger_name)
+                logger.setLevel(getattr(logging, logger_config.get('level', 'INFO')))
+                logger.propagate = logger_config.get('propagate', False)
         
         logging.info("Logger initialized successfully")
         
@@ -66,7 +100,8 @@ def setup_logger(config_path: str = "config/config.yaml") -> None:
         # Set up a basic console logger as fallback
         logging.basicConfig(
             level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
         )
         logging.error("Failed to setup logger with config, using basic configuration")
 

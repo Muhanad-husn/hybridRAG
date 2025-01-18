@@ -9,39 +9,25 @@ from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
 
-# Configure logging with UTF-8 support
-def setup_utf8_logger():
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    
-    # Create handlers with UTF-8 encoding
-    file_handler = logging.FileHandler('logs/app.log', encoding='utf-8')
-    console_handler = logging.StreamHandler(sys.stdout)
-    
-    # Create a formatter
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-    
-    # Add handlers to the logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    
-    return logger
-
-# Initialize logger with UTF-8 support
-logger = setup_utf8_logger()
 # Initialize Flask app
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 
-# Initialize translator, search history, and saved results
+# Initialize logger using the unified logging setup
+setup_logger()
+logger = get_logger(__name__)
+
+# Initialize translator and search history
 translator = Translator()
 search_history = []  # List to store unique search queries
 saved_results = []  # List to store saved result filenames
-translator = Translator()
 
+_font_verified = False
 def verify_font():
+    global _font_verified
+    if _font_verified:
+        return
+        
     try:
         font_path = os.path.join(os.path.dirname(__file__), 'static', 'assets', 'fonts', 'NotoNaskhArabic-Regular.ttf')
         logger.info(f"Verifying font at: {font_path}")
@@ -50,6 +36,7 @@ def verify_font():
             raise FileNotFoundError(f"Font file not found at {font_path}")
             
         logger.info("Arabic font verified successfully")
+        _font_verified = True
     except Exception as e:
         logger.error(f"Font verification failed: {str(e)}")
         raise
@@ -141,6 +128,49 @@ def save_result():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/logs', methods=['GET'])
+def get_logs():
+    try:
+        with open('logs/app.log', 'r', encoding='utf-8') as f:
+            # Get last 50 lines
+            lines = deque(maxlen=50)
+            for line in f:
+                if 'INFO' in line and any(x in line for x in [
+                    'Processing',
+                    'Translating',
+                    'Translation',
+                    'Saving',
+                    'response saved',
+                    'Verified',
+                    'Adding',
+                    'Confidence'
+                ]):
+                    # Extract timestamp and message
+                    parts = line.split(' - ')
+                    if len(parts) >= 3:
+                        timestamp = parts[0].strip()
+                        message = parts[2].strip()
+                        
+                        # Create unique key from message content
+                        msg_key = message.split(':', 1)[0] if ':' in message else message
+                        
+                        # Add to deque with timestamp
+                        lines.append(f"[{timestamp}] {message}")
+            
+            # Convert deque to list and remove duplicates while preserving order
+            seen = set()
+            unique_logs = []
+            for log in lines:
+                msg = log.split('] ', 1)[1] if '] ' in log else log
+                if msg not in seen:
+                    seen.add(msg)
+                    unique_logs.append(log)
+            
+            return jsonify({'logs': unique_logs})
+    except Exception as e:
+        logger.error(f"Error reading logs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/search', methods=['POST'])
 def search():
     try:
@@ -163,16 +193,11 @@ def search():
             logger.info(f"Processing Arabic query: {query}")
             # Translate query to English for internal processing only
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
-            logger.info(f"Translated to English for processing: {english_query}")
             # Pass original query without translation
             result = run_hybrid_search(english_query, original_lang='ar', original_query=query)
         else:
             logger.info(f"Processing English query: {query}")
             result = run_hybrid_search(query)
-        
-        logger.debug("Response data: %s", result)
-        logger.debug("Response keys: %s", result.keys())
-        logger.debug("Language: %s", result.get('language'))
 
         # Get the most recent HTML files from docs directory
         docs_dir = os.path.join(os.path.dirname(__file__), 'docs')
@@ -194,16 +219,10 @@ def serve_result(filename):
         docs_dir = os.path.join(os.path.dirname(__file__), 'docs')
         filepath = os.path.join(docs_dir, filename)
         
-        print(f"\nServing result file:")
-        print(f"Filename requested: {filename}")
-        print(f"Full filepath: {filepath}")
-        
         if not os.path.exists(filepath):
-            print(f"ERROR: File not found at {filepath}")
             logger.error(f"File not found: {filepath}")
             return jsonify({'error': 'File not found'}), 404
             
-        print(f"File exists, preparing to serve...")
         logger.info(f"Serving file: {filepath}")
         
         try:
@@ -213,14 +232,11 @@ def serve_result(filename):
                 as_attachment=True,
                 download_name=filename
             )
-            print(f"File served successfully: {filename}")
             return response
         except Exception as serve_error:
-            print(f"ERROR serving file: {str(serve_error)}")
             raise serve_error
             
     except Exception as e:
-        print(f"ERROR in serve_result: {str(e)}")
         logger.error(f"Error serving result file: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
@@ -246,7 +262,6 @@ def generate_result():
         # Log basic info without Arabic text to avoid encoding issues
         logger.info(f"Starting HTML generation - Language: {'Arabic' if is_arabic else 'English'}")
         logger.info(f"Content length: {len(content)}")
-        logger.info(f"Number of sources: {len(sources)}")
 
         try:
             # Generate HTML file
