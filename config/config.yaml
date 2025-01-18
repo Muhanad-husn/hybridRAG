@@ -52,6 +52,37 @@ logging:
   log_level: "INFO"
   max_log_size: 5242880  # 5 MB
   backup_count: 3
+  loggers:
+    werkzeug:  # Flask's logger
+      level: "WARNING"
+      propagate: false
+    flask:
+      level: "INFO"
+      propagate: false
+    root:
+      level: "INFO"
+      handlers: ["file", "console"]
+  handlers:
+    file:
+      class: "logging.handlers.RotatingFileHandler"
+      formatter: "detailed"
+      filename: "logs/app.log"
+      maxBytes: 5242880
+      backupCount: 3
+    console:
+      class: "logging.StreamHandler"
+      formatter: "simple"
+      level: "INFO"
+  formatters:
+    detailed:
+      format: "%(asctime)s - %(levelname)s - %(message)s"
+      datefmt: "%Y-%m-%d %H:%M:%S"
+    simple:
+      format: "%(levelname)s - %(message)s"
+  filters:
+    ignore_repeated:
+      class: "logging.Filter"
+      name: "repeated_filter"
 
 # Timeout Settings
 timeouts:

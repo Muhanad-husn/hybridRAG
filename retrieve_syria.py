@@ -275,12 +275,31 @@ Please provide a clear and accurate answer based solely on the information provi
                 # Don't fallback to English for Arabic answer
                 arabic_answer = None
         
-        # Calculate confidence score based on search result scores
+        # Calculate confidence score based on multiple factors
         confidence = 0
         if results:
-            # Get average score of top results, normalize to 0-100 range
-            avg_score = sum(float(r.get('score', 0.0)) for r in results[:5]) / 5
-            confidence = min(int(avg_score * 100), 100)  # Cap at 100%
+            # Factor 1: Relevance scores from search results (30%)
+            relevance_scores = [float(r.get('score', 0.0)) for r in results[:5]]
+            avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0
+            relevance_confidence = min(avg_relevance * 30, 30)  # Max 30% from relevance
+
+            # Factor 2: Number of sources (30%)
+            source_count = len(sources)
+            source_confidence = min(source_count * 6, 30)  # 6% per source, max 30%
+
+            # Factor 3: Answer completeness (40%)
+            answer_length = len(english_answer) if english_answer else 0
+            length_confidence = min(answer_length / 1000 * 40, 40)  # Max 40% for 1000+ chars
+
+            # Combine factors
+            confidence = int(relevance_confidence + source_confidence + length_confidence)
+            
+            # Log confidence calculation
+            logger.info(f"Confidence calculation:")
+            logger.info(f"- Relevance confidence: {relevance_confidence:.1f}%")
+            logger.info(f"- Source confidence: {source_confidence:.1f}%")
+            logger.info(f"- Length confidence: {length_confidence:.1f}%")
+            logger.info(f"- Total confidence: {confidence}%")
 
         # Extract vector data from results
         vector_data = []

@@ -13,6 +13,69 @@ document.addEventListener('DOMContentLoaded', function() {
     const historySearch = document.querySelector('.history-search');
     const historySort = document.querySelector('.history-sort');
 
+    // Operation status management
+    let lastLogTimestamp = '';
+
+    async function fetchAndDisplayLogs() {
+        try {
+            const response = await fetch('/logs');
+            const data = await response.json();
+            
+            if (data.logs && data.logs.length > 0) {
+                const statusElement = document.getElementById('operationStatus');
+                const latestLog = data.logs[data.logs.length - 1];
+                
+                // Only update if it's a new message
+                if (latestLog !== statusElement.textContent) {
+                    statusElement.textContent = latestLog;
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching logs:', error);
+        }
+    }
+
+    // Poll for log updates during operations
+    let logPollingInterval = null;
+
+    function startLogPolling() {
+        if (!logPollingInterval) {
+            logPollingInterval = setInterval(fetchAndDisplayLogs, 500);
+        }
+    }
+
+    function stopLogPolling() {
+        if (logPollingInterval) {
+            clearInterval(logPollingInterval);
+            logPollingInterval = null;
+        }
+    }
+
+    function updateOperationStatus(message) {
+        const statusElement = document.getElementById('operationStatus');
+        const timestamp = new Date().toLocaleTimeString();
+        statusElement.textContent = `[${timestamp}] ${message}`;
+    }
+
+    // Confidence indicator management
+    function updateConfidence(confidence) {
+        const confidenceIndicator = document.getElementById('confidenceIndicator');
+        const confidenceFill = confidenceIndicator.querySelector('.confidence-fill');
+        const confidencePercentage = confidenceIndicator.querySelector('.confidence-percentage');
+        
+        if (confidenceFill && confidencePercentage) {
+            // Convert confidence to percentage if needed
+            const confidenceValue = typeof confidence === 'number' ? confidence :
+                                  typeof confidence === 'string' ? parseFloat(confidence) : 0;
+            
+            // Ensure value is between 0-100
+            const percentage = Math.min(Math.max(confidenceValue, 0), 100);
+            
+            confidenceFill.style.width = `${percentage}%`;
+            confidencePercentage.textContent = `${Math.round(percentage)}%`;
+        }
+    }
+
     // View switching
     const navButtons = document.querySelectorAll('.nav-btn');
     const views = document.querySelectorAll('.view');
@@ -44,6 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load and display search history
     async function loadSearchHistory() {
         try {
+            updateOperationStatus('Loading search history...');
             const response = await fetch('/search-history');
             const data = await response.json();
             
@@ -63,7 +127,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     rerunButton.onclick = () => {
                         queryInput.value = query;
                         searchForm.dispatchEvent(new Event('submit'));
-                        // Switch to search view
                         document.querySelector('[data-view="search"]').click();
                     };
                     
@@ -71,9 +134,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     item.appendChild(rerunButton);
                     historyList.appendChild(item);
                 });
+                updateOperationStatus('Search history loaded successfully');
             }
         } catch (error) {
-            console.error('Error loading search history:', error);
+            console.error('[History] Error:', error);
+            updateOperationStatus('Error loading search history');
         }
     }
 
@@ -93,6 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load saved results
     async function loadSavedResults() {
         try {
+            updateOperationStatus('Loading saved results...');
             const response = await fetch('/saved-results');
             const data = await response.json();
             
@@ -119,12 +185,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         resultCard.appendChild(openButton);
                         savedResultsGrid.appendChild(resultCard);
                     });
+                    updateOperationStatus('Saved results loaded successfully');
                 } else {
                     savedResultsGrid.innerHTML = '<p>No saved results yet.</p>';
+                    updateOperationStatus('No saved results found');
                 }
             }
         } catch (error) {
-            console.error('Error loading saved results:', error);
+            console.error('[Saved] Error:', error);
+            updateOperationStatus('Error loading saved results');
             const savedResultsGrid = document.querySelector('.saved-results-grid');
             if (savedResultsGrid) {
                 savedResultsGrid.innerHTML = '<p>Error loading saved results.</p>';
@@ -134,6 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load tutorial content
     function loadTutorial() {
+        updateOperationStatus('Loading tutorial content...');
         const tutorialSteps = document.querySelector('.tutorial-steps');
         const tutorialExamples = document.querySelector('.tutorial-examples');
         
@@ -161,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <li>What humanitarian aid efforts are ongoing in Syria?</li>
                 </ul>
             `;
+            updateOperationStatus('Tutorial content loaded');
         }
     }
 
@@ -173,8 +244,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         function switchTab(type) {
             if (!['en', 'ar', 'raw'].includes(type)) return;
-            
-            console.log(`Switching to ${type} tab`);
             
             // Update tab buttons
             tabs.forEach(t => t.classList.toggle('active', t.dataset.type === type));
@@ -196,8 +265,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 englishSection.dir = 'ltr';
                 englishSection.style.textAlign = 'left';
             }
-            
-            console.log(`Tab switched to ${type}`);
         }
 
         tabs.forEach(tab => {
@@ -214,42 +281,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Save functionality
     function setupSaveButtons(data) {
-        console.log('Setting up save buttons with data:', {
-            hasEnglishFile: Boolean(data.english_file),
-            hasArabicFile: Boolean(data.arabic_file)
-        });
-
+        updateOperationStatus('Setting up save buttons...');
         const saveButtons = document.querySelectorAll('.save-btn');
-        console.log(`Found ${saveButtons.length} save buttons`);
-
+        
         saveButtons.forEach(btn => {
             const lang = btn.dataset.lang;
             const filename = lang === 'en' ? data.english_file : data.arabic_file;
-            
-            console.log(`Configuring ${lang} save button:`, {
-                hasFile: Boolean(filename),
-                filename: filename
-            });
             
             // Remove existing listeners
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
             
             if (filename) {
-                console.log(`Setting up save button for ${lang}:`, {
-                    filename: filename,
-                    buttonId: newBtn.id,
-                    buttonLang: newBtn.dataset.lang
-                });
-                
                 newBtn.disabled = false;
                 newBtn.title = lang === 'en' ? "Click to download HTML file" : "انقر للتحميل بصيغة HTML";
                 
                 newBtn.addEventListener('click', async (e) => {
                     e.preventDefault();
-                    console.log('\nSave button clicked:');
-                    console.log('Language:', lang);
-                    console.log('Filename:', filename);
+                    updateOperationStatus('Saving result...');
                     
                     try {
                         // First save the result to our saved results list
@@ -268,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Then initiate the download
                         const downloadUrl = `/results/${filename}`;
                         window.location.href = downloadUrl;
-                        console.log('Result saved and download initiated');
+                        updateOperationStatus('Result saved successfully');
                         
                         // Show success message
                         const successMessage = document.createElement('div');
@@ -281,7 +330,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         }, 3000);
                         
                     } catch (error) {
-                        console.error('Error saving/downloading result:', error);
+                        console.error('[Save] Error:', error);
+                        updateOperationStatus('Error saving result');
                         const errorMessage = document.createElement('div');
                         errorMessage.className = 'error-message';
                         errorMessage.textContent = 'Failed to save result';
@@ -292,15 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }, 3000);
                     }
                 });
-                
-                console.log(`${lang} save button enabled and configured`);
             } else {
-                console.log(`${lang} save button disabled:`, {
-                    reason: 'No filename available',
-                    buttonId: newBtn.id,
-                    buttonLang: newBtn.dataset.lang
-                });
-                
                 newBtn.disabled = true;
                 newBtn.title = lang === 'en' ? "No file available" : "الملف غير متوفر";
             }
@@ -319,6 +361,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingIndicator.classList.remove('hidden');
         searchButton.disabled = true;
 
+        // Start polling for logs
+        lastLogTimestamp = '';
+        startLogPolling();
+
         try {
             const response = await fetch('/search', {
                 method: 'POST',
@@ -332,39 +378,33 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
-            console.log('\nSearch response received:', {
-                status: response.status,
-                ok: response.ok,
-                hasEnglishAnswer: Boolean(data.answer),
-                hasArabicAnswer: Boolean(data.arabic_answer),
-                englishFile: data.english_file,
-                arabicFile: data.arabic_file,
-                language: data.language
-            });
 
             if (response.ok) {
-                console.log('Processing search response data:', {
-                    englishContentLength: data.answer?.length,
-                    arabicContentLength: data.arabic_answer?.length,
-                    hasEnglishFile: Boolean(data.english_file),
-                    hasArabicFile: Boolean(data.arabic_file),
-                    sourceCount: data.sources?.length
-                });
+                // Update confidence if available
+                if (data.confidence !== undefined) {
+                    updateConfidence(data.confidence); // Already in percentage form
+                }
                 displayResults(data);
             } else {
-                console.error('Search response error:', data.error);
+                console.error('[Search] Error:', data.error);
                 throw new Error(data.error || 'An error occurred while processing your query');
             }
         } catch (error) {
+            console.error('[Search] Error:', error.message);
+            updateOperationStatus(`Error: ${error.message}`);
             displayError(error.message);
         } finally {
-            loadingIndicator.classList.add('hidden');
-            searchButton.disabled = false;
+            // Stop polling for logs
+            stopLogPolling();
+            setTimeout(() => {
+                loadingIndicator.classList.add('hidden');
+                searchButton.disabled = false;
+            }, 500);
         }
     });
 
     // Display results
-    function displayResults(data) {
+    async function displayResults(data) {
         if (data.error) {
             displayError(data.error);
             return;
@@ -376,35 +416,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         sourcesList.innerHTML = '';
 
-        console.log('Displaying responses with data:', {
-            hasEnglish: Boolean(data.answer),
-            hasArabic: Boolean(data.arabic_answer),
-            englishFile: data.english_file,
-            arabicFile: data.arabic_file
-        });
-
-        console.log('Setting up responses with data:', {
-            hasEnglish: Boolean(data.answer),
-            hasArabic: Boolean(data.arabic_answer),
-            englishLength: data.answer?.length,
-            arabicLength: data.arabic_answer?.length
-        });
-
-        // Update confidence indicator
-        const confidenceFill = document.querySelector('.confidence-fill');
-        const confidencePercentage = document.querySelector('.confidence-percentage');
-        if (confidenceFill && confidencePercentage) {
-            const confidence = data.confidence || 0;
-            confidenceFill.style.width = `${confidence}%`;
-            confidencePercentage.textContent = `${confidence}%`;
-            console.log('Confidence updated:', confidence);
-        }
-
         // Display English response
         const englishContent = document.querySelector('#englishResponse .response-content');
         if (englishContent && data.answer) {
             englishContent.textContent = data.answer;
-            console.log('English content set');
         }
 
         // Display Arabic response
@@ -415,9 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 arabicContent.dir = 'rtl';
                 arabicContent.style.textAlign = 'right';
                 arabicContent.style.fontFamily = "'Noto Naskh Arabic', Arial, sans-serif";
-                console.log('Arabic content set');
             } else {
-                console.error('No Arabic content available');
                 arabicContent.textContent = 'المحتوى العربي غير متوفر';
                 arabicContent.dir = 'rtl';
                 arabicContent.style.textAlign = 'right';
@@ -430,13 +443,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Display raw data
         const vectorContent = document.querySelector('.vector-content');
-        
-        console.log('Raw data received:', {
-            hasLLMInput: Boolean(data.llm_input),
-            inputKeys: data.llm_input ? Object.keys(data.llm_input) : []
-        });
-
-        // Handle LLM input data
         if (vectorContent && data.llm_input) {
             try {
                 // Extract only the context section
@@ -446,7 +452,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .join('\n');
                 vectorContent.textContent = formattedInput;
             } catch (error) {
-                console.error('Error formatting LLM input:', error);
+                console.error('[Display] Error:', error);
                 vectorContent.textContent = 'Error displaying LLM input data';
             }
         } else {
@@ -472,6 +478,9 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsDiv.classList.remove('hidden');
         errorDiv.classList.add('hidden');
         switchTab(data.language === 'ar' ? 'ar' : 'en');
+
+        // Continue polling for logs during result processing
+        await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
     // Error display
@@ -480,6 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
         errorMessage.textContent = message;
         errorDiv.classList.remove('hidden');
         resultsDiv.classList.add('hidden');
+        updateOperationStatus(`Error: ${message}`);
     }
 
     // Set initial tab

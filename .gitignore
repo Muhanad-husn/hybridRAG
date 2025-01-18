@@ -65,3 +65,6 @@ instruction_files/
 test_*.pdf
 test_*.py
 entity_resolution.docx
+UI.png
+progress.png
+entity_resolution.txt
