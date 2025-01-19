@@ -7,17 +7,15 @@ import traceback
 from typing import Dict, Any, List, Optional
 from contextlib import redirect_stderr
 from io import StringIO
-# Suppress all warnings and logging
+from datetime import datetime
+# Suppress warnings
 import warnings
 warnings.filterwarnings('ignore')
 os.environ['LOGURU_LEVEL'] = 'CRITICAL'
 os.environ['FAISS_LOGGING_LEVEL'] = '0'  # Suppress FAISS logging
-logging.getLogger().setLevel(logging.CRITICAL)
-logging.getLogger('faiss').setLevel(logging.CRITICAL)
 
-# Import after logging configuration
+# Import dependencies
 from langchain.schema import Document
-from src.utils.logger import setup_logger
 from src.input_layer.document_processor import DocumentProcessor
 from src.processing_layer.embedding_generator import EmbeddingGenerator
 from src.processing_layer.graph_constructor import GraphConstructor
@@ -298,12 +296,29 @@ Please provide a clear and accurate answer based solely on the information provi
             logger.error(f"Error extracting graph data: {str(e)}")
 
         # Generate HTML content
-        from app import create_result_html
         english_result = None
         arabic_result = None
 
+        def create_html_result(content, query, translated_query, sources, is_arabic):
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            safe_title = ''.join(c for c in content.split('\n')[0] if c.isalnum() or c in (' ', '-', '_'))[:50]
+            filename = f"{safe_title}.html"
+            return {
+                'html': f"""<html>
+<body>
+<h1>{content.split('\n')[0]}</h1>
+{content}
+<hr>
+<p>Query: {query}</p>
+<p>Sources: {', '.join(sources)}</p>
+<p>Generated: {timestamp}</p>
+</body>
+</html>""",
+                'filename': filename
+            }
+
         if english_answer:
-            english_result = create_result_html(
+            english_result = create_html_result(
                 content=english_answer,
                 query=query,
                 translated_query="",
@@ -312,7 +327,7 @@ Please provide a clear and accurate answer based solely on the information provi
             )
 
         if arabic_answer:
-            arabic_result = create_result_html(
+            arabic_result = create_html_result(
                 content=arabic_answer,
                 query=original_query or query,
                 translated_query=query if original_query else "",

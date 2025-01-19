@@ -83,11 +83,17 @@ def setup_logger(config_path: str = "config/config.yaml") -> None:
             '%(levelname)s - %(message)s'
         )
         
-        # Setup file handler with rotation
-        file_handler = RotatingFileHandler(
-            os.path.join(log_dir, 'app.log'),
-            maxBytes=log_config.get('max_log_size', 5 * 1024 * 1024),  # 5 MB default
-            backupCount=log_config.get('backup_count', 3),
+        # Setup file handler
+        log_file = os.path.join(log_dir, 'app.log')
+        
+        # Only clear the file if this is the initial startup (not a reload)
+        if not any(isinstance(h, logging.FileHandler) for h in logging.getLogger().handlers):
+            open(log_file, 'w').close()
+            
+        # Always open in append mode to preserve logs
+        file_handler = logging.FileHandler(
+            log_file,
+            mode='a',
             encoding='utf-8'
         )
         file_handler.setLevel(logging.INFO)

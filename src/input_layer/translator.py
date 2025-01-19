@@ -15,12 +15,20 @@ class Translator:
     
     def __init__(self, config_path: str = "config/translation_config.yaml"):
         """Initialize the translator with configuration."""
+        # Get existing logger without reinitializing
         self.logger = logging.getLogger(__name__)
+        
+        # Load config and models without reinitializing logger
         self.config = self._load_config(config_path)
         
         # Initialize translation models and tokenizers
-        self.ar_to_en_model, self.ar_to_en_tokenizer = self._load_model("ar_to_en")
-        self.en_to_ar_model, self.en_to_ar_tokenizer = self._load_model("en_to_ar")
+        logging_level = self.logger.getEffectiveLevel()  # Store current level
+        self.logger.setLevel(logging.ERROR)  # Temporarily set to ERROR level
+        try:
+            self.ar_to_en_model, self.ar_to_en_tokenizer = self._load_model("ar_to_en")
+            self.en_to_ar_model, self.en_to_ar_tokenizer = self._load_model("en_to_ar")
+        finally:
+            self.logger.setLevel(logging_level)  # Restore original level
         
         # Initialize cache if enabled
         if self.config["cache"]["enabled"]:

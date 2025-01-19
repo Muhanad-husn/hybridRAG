@@ -10,8 +10,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 import traceback
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+# Get logger instance
 logger = logging.getLogger(__name__)
 
 class HybridRetrieval:
