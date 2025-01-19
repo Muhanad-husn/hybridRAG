@@ -469,7 +469,7 @@ class HybridRetrieval:
                         high_degree_nodes += 1
                         node_data = graph.graph.nodes[node]
                         node_type = node_data.get('type', 'unknown')
-                        logger.info(f"Found high-degree node: {node} ({node_type}) with {degree} connections")
+                        #logger.info(f"Found high-degree node: {node} ({node_type}) with {degree} connections")
                         
                         # Get all relationships for this node
                         for neighbor in graph.graph.neighbors(node):
