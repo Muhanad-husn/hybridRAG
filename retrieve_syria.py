@@ -59,43 +59,36 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         try:
             # Check if vector store exists
             embeddings_dir = os.path.join("data", "embeddings")
-            need_processing = not (os.path.exists(embeddings_dir) and os.listdir(embeddings_dir))
-            
-            # Load processed chunks if they exist
-            chunks_dir = os.path.join("data", "processed_chunks")
-            if os.path.exists(chunks_dir) and os.listdir(chunks_dir):
-                documents = []
-                for chunk_file in os.listdir(chunks_dir):
-                    if chunk_file.endswith('.txt'):
-                        with open(os.path.join(chunks_dir, chunk_file), 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            source = chunk_file.split('_', 2)[-1]  # Get original source from chunk filename
-                            documents.append(Document(page_content=content, metadata={"source": source}))
-                
-                if need_processing:
+            if not (os.path.exists(embeddings_dir) and os.listdir(embeddings_dir)):
+                # Need to process documents and generate embeddings
+                chunks_dir = os.path.join("data", "processed_chunks")
+                if os.path.exists(chunks_dir) and os.listdir(chunks_dir):
+                    # Load existing chunks
+                    documents = []
+                    for chunk_file in os.listdir(chunks_dir):
+                        if chunk_file.endswith('.txt'):
+                            with open(os.path.join(chunks_dir, chunk_file), 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                source = chunk_file.split('_', 2)[-1]  # Get original source from chunk filename
+                                documents.append(Document(page_content=content, metadata={"source": source}))
+                    
                     # Generate and save embeddings
                     documents = embedding_generator.process_documents(documents)
                     embedding_generator.save_embeddings(documents)
-                    retrieval_system.build_index(documents)
                 else:
-                    # Just initialize retrieval system with documents
-                    retrieval_system.build_index(documents)
-            else:
-                # Process documents from scratch
-                input_dir = os.path.join("data", "raw_documents")
-                documents = document_processor.process_directory(input_dir)
-                if not documents:
-                    raise ValueError("No documents were processed successfully")
-                
-                # Save chunks
-                document_processor.save_processed_chunks(documents, chunks_dir)
-                
-                # Generate embeddings
-                documents = embedding_generator.process_documents(documents)
-                embedding_generator.save_embeddings(documents)
-                
-                # Build retrieval index
-                retrieval_system.build_index(documents)
+                    # Process documents from scratch
+                    input_dir = os.path.join("data", "raw_documents")
+                    documents = document_processor.process_directory(input_dir)
+                    if not documents:
+                        raise ValueError("No documents were processed successfully")
+                    
+                    # Save chunks
+                    document_processor.save_processed_chunks(documents, chunks_dir)
+                    
+                    # Generate embeddings
+                    documents = embedding_generator.process_documents(documents)
+                    embedding_generator.save_embeddings(documents)
+            # No need to process documents if embeddings exist
         except Exception as e:
             print(f"Error preparing documents: {str(e)}")
             raise
