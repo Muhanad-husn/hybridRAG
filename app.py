@@ -315,7 +315,7 @@ if __name__ == '__main__':
         logger.info("-" * 60)
         logger.info(f"Server URL: http://localhost:{port}")
         logger.info("=" * 60)
-        app.run(debug=True, port=port)
+        app.run(debug=False, port=port)
     except Exception as e:
         logger.error(f"Failed to start application: {str(e)}")
         raise
