@@ -59,6 +59,9 @@ logging:
     flask:
       level: "INFO"
       propagate: false
+    src.processing_layer.graph_constructor:  # Graph constructor logger
+      level: "WARNING"
+      propagate: true
     root:
       level: "INFO"
       handlers: ["file", "console"]
