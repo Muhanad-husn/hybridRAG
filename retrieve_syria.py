@@ -111,36 +111,42 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         query_embedding = embedding_generator.generate_embedding(query)
         
         try:
-            # Get vector store results first
+            # Get vector store results first - use maximum possible
             vector_results = retrieval_system.hybrid_search(
                 query=query,
                 query_embedding=query_embedding,
                 graph=None,  # Don't include graph results yet
-                top_k=20,
+                top_k=60,    # Use maximum retrieval count
                 mode="Dense"  # Only dense retrieval
             )
             
-            # Rerank vector results and keep exactly 10
+            # Rerank vector results and keep user's configured count (15)
             reranked_vector_results = retrieval_system.rerank_results(
                 query=query,
                 results=vector_results,
-                top_k=10  # Keep exactly 10 after reranking
-            )[:10]  # Ensure we have exactly 10
+                top_k=15     # Use user's configured count
+            )
             
             # Get graph results
             graph_results = retrieval_system.hybrid_search(
                 query=query,
                 query_embedding=query_embedding,
                 graph=graph_constructor,
-                top_k=1,  # We only want the graph analysis
+                top_k=5,     # Allow for multiple graph relationships
                 mode="Hybrid"  # Get graph results
             )
             
-            # Filter to keep only the graph analysis result
-            graph_analysis = [r for r in graph_results if r.get('meta') == 'graph_relationships'][:1]  # Take only first graph result
+            # Filter to keep only the graph analysis results
+            graph_analysis = [r for r in graph_results if r.get('meta') == 'graph_relationships']
             
-            # Combine exactly 10 reranked vector results with 1 graph analysis
-            combined_results = reranked_vector_results + graph_analysis
+            # Calculate how many graph results we can include while respecting the total limit
+            remaining_slots = 15 - len(reranked_vector_results)  # User's configured limit minus vector results
+            if remaining_slots > 0 and graph_analysis:
+                # Add graph results up to the remaining limit
+                graph_analysis = graph_analysis[:remaining_slots]
+                combined_results = reranked_vector_results + graph_analysis
+            else:
+                combined_results = reranked_vector_results
             
             # Sort by score (no need to deduplicate since we're controlling the counts)
             results = sorted(
