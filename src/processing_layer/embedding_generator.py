@@ -134,12 +134,7 @@ class EmbeddingGenerator:
                     os.remove(item_path)
                 elif os.path.isdir(item_path):
                     shutil.rmtree(item_path)
-            
-            # Create new vector store after cleanup
-            self._create_new_vector_store()
-            # Save the new store
-            self.vector_store.save_local(embeddings_dir)
-            return True
+            return False
             
         except Exception as e:
             logger.warning(f"Failed to load existing index: {str(e)}")
