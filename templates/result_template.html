@@ -114,34 +114,20 @@
         }
 
         .sources {
-            margin-top: 40px;
-            padding: 30px;
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .source-tag {
+            display: inline-block;
+            padding: 4px 12px;
             background-color: var(--section-bg);
-            border-radius: 12px;
             border: 1px solid var(--border-color);
-        }
-
-        .source-item {
-            margin: 8px 0;
-            padding: 8px 12px;
-            line-height: 1.6;
+            border-radius: 15px;
+            font-size: 0.9em;
             color: var(--secondary-color);
-            font-size: 0.95em;
-            border-left: 3px solid var(--border-color);
-            transition: border-color 0.2s ease;
-        }
-
-        .source-item:hover {
-            border-left-color: var(--primary-color);
-        }
-
-        .source-item.arabic {
-            border-left: none;
-            border-right: 3px solid var(--border-color);
-        }
-
-        .source-item.arabic:hover {
-            border-right-color: var(--primary-color);
         }
 
         /* Responsive Design */
@@ -245,22 +231,9 @@
     </div>
 
     {% if sources %}
-        <div class="sources">
-            <div class="section-title {{ 'arabic' if is_arabic else 'english' }}">
-                {% if is_arabic %}
-                    المصادر:
-                {% else %}
-                    Sources:
-                {% endif %}
-            </div>
+        <div class="sources {{ 'arabic' if is_arabic else 'english' }}">
             {% for source in sources %}
-                <div class="source-item {{ 'arabic' if is_arabic else 'english' }}">
-                    {% if is_arabic %}
-                        ●  {{ source }}
-                    {% else %}
-                        ●  {{ source }}
-                    {% endif %}
-                </div>
+                <span class="source-tag">{{ source }}</span>
             {% endfor %}
         </div>
     {% endif %}
