@@ -26,23 +26,12 @@ class HybridRetrieval:
         logger.info("Initializing embedding generator...")
         self.embedding_generator = EmbeddingGenerator(config_path)
         
-        # Verify vector store is initialized
+        # Verify vector store exists
         embeddings_dir = os.path.join('data', 'embeddings')
         index_path = os.path.join(embeddings_dir, 'index.faiss')
-        if os.path.exists(index_path):
-            logger.info(f"Found existing FAISS index at {index_path}")
-            # Test if vector store is working
-            try:
-                test_query = "test query"
-                test_results = self.embedding_generator.vector_store.similarity_search(test_query, k=1)
-                if test_results:
-                    logger.info("Vector store verified successfully")
-                else:
-                    logger.warning("Vector store test returned no results")
-            except Exception as e:
-                logger.error(f"Error testing vector store: {str(e)}\n{traceback.format_exc()}")
-        else:
-            logger.warning(f"No FAISS index found at {index_path}")
+        if not os.path.exists(index_path):
+            raise ValueError("Vector store not initialized. Please run src/main.py first to initialize the system.")
+        logger.info(f"Found existing FAISS index at {index_path}")
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""

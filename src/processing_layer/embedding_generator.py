@@ -87,58 +87,28 @@ class EmbeddingGenerator:
             raise
 
     def _initialize_vector_store(self) -> None:
-        """Initialize the vector store."""
+        """Initialize or load the vector store."""
         try:
             # Set up storage directory
             os.makedirs(self.embeddings_dir, exist_ok=True)
             index_path = os.path.join(self.embeddings_dir, 'index.faiss')
 
-            # Try to load and verify existing index
-            if os.path.exists(index_path) and os.path.getsize(index_path) > 0:
-                if self._verify_and_repair_vector_store(self.embeddings_dir):
-                    return
-                    
-            # Create new empty index if verification failed or no index exists
-            self._create_new_vector_store()
-            
+            # Load existing index if it exists
+            if os.path.exists(index_path):
+                self.vector_store = FAISS.load_local(
+                    self.embeddings_dir,
+                    self.embedding_function,
+                    allow_dangerous_deserialization=True
+                )
+                logger.info("Loaded existing vector store")
+            else:
+                # Create new empty vector store
+                self._create_new_vector_store()
+                logger.info("Created new vector store")
+
         except Exception as e:
-            logger.error(f"Error initializing vector store: {str(e)}\n{traceback.format_exc()}")
+            logger.error(f"Error initializing vector store: {str(e)}")
             raise
-            
-    def _verify_and_repair_vector_store(self, embeddings_dir: str) -> bool:
-        """Verify vector store is working and repair if needed."""
-        try:
-            logger.info(f"Loading existing FAISS index from {embeddings_dir}")
-            self.vector_store = FAISS.load_local(
-                embeddings_dir,
-                self.embedding_function,
-                allow_dangerous_deserialization=True
-            )
-            
-            # Test if the index is working
-            test_query = "test query"
-            try:
-                test_results = self.vector_store.similarity_search(test_query, k=1)
-                if test_results:
-                    logger.info("Successfully loaded and verified existing index")
-                    return True
-                logger.warning("Test query returned no results")
-            except Exception as test_error:
-                logger.warning(f"Index verification failed: {str(test_error)}")
-                
-            # Clean up corrupted index
-            logger.info("Cleaning up corrupted index files")
-            for item in os.listdir(embeddings_dir):
-                item_path = os.path.join(embeddings_dir, item)
-                if os.path.isfile(item_path):
-                    os.remove(item_path)
-                elif os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-            return False
-            
-        except Exception as e:
-            logger.warning(f"Failed to load existing index: {str(e)}")
-            return False
             
     def _create_new_vector_store(self) -> None:
         """Create a new empty vector store."""

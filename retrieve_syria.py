@@ -57,48 +57,13 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         retrieval_system = HybridRetrieval(config_path)
         
         try:
-            # Check if vector store exists using configured path
+            # Verify vector store exists
             if not (os.path.exists(embedding_generator.embeddings_dir) and
                    os.listdir(embedding_generator.embeddings_dir)):
-                logger.info("No embeddings found. Processing documents...")
+                logger.error("Vector store not found. Please run src/main.py first to initialize the system.")
+                raise ValueError("Vector store not initialized. Run src/main.py first.")
                 
-                # Process documents from raw_documents directory
-                input_dir = os.path.join("data", "raw_documents")
-                if not os.path.exists(input_dir) or not os.listdir(input_dir):
-                    logger.error(f"No documents found in {input_dir}")
-                    raise ValueError(f"No documents found in {input_dir}")
-                
-                # Process documents from scratch
-                documents = document_processor.process_directory(input_dir)
-                if not documents:
-                    logger.error("No documents were processed successfully")
-                    raise ValueError("No documents were processed successfully")
-                
-                logger.info(f"Processed {len(documents)} documents")
-                
-                # Save chunks
-                chunks_dir = os.path.join("data", "processed_chunks")
-                os.makedirs(chunks_dir, exist_ok=True)
-                document_processor.save_processed_chunks(documents, chunks_dir)
-                logger.info("Saved document chunks")
-                
-                # Generate embeddings
-                documents = embedding_generator.process_documents(documents)
-                logger.info("Generated embeddings")
-                
-                # Save embeddings
-                embedding_generator.save_embeddings(documents)
-                logger.info("Saved embeddings to vector store")
-                
-                # Build retrieval index
-                retrieval_system.build_index(documents)
-                # Save the vector store to disk using configured path
-                retrieval_system.embedding_generator.vector_store.save_local(
-                    retrieval_system.embedding_generator.embeddings_dir
-                )
-                logger.info("Built and saved retrieval index")
-            else:
-                logger.info("Using existing embeddings")
+            logger.info("Using existing embeddings")
         except Exception as e:
             print(f"Error preparing documents: {str(e)}")
             raise
