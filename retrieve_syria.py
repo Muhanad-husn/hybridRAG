@@ -92,7 +92,10 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 
                 # Build retrieval index
                 retrieval_system.build_index(documents)
-                logger.info("Built retrieval index")
+                # Save the vector store to disk
+                embeddings_dir = os.path.join("data", "embeddings")
+                retrieval_system.embedding_generator.vector_store.save_local(embeddings_dir)
+                logger.info("Built and saved retrieval index")
             else:
                 logger.info("Using existing embeddings")
         except Exception as e:
