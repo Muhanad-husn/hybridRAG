@@ -2,6 +2,7 @@ import os
 import logging
 import shutil
 import asyncio
+import traceback
 from typing import Optional, Any, Dict, List
 from src.input_layer.document_processor import DocumentProcessor
 from src.processing_layer.embedding_generator import EmbeddingGenerator
@@ -164,50 +165,53 @@ class HyperRAG:
 async def amain():
     """Async main entry point for the application."""
     try:
-        # Setup logging
+        # Setup logging first, before any operations
         setup_logger()
-        logger = logging.getLogger(__name__)
+        
+        # Get root logger for main script
+        logger = logging.getLogger()
+        logger.info("=" * 60)
+        logger.info("Starting document processing")
+        logger.info("-" * 60)
         
         # Initialize the system
+        logger.info("Initializing RAG system...")
         rag_system = HyperRAG()
         
-        # Reset storage to clear existing state
+        # Reset storage since this is initial setup
+        logger.info("Resetting storage for initial setup...")
         rag_system.reset_storage()
-        logger.info("Reset storage to clear existing state")
+        logger.info("Storage reset completed")
         
-        # Example usage
+        # Process documents from raw_documents directory
         input_dir = os.path.join("data", "raw_documents")
+        logger.info(f"Checking for documents in {input_dir}")
         
+        if not os.path.exists(input_dir) or not os.listdir(input_dir):
+            logger.error(f"No documents found in {input_dir}")
+            raise ValueError(f"No documents found in {input_dir}")
+        
+        logger.info("Found documents to process")
+            
         # Process documents (this will trigger LLM extraction and graph construction)
+        logger.info("Starting document processing pipeline...")
         await rag_system.aprocess_documents(
             input_dir=input_dir,
             save_chunks=True,
             save_embeddings=True
         )
         
-        # Test query
-        query = "What were the key factors that escalated the peaceful demonstrations in Syria into a full-scale armed conflict?"
-        
-        print(f"\nQuery:")
-        print(query)
-        
-        # Perform hybrid search with reranking
-        print("\nHybrid Search Results:")
-        results = rag_system.query(
-            query=query,
-            mode="Hybrid",
-            top_k=10,  # Get more results initially
-            rerank_top_k=5  # Rerank and limit to top 5
-        )
-        
-        # Print results
-        for idx, result in enumerate(results, 1):
-            print(f"\nResult {idx}:")
-            print(format_result(result))
-            print("-" * 80)  # Add separator between results
+        logger.info("=" * 60)
+        logger.info("Document processing completed successfully")
+        logger.info("=" * 60)
         
     except Exception as e:
-        logging.error(f"Application error: {str(e)}")
+        logger.error("=" * 60)
+        logger.error("Document processing failed")
+        logger.error("-" * 60)
+        logger.error(f"Error: {str(e)}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        logger.error("=" * 60)
         raise
 
 if __name__ == "__main__":

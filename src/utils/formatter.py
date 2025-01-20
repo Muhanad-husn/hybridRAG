@@ -86,13 +86,30 @@ class ResultFormatter:
         
     def format_reranked_result(self, result: Dict[str, Any]) -> str:
         """Format reranked search results."""
+        # Get text content, handling both direct text and page_content
         text = result.get('text', '')
+        if not text and 'page_content' in result:
+            text = result.get('page_content', '')
+        
+        # Clean and truncate text
         if isinstance(text, str):
             text = self._truncate_text(text.strip())
+        else:
+            return ""  # Return empty string if no valid text found
             
-        meta = self._clean_source_path(result.get('meta', 'unknown'))
-        score = result.get('score', 0.0)
+        # Get metadata, handling both direct meta and metadata
+        meta = result.get('meta', '')
+        if not meta and 'metadata' in result:
+            meta = result.get('metadata', {}).get('source', 'unknown')
+        meta = self._clean_source_path(str(meta))
         
+        # Get score, defaulting to 0.0
+        score = float(result.get('score', 0.0))
+        
+        # Only create output if we have valid text
+        if not text.strip():
+            return ""
+            
         sections = [
             "Context from document:",
             f"[{meta} (Relevance: {self._format_score(score)})]",

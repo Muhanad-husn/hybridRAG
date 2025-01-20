@@ -60,35 +60,41 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             # Check if vector store exists
             embeddings_dir = os.path.join("data", "embeddings")
             if not (os.path.exists(embeddings_dir) and os.listdir(embeddings_dir)):
-                # Need to process documents and generate embeddings
+                logger.info("No embeddings found. Processing documents...")
+                
+                # Process documents from raw_documents directory
+                input_dir = os.path.join("data", "raw_documents")
+                if not os.path.exists(input_dir) or not os.listdir(input_dir):
+                    logger.error(f"No documents found in {input_dir}")
+                    raise ValueError(f"No documents found in {input_dir}")
+                
+                # Process documents from scratch
+                documents = document_processor.process_directory(input_dir)
+                if not documents:
+                    logger.error("No documents were processed successfully")
+                    raise ValueError("No documents were processed successfully")
+                
+                logger.info(f"Processed {len(documents)} documents")
+                
+                # Save chunks
                 chunks_dir = os.path.join("data", "processed_chunks")
-                if os.path.exists(chunks_dir) and os.listdir(chunks_dir):
-                    # Load existing chunks
-                    documents = []
-                    for chunk_file in os.listdir(chunks_dir):
-                        if chunk_file.endswith('.txt'):
-                            with open(os.path.join(chunks_dir, chunk_file), 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                source = chunk_file.split('_', 2)[-1]  # Get original source from chunk filename
-                                documents.append(Document(page_content=content, metadata={"source": source}))
-                    
-                    # Generate and save embeddings
-                    documents = embedding_generator.process_documents(documents)
-                    embedding_generator.save_embeddings(documents)
-                else:
-                    # Process documents from scratch
-                    input_dir = os.path.join("data", "raw_documents")
-                    documents = document_processor.process_directory(input_dir)
-                    if not documents:
-                        raise ValueError("No documents were processed successfully")
-                    
-                    # Save chunks
-                    document_processor.save_processed_chunks(documents, chunks_dir)
-                    
-                    # Generate embeddings
-                    documents = embedding_generator.process_documents(documents)
-                    embedding_generator.save_embeddings(documents)
-            # No need to process documents if embeddings exist
+                os.makedirs(chunks_dir, exist_ok=True)
+                document_processor.save_processed_chunks(documents, chunks_dir)
+                logger.info("Saved document chunks")
+                
+                # Generate embeddings
+                documents = embedding_generator.process_documents(documents)
+                logger.info("Generated embeddings")
+                
+                # Save embeddings
+                embedding_generator.save_embeddings(documents)
+                logger.info("Saved embeddings to vector store")
+                
+                # Build retrieval index
+                retrieval_system.build_index(documents)
+                logger.info("Built retrieval index")
+            else:
+                logger.info("Using existing embeddings")
         except Exception as e:
             print(f"Error preparing documents: {str(e)}")
             raise
@@ -97,21 +103,47 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         query_embedding = embedding_generator.generate_embedding(query)
         
         try:
-            # Get vector store results first - use maximum possible
+            # Get vector store results first
+            logger.info("Retrieving dense vector results...")
             vector_results = retrieval_system.hybrid_search(
                 query=query,
                 query_embedding=query_embedding,
                 graph=None,  # Don't include graph results yet
-                top_k=60,    # Use maximum retrieval count
-                mode="Dense"  # Only dense retrieval
+                top_k=100,   # Get more results for better reranking
+                mode="Dense" # Only dense retrieval
             )
             
-            # Rerank vector results and keep user's configured count (15)
+            if not vector_results:
+                logger.warning("No vector results found")
+                return {
+                    "query": query,
+                    "answer": "I apologize, but I couldn't find any relevant information in the vector store.",
+                    "error": "No vector results found",
+                    "sources": [],
+                    "confidence": 0
+                }
+            
+            logger.info(f"Found {len(vector_results)} initial vector results")
+            
+            # Rerank vector results
+            logger.info("Reranking vector results...")
             reranked_vector_results = retrieval_system.rerank_results(
                 query=query,
                 results=vector_results,
-                top_k=15     # Use user's configured count
+                top_k=15  # Keep top 15 after reranking
             )
+            
+            if not reranked_vector_results:
+                logger.warning("No results after reranking")
+                return {
+                    "query": query,
+                    "answer": "I apologize, but the reranking process didn't yield any relevant results.",
+                    "error": "No results after reranking",
+                    "sources": [],
+                    "confidence": 0
+                }
+            
+            logger.info(f"Reranked to {len(reranked_vector_results)} results")
             
             # Get graph results
             graph_results = retrieval_system.hybrid_search(
@@ -147,11 +179,33 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
 
         # Format results for LLM
         context_parts = []
-        for result in results:
-            formatted = format_result(result, format_type="text")
-            context_parts.append(formatted)
         
+        # First add dense retrieval results
+        for result in reranked_vector_results:
+            if isinstance(result, dict) and 'text' in result:
+                formatted = format_result(result, format_type="text")
+                if formatted.strip():  # Only add non-empty results
+                    context_parts.append(formatted)
+                    
+        # Then add graph analysis if available
+        if graph_analysis:
+            for result in graph_analysis:
+                formatted = format_result(result, format_type="text")
+                if formatted.strip():
+                    context_parts.append(formatted)
+        
+        # Join all parts with double newlines
         context = "\n\n".join(context_parts)
+        
+        if not context.strip():
+            logger.warning("No context generated from search results")
+            return {
+                "query": query,
+                "answer": "I apologize, but I couldn't find any relevant information to answer your question.",
+                "error": "No relevant context found",
+                "sources": [],
+                "confidence": 0
+            }
 
         # Extract sources using regex
         sources = set()

@@ -330,7 +330,7 @@ class LLMGraphTransformer:
         """Asynchronously process a single document."""
         try:
             text = document.page_content
-            logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
+            #logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
             
             # Get raw model response using predict
             if hasattr(self.llm, 'client'):
@@ -347,10 +347,10 @@ class LLMGraphTransformer:
                 raw_response = await self.llm.apredict(text=f"{system_prompt}\n\n{user_prompt_template.format(text=text)}")
             
             # Log raw response
-            logger.info("Raw model response (async):")
-            logger.info("-" * 80)
-            logger.info(raw_response)
-            logger.info("-" * 80)
+            #logger.info("Raw model response (async):")
+            #logger.info("-" * 80)
+            #logger.info(raw_response)
+            #logger.info("-" * 80)
             
             # Extract nodes and relationships (similar to sync version)
             nodes = []
@@ -416,7 +416,7 @@ class LLMGraphTransformer:
             
             # Perform node deduplication
             if nodes and relationships:
-                logger.info("Starting node deduplication...")
+                #logger.info("Starting node deduplication...")
                 # Convert Node objects to dictionaries for deduplication
                 node_dicts = [{'id': node.id, 'type': node.type, 'properties': node.properties} for node in nodes]
                 
