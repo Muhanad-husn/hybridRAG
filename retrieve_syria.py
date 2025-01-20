@@ -184,9 +184,12 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             for match in matches:
                 source = match.strip()
                 if source != 'graph_relationships':  # Exclude graph relationships
-                    # Remove file extension if present
-                    source = os.path.splitext(source)[0]
-                    sources.add(source)
+                    # Remove reference numbers and file extension
+                    source = re.sub(r'\[\d+\]|\[\d+/\d+\]', '', source)  # Remove [10] or [1/16] patterns
+                    source = os.path.splitext(source)[0]  # Remove file extension
+                    source = source.strip()  # Clean up any remaining whitespace
+                    if source:  # Only add if not empty
+                        sources.add(source)
         sources = sorted(list(sources))
         
         # Initialize OpenRouter client
