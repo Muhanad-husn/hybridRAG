@@ -4,6 +4,7 @@ import re
 import json
 import logging
 import traceback
+import tiktoken
 from typing import Dict, Any, List, Optional
 from contextlib import redirect_stderr
 from io import StringIO
@@ -167,6 +168,35 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         
         # Join all parts with double newlines
         context = "\n\n".join(context_parts)
+        
+        # Check context length using tiktoken
+        try:
+            enc = tiktoken.encoding_for_model("gpt-4")  # Using GPT-4 encoding as a standard
+            context_tokens = len(enc.encode(context))
+            logger.info(f"Context length: {context_tokens} tokens")
+            
+            if context_tokens > 6000:
+                # Calculate new rerank count to maintain roughly the same tokens per result
+                tokens_per_result = context_tokens / len(context_parts)
+                target_results = int(6000 / tokens_per_result)
+                
+                # Ensure minimum results
+                new_rerank_count = max(5, min(target_results, rerank_count))
+                
+                logger.warning(f"Context length ({context_tokens} tokens) exceeds 6k limit. "
+                             f"Reducing rerank_count from {rerank_count} to {new_rerank_count}")
+                
+                # Recursively call with new rerank_count
+                return run_hybrid_search(
+                    query=query,
+                    original_lang=original_lang,
+                    original_query=original_query,
+                    translate=translate,
+                    rerank_count=new_rerank_count
+                )
+        except Exception as e:
+            logger.error(f"Error checking context length: {str(e)}")
+            # Continue with original context if token check fails
         
         if not context.strip():
             logger.warning("No context generated from search results")
@@ -385,8 +415,11 @@ Please provide a clear and accurate answer based solely on the information provi
             "language": original_lang or 'en',
             "confidence": confidence,
             "llm_input": {
-                "context": context
-            }
+                "context": context,
+                "context_tokens": context_tokens if 'context_tokens' in locals() else None
+            },
+            "warning": f"Context length exceeded 6k tokens. Results automatically reduced from {rerank_count} to {new_rerank_count} for better processing."
+            if 'new_rerank_count' in locals() else None
         }
 
         # Add HTML content if available
