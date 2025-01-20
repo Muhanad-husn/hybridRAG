@@ -89,9 +89,8 @@ class EmbeddingGenerator:
         """Initialize the vector store."""
         try:
             # Set up storage directory
-            embeddings_dir = os.path.join('data', 'embeddings')
-            os.makedirs(embeddings_dir, exist_ok=True)
-            index_path = os.path.join(embeddings_dir, 'index.faiss')
+            os.makedirs(self.embeddings_dir, exist_ok=True)
+            index_path = os.path.join(self.embeddings_dir, 'index.faiss')
 
             # Try to load and verify existing index
             if os.path.exists(index_path) and os.path.getsize(index_path) > 0:
@@ -176,12 +175,11 @@ class EmbeddingGenerator:
         """Reset the vector store by creating a new empty FAISS index."""
         try:
             # Set up storage directory
-            embeddings_dir = os.path.join('data', 'embeddings')
-            os.makedirs(embeddings_dir, exist_ok=True)
+            os.makedirs(self.embeddings_dir, exist_ok=True)
             
             # Clean up old files first
-            for item in os.listdir(embeddings_dir):
-                item_path = os.path.join(embeddings_dir, item)
+            for item in os.listdir(self.embeddings_dir):
+                item_path = os.path.join(self.embeddings_dir, item)
                 if os.path.isfile(item_path):
                     os.remove(item_path)
                 elif os.path.isdir(item_path):
@@ -200,10 +198,10 @@ class EmbeddingGenerator:
             )
             
             # Save the empty index
-            self.vector_store.save_local(embeddings_dir)
+            self.vector_store.save_local(self.embeddings_dir)
             
             # Verify the index was saved
-            if not os.path.exists(os.path.join(embeddings_dir, 'index.faiss')):
+            if not os.path.exists(os.path.join(self.embeddings_dir, 'index.faiss')):
                 raise ValueError("Failed to save FAISS index")
             
             logger.info("Vector store reset successfully")

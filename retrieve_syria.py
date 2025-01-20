@@ -57,9 +57,9 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         retrieval_system = HybridRetrieval(config_path)
         
         try:
-            # Check if vector store exists
-            embeddings_dir = os.path.join("data", "embeddings")
-            if not (os.path.exists(embeddings_dir) and os.listdir(embeddings_dir)):
+            # Check if vector store exists using configured path
+            if not (os.path.exists(embedding_generator.embeddings_dir) and
+                   os.listdir(embedding_generator.embeddings_dir)):
                 logger.info("No embeddings found. Processing documents...")
                 
                 # Process documents from raw_documents directory
