@@ -3,6 +3,7 @@ import yaml
 import torch
 import numpy as np
 import faiss
+import shutil
 from typing import List, Dict, Union, Optional
 from transformers import AutoTokenizer, AutoModel
 from langchain.schema import Document
@@ -90,32 +91,83 @@ class EmbeddingGenerator:
             # Set up storage directory
             embeddings_dir = os.path.join('data', 'embeddings')
             os.makedirs(embeddings_dir, exist_ok=True)
-            self.index_path = os.path.join(embeddings_dir, 'index.faiss')
-            self.docstore_path = os.path.join(embeddings_dir, 'docstore.json')
+            index_path = os.path.join(embeddings_dir, 'index.faiss')
+
+            # Try to load and verify existing index
+            if os.path.exists(index_path) and os.path.getsize(index_path) > 0:
+                if self._verify_and_repair_vector_store(embeddings_dir):
+                    return
+                    
+            # Create new empty index if verification failed or no index exists
+            self._create_new_vector_store()
             
-            # Try to load existing index, or create new one if it doesn't exist
-            if os.path.exists(self.index_path):
-                logger.info(f"Loading existing FAISS index from {embeddings_dir}")
-                self.vector_store = FAISS.load_local(
-                    embeddings_dir,
-                    self.embedding_function,
-                    allow_dangerous_deserialization=True
-                )
-            else:
-                logger.info("Creating new FAISS index")
-                # Create new empty FAISS index
-                dimension = 384  # GTE-small embedding dimension
-                index = faiss.IndexFlatIP(dimension)
+        except Exception as e:
+            logger.error(f"Error initializing vector store: {str(e)}\n{traceback.format_exc()}")
+            raise
+            
+    def _verify_and_repair_vector_store(self, embeddings_dir: str) -> bool:
+        """Verify vector store is working and repair if needed."""
+        try:
+            logger.info(f"Loading existing FAISS index from {embeddings_dir}")
+            self.vector_store = FAISS.load_local(
+                embeddings_dir,
+                self.embedding_function,
+                allow_dangerous_deserialization=True
+            )
+            
+            # Test if the index is working
+            test_query = "test query"
+            try:
+                test_results = self.vector_store.similarity_search(test_query, k=1)
+                if test_results:
+                    logger.info("Successfully loaded and verified existing index")
+                    return True
+                logger.warning("Test query returned no results")
+            except Exception as test_error:
+                logger.warning(f"Index verification failed: {str(test_error)}")
                 
-                # Create new FAISS vector store
-                self.vector_store = FAISS(
-                    embedding_function=self.embedding_function,
-                    index=index,
-                    docstore=InMemoryDocstore({}),
-                    index_to_docstore_id={}
-                )
+            # Clean up corrupted index
+            logger.info("Cleaning up corrupted index files")
+            for item in os.listdir(embeddings_dir):
+                item_path = os.path.join(embeddings_dir, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+            return False
             
-            logger.info("Vector store initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to load existing index: {str(e)}")
+            return False
+            
+    def _create_new_vector_store(self) -> None:
+        """Create a new empty vector store."""
+        try:
+            logger.info("Creating new FAISS index")
+            dimension = 384  # GTE-small embedding dimension
+            
+            # Create and configure FAISS index
+            index = faiss.IndexFlatIP(dimension)
+            if faiss.get_num_gpus() > 0:
+                logger.info("Moving index to GPU")
+                res = faiss.StandardGpuResources()
+                index = faiss.index_cpu_to_gpu(res, 0, index)
+            
+            # Create vector store with the index
+            self.vector_store = FAISS(
+                embedding_function=self.embedding_function,
+                index=index,
+                docstore=InMemoryDocstore({}),
+                index_to_docstore_id={}
+            )
+            
+            # Test the empty index
+            test_query = "test query"
+            test_embedding = self.generate_embedding(test_query)
+            if test_embedding is None or len(test_embedding) != dimension:
+                raise ValueError(f"Invalid test embedding dimension: {len(test_embedding) if test_embedding is not None else 'None'}")
+            
+            logger.info("Vector store initialized and tested successfully")
         except Exception as e:
             logger.error(f"Error initializing vector store: {str(e)}")
             raise
@@ -126,21 +178,33 @@ class EmbeddingGenerator:
             # Set up storage directory
             embeddings_dir = os.path.join('data', 'embeddings')
             os.makedirs(embeddings_dir, exist_ok=True)
-            self.index_path = os.path.join(embeddings_dir, 'index.faiss')
-            self.docstore_path = os.path.join(embeddings_dir, 'docstore.json')
+            
+            # Clean up old files first
+            for item in os.listdir(embeddings_dir):
+                item_path = os.path.join(embeddings_dir, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
             
             # Create new empty FAISS index
             dimension = 384  # GTE-small embedding dimension
             index = faiss.IndexFlatIP(dimension)
             
-            # Create new FAISS vector store and save it
+            # Create new FAISS vector store
             self.vector_store = FAISS(
                 embedding_function=self.embedding_function,
                 index=index,
                 docstore=InMemoryDocstore({}),
                 index_to_docstore_id={}
             )
+            
+            # Save the empty index
             self.vector_store.save_local(embeddings_dir)
+            
+            # Verify the index was saved
+            if not os.path.exists(os.path.join(embeddings_dir, 'index.faiss')):
+                raise ValueError("Failed to save FAISS index")
             
             logger.info("Vector store reset successfully")
         except Exception as e:
@@ -181,84 +245,6 @@ class EmbeddingGenerator:
             logger.error(f"Error generating embedding: {str(e)}")
             raise
             
-    def process_documents(self, documents: List[Document]) -> List[Document]:
-        """Process documents to add embeddings to metadata."""
-        try:
-            processed_docs = []
-            # Generate embeddings for each document
-            for doc in documents:
-                embedding = self.generate_embedding(doc.page_content)
-                doc.metadata['embedding'] = embedding.tolist()  # Convert numpy array to list for JSON serialization
-                processed_docs.append(doc)
-            return processed_docs
-        except Exception as e:
-            logger.error(f"Error processing documents: {str(e)}")
-            raise
-            
-        except Exception as e:
-            logger.error(f"Error generating embedding: {str(e)}")
-            raise
-            
-    def save_embeddings(self, documents: List[Document]) -> None:
-        """Save document embeddings to vector store and persist to disk."""
-        try:
-            # Add documents to vector store
-            self.vector_store.add_documents(documents)
-            
-            # Save the updated index to disk
-            embeddings_dir = os.path.join('data', 'embeddings')
-            self.vector_store.save_local(embeddings_dir)
-            
-            logger.info("Saved embeddings to vector store and persisted to disk")
-        except Exception as e:
-            logger.error(f"Error saving embeddings: {str(e)}")
-            raise
-            # Implementation remains the same
-            pass
-            
-    def save_embeddings(self, documents: List[Document]) -> None:
-        """Save document embeddings to vector store and persist to disk."""
-        try:
-            # Add documents to vector store
-            self.vector_store.add_documents(documents)
-            
-            # Save the updated index to disk
-            embeddings_dir = os.path.join('data', 'embeddings')
-            self.vector_store.save_local(embeddings_dir)
-            
-            logger.info("Saved embeddings to vector store and persisted to disk")
-        except Exception as e:
-            logger.error(f"Error saving embeddings: {str(e)}")
-            raise
-            # Tokenize the input text
-            inputs = self.tokenizer(
-                text,
-                return_tensors="pt",
-                truncation=True,
-                padding=True,
-                max_length=self.max_length
-            )
-            
-            # Move inputs to the same device as the model
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            
-            # Generate embeddings without computing gradients
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                # Extract the last hidden state
-                token_embeddings = outputs.last_hidden_state
-                
-                # Compute mean of token embeddings
-                embedding = token_embeddings.mean(dim=1)
-                
-            # Convert to numpy array and move to CPU if necessary
-            embedding_np = embedding.cpu().numpy()
-            
-            return embedding_np[0]  # Return the first (and only) embedding
-            
-        except Exception as e:
-            logger.error(f"Error generating embedding: {str(e)}")
-            raise
 
     def generate_embeddings_batch(
         self,

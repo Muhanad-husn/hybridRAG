@@ -3,7 +3,8 @@ import yaml
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from langchain.schema import Document
-from flashrank import Ranker, RerankRequest
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
 from ..processing_layer.embedding_generator import EmbeddingGenerator
 from ..processing_layer.graph_constructor import GraphConstructor
 import logging
@@ -20,7 +21,28 @@ class HybridRetrieval:
         """Initialize the hybrid retrieval system."""
         self.config = self._load_config(config_path)
         self.ranker = self._initialize_ranker()
+        
+        # Initialize embedding generator
+        logger.info("Initializing embedding generator...")
         self.embedding_generator = EmbeddingGenerator(config_path)
+        
+        # Verify vector store is initialized
+        embeddings_dir = os.path.join('data', 'embeddings')
+        index_path = os.path.join(embeddings_dir, 'index.faiss')
+        if os.path.exists(index_path):
+            logger.info(f"Found existing FAISS index at {index_path}")
+            # Test if vector store is working
+            try:
+                test_query = "test query"
+                test_results = self.embedding_generator.vector_store.similarity_search(test_query, k=1)
+                if test_results:
+                    logger.info("Vector store verified successfully")
+                else:
+                    logger.warning("Vector store test returned no results")
+            except Exception as e:
+                logger.error(f"Error testing vector store: {str(e)}\n{traceback.format_exc()}")
+        else:
+            logger.warning(f"No FAISS index found at {index_path}")
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
@@ -31,21 +53,23 @@ class HybridRetrieval:
             logger.error(f"Error loading config: {str(e)}")
             raise
 
-    def _initialize_ranker(self) -> Ranker:
-        """Initialize the reranking model."""
+    def _initialize_ranker(self):
+        """Initialize the reranking model using transformers."""
         try:
-            # Use absolute path for cache directory
-            cache_dir = os.path.join(os.getcwd(), "data", "cache", "reranker")
-            os.makedirs(cache_dir, exist_ok=True)
-            
-            # Initialize ranker with model from config
-            model_name = self.config["ranking"].get("model_name", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+            model_name = self.config["ranking"]["model_name"]
             logger.info(f"Initializing ranker with model: {model_name}")
             
-            return Ranker(
-                model_name=model_name,
-                cache_dir=cache_dir
-            )
+            # Initialize tokenizer and model
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
+            
+            # Move model to GPU if available
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.model = self.model.to(self.device)
+            self.model.eval()
+            
+            logger.info(f"Model loaded successfully on {self.device}")
+            return self.model
         except Exception as e:
             logger.error(f"Error initializing ranker: {str(e)}")
             raise
@@ -82,13 +106,46 @@ class HybridRetrieval:
             List of (document, score) tuples
         """
         try:
-            # Use Chroma's similarity search
-            results = self.embedding_generator.vector_store.similarity_search_with_score(
-                query,
-                k=k
-            )
-            
-            return [(doc, float(score)) for doc, score in results]
+            # Use vector store's similarity search
+            try:
+                # First try similarity_search_with_score
+                results = self.embedding_generator.vector_store.similarity_search_with_score(
+                    query,
+                    k=k
+                )
+                
+                if not results:
+                    logger.warning("No results found with similarity_search_with_score, trying similarity_search")
+                    # Try regular similarity_search as fallback
+                    docs = self.embedding_generator.vector_store.similarity_search(
+                        query,
+                        k=k
+                    )
+                    if docs:
+                        # Assign default scores if no scores available
+                        results = [(doc, 0.9) for doc in docs]
+                    else:
+                        logger.warning("No results found in vector store")
+                        return []
+                
+                logger.info(f"Found {len(results)} results in vector store")
+                # Ensure proper formatting of results
+                formatted_results = []
+                for doc, score in results:
+                    if hasattr(doc, 'page_content'):
+                        formatted_results.append((doc, float(score)))
+                    else:
+                        # Create Document object if needed
+                        formatted_doc = Document(
+                            page_content=str(doc),
+                            metadata={'source': 'unknown'}
+                        )
+                        formatted_results.append((formatted_doc, float(score)))
+                return formatted_results
+                
+            except Exception as e:
+                logger.error(f"Error in vector store search: {str(e)}\n{traceback.format_exc()}")
+                return []
             
         except Exception as e:
             logger.error(f"Error in similarity search: {str(e)}")
@@ -355,48 +412,44 @@ class HybridRetrieval:
                     }
                 passages.append(passage)
             
-            # Convert passages to the format expected by FlashRank
-            formatted_passages = []
-            for idx, result in enumerate(results, start=1):
-                if isinstance(result, tuple):  # Handle (doc, score) format
-                    doc, score = result
-                    formatted_passages.append({
-                        "id": idx,
-                        "text": doc.page_content,
-                        "meta": doc.metadata
-                    })
-                elif 'node' in result:  # Handle graph search results
-                    node = result['node']
-                    props = node.get('properties', {})
-                    if isinstance(props, str):
-                        try:
-                            import json
-                            props = json.loads(props)
-                        except:
-                            props = {'text': props}
-                    
-                    # Create readable text from properties
-                    text_parts = [
-                        f"Type: {node.get('type', 'unknown')}",
-                        *[f"{k}: {v}" for k, v in props.items() if k != 'source']
-                    ]
-                    formatted_passages.append({
-                        "id": idx,
-                        "text": "\n".join(text_parts),
-                        "meta": {"id": node.get('id', 'unknown')}
-                    })
-                else:  # Handle dictionary format
-                    formatted_passages.append({
-                        "id": idx,
-                        "text": result.get("text", ""),
-                        "meta": result.get("meta", {})
-                    })
+            if not passages:  # Handle empty results
+                return []
 
-            # Create rerank request
-            rerank_request = RerankRequest(query=query, passages=formatted_passages)
-            
-            # Perform reranking
-            reranked_results = self.ranker.rerank(rerank_request)
+            if len(passages) == 1:  # Handle single result
+                return [{
+                    "id": passages[0]["id"],
+                    "text": passages[0]["text"],
+                    "meta": passages[0]["meta"],
+                    "score": 1.0
+                }]
+
+            # Prepare inputs for the model
+            pairs = [[query, passage["text"]] for passage in passages]
+
+            # Tokenize all pairs
+            features = self.tokenizer(
+                pairs,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+                max_length=512
+            ).to(self.device)
+
+            # Get scores from model
+            with torch.no_grad():
+                outputs = self.model(**features)
+                scores = torch.nn.functional.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
+
+            # Create reranked results
+            reranked_results = [
+                {
+                    "id": passage["id"],
+                    "text": passage["text"],
+                    "meta": passage["meta"],
+                    "score": float(score)
+                }
+                for passage, score in zip(passages, scores)
+            ]
             
             # Sort by score
             sorted_results = sorted(
@@ -409,7 +462,21 @@ class HybridRetrieval:
             if top_k:
                 sorted_results = sorted_results[:top_k]
             
-            return sorted_results
+            # Convert to standard format with both old and new fields
+            formatted_results = []
+            for result in sorted_results:
+                formatted_result = {
+                    "text": result["text"],
+                    "meta": result["meta"],
+                    "score": float(result["score"]),
+                    # Add page_content for compatibility
+                    "page_content": result["text"],
+                    # Add metadata for compatibility
+                    "metadata": {"source": result["meta"]}
+                }
+                formatted_results.append(formatted_result)
+            
+            return formatted_results
             
         except Exception as e:
             logger.error(f"Error in reranking: {str(e)}")
@@ -442,18 +509,39 @@ class HybridRetrieval:
         combined_results = []
         
         try:
-            # First get dense retrieval results
-            logger.info(f"Processing dense retrieval results in {mode} mode")
-            embedding_results = self.similarity_search(query, k=top_k)
-            
-            if embedding_results:
-                for doc, score in embedding_results:
-                    combined_results.append({
-                        'text': doc.page_content,
-                        'meta': doc.metadata.get('source', 'unknown'),
-                        'score': float(score)
-                    })
-                logger.info(f"Added {len(embedding_results)} dense retrieval results")
+            try:
+                # First get dense retrieval results
+                logger.info(f"Processing dense retrieval results in {mode} mode")
+                embedding_results = self.similarity_search(query, k=top_k)
+                
+                if embedding_results:
+                    for doc, score in embedding_results:
+                        # Ensure we have valid content
+                        if not hasattr(doc, 'page_content') or not doc.page_content.strip():
+                            logger.warning(f"Skipping invalid document: {doc}")
+                            continue
+                            
+                        # Format the result with both old and new fields
+                        result = {
+                            'text': doc.page_content,
+                            'meta': doc.metadata.get('source', 'unknown'),
+                            'score': float(score),
+                            'page_content': doc.page_content,
+                            'metadata': doc.metadata
+                        }
+                        combined_results.append(result)
+                    
+                    if combined_results:
+                        logger.info(f"Added {len(combined_results)} valid dense retrieval results")
+                    else:
+                        logger.warning("No valid results after filtering")
+                        return []
+                else:
+                    logger.warning("No dense retrieval results found")
+                    return []  # Return empty list if no results found
+            except Exception as e:
+                logger.error(f"Error in dense retrieval: {str(e)}\n{traceback.format_exc()}")
+                return []  # Return empty list on error
 
             # Then add graph-based results if in hybrid mode
             if mode == "Hybrid" and graph is not None:
