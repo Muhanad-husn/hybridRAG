@@ -373,7 +373,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     query: query,
-                    mode: 'hybrid'
+                    mode: 'hybrid',
+                    translate: document.getElementById('translateToggle').checked
                 })
             });
 
@@ -422,20 +423,37 @@ document.addEventListener('DOMContentLoaded', function() {
             englishContent.textContent = data.answer;
         }
 
-        // Display Arabic response
+        // Handle Arabic tab visibility and content
+        const arabicTab = document.querySelector('.tab-btn[data-type="ar"]');
         const arabicContent = document.querySelector('#arabicResponse .response-content');
+        const translateEnabled = document.getElementById('translateToggle').checked;
+
+        // Show/hide Arabic tab based on translation setting
+        arabicTab.style.display = translateEnabled ? 'block' : 'none';
+        
         if (arabicContent) {
-            if (data.arabic_answer) {
+            if (translateEnabled && data.arabic_answer) {
                 arabicContent.textContent = data.arabic_answer;
                 arabicContent.dir = 'rtl';
                 arabicContent.style.textAlign = 'right';
                 arabicContent.style.fontFamily = "'Noto Naskh Arabic', Arial, sans-serif";
+                arabicContent.style.color = 'var(--text-primary)';
+            } else if (!translateEnabled) {
+                arabicContent.textContent = 'الترجمة العربية معطلة';
+                arabicContent.dir = 'rtl';
+                arabicContent.style.textAlign = 'right';
+                arabicContent.style.color = '#666';
             } else {
                 arabicContent.textContent = 'المحتوى العربي غير متوفر';
                 arabicContent.dir = 'rtl';
                 arabicContent.style.textAlign = 'right';
                 arabicContent.style.color = '#666';
             }
+        }
+
+        // Switch to English tab if Arabic is disabled and we're on Arabic tab
+        if (!translateEnabled && document.querySelector('.tab-btn[data-type="ar"]').classList.contains('active')) {
+            switchTab('en');
         }
 
         // Setup save buttons with file information

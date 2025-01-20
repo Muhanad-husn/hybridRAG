@@ -192,6 +192,7 @@ def search():
     try:
         data = request.get_json()
         query = data.get('query', '').strip()
+        translate_enabled = data.get('translate', True)  # Default to True for backward compatibility
         
         if not query:
             logger.warning("Empty search query received")
@@ -210,11 +211,11 @@ def search():
             logger.info(f"Processing Arabic query: {query}")
             # Translate query to English for internal processing only
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
-            # Pass original query without translation
-            result = run_hybrid_search(english_query, original_lang='ar', original_query=query)
+            # Pass original query without translation and respect translation preference
+            result = run_hybrid_search(english_query, original_lang='ar', original_query=query, translate=translate_enabled)
         else:
             logger.info(f"Processing English query: {query}")
-            result = run_hybrid_search(query)
+            result = run_hybrid_search(query, translate=translate_enabled)
 
         # Generate HTML content without saving
         if result.get('answer'):
@@ -228,7 +229,8 @@ def search():
             result['english_html'] = english_result['html']
             result['english_filename'] = english_result['filename']
 
-        if result.get('arabic_answer'):
+        # Only include Arabic translation if translation is enabled
+        if translate_enabled and result.get('arabic_answer'):
             arabic_result = create_result_html(
                 content=result['arabic_answer'],
                 query=result.get('original_query', query),

@@ -73,6 +73,30 @@ header h1 {
     margin-bottom: 30px;
 }
 
+.search-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.translate-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.translate-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.toggle-label {
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
 .input-group {
     display: flex;
     gap: 15px;

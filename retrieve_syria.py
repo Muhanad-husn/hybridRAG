@@ -35,7 +35,7 @@ def get_translator():
         _translator = Translator()
     return _translator
 
-def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None) -> Dict[str, Any]:
+def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None, translate: bool = True) -> Dict[str, Any]:
     """
     Run hybrid search with both dense retrieval and graph analysis,
     then process results with LLM to generate an answer.
@@ -226,9 +226,9 @@ Please provide a clear and accurate answer based solely on the information provi
         # Always keep English answer
         answer = english_answer
 
-        # Always translate to Arabic
+        # Only translate to Arabic if translation is enabled
         arabic_answer = None
-        if english_answer:
+        if english_answer and translate:
             try:
                 translator = get_translator()
                 logger.info("Translating LLM response to Arabic...")
@@ -243,6 +243,8 @@ Please provide a clear and accurate answer based solely on the information provi
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 # Don't fallback to English for Arabic answer
                 arabic_answer = None
+        elif english_answer and not translate:
+            logger.info("Skipping Arabic translation as per user preference")
         
         # Calculate UI-optimized confidence score
         confidence = 0
