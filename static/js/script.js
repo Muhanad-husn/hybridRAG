@@ -374,7 +374,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     query: query,
                     mode: 'hybrid',
-                    translate: document.getElementById('translateToggle').checked
+                    translate: document.getElementById('translateToggle').checked,
+                    rerank_count: Math.min(Math.max(parseInt(document.getElementById('resultsCount').value) || 15, 5), 80)
                 })
             });
 

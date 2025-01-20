@@ -35,7 +35,8 @@ def get_translator():
         _translator = Translator()
     return _translator
 
-def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None, translate: bool = True) -> Dict[str, Any]:
+def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None,
+                     translate: bool = True, rerank_count: int = 15) -> Dict[str, Any]:
     """
     Run hybrid search with both dense retrieval and graph analysis,
     then process results with LLM to generate an answer.
@@ -99,7 +100,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             reranked_vector_results = retrieval_system.rerank_results(
                 query=query,
                 results=vector_results,
-                top_k=15  # Keep top 15 after reranking
+                top_k=rerank_count  # Use dynamic rerank count
             )
             
             if not reranked_vector_results:
@@ -114,12 +115,13 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             
             logger.info(f"Reranked to {len(reranked_vector_results)} results")
             
-            # Get graph results
+            # Get graph results - keep graph results proportional to rerank_count
+            graph_k = max(3, min(rerank_count // 3, 10))  # Scale graph results with rerank_count, min 3, max 10
             graph_results = retrieval_system.hybrid_search(
                 query=query,
                 query_embedding=query_embedding,
                 graph=graph_constructor,
-                top_k=5,     # Allow for multiple graph relationships
+                top_k=graph_k,
                 mode="Hybrid"  # Get graph results
             )
             
@@ -127,7 +129,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             graph_analysis = [r for r in graph_results if r.get('meta') == 'graph_relationships']
             
             # Calculate how many graph results we can include while respecting the total limit
-            remaining_slots = 15 - len(reranked_vector_results)  # User's configured limit minus vector results
+            remaining_slots = rerank_count - len(reranked_vector_results)  # User's configured limit minus vector results
             if remaining_slots > 0 and graph_analysis:
                 # Add graph results up to the remaining limit
                 graph_analysis = graph_analysis[:remaining_slots]
@@ -246,19 +248,25 @@ Please provide a clear and accurate answer based solely on the information provi
         elif english_answer and not translate:
             logger.info("Skipping Arabic translation as per user preference")
         
-        # Calculate UI-optimized confidence score
+        # Calculate UI-optimized confidence score with dynamic scaling
         confidence = 0
         if results:
             # Get base probabilities (0-1 range)
-            relevance_scores = [float(r.get('score', 0.0)) for r in results[:5]]
+            # Scale number of scores to consider based on rerank_count
+            scores_to_consider = max(5, min(rerank_count // 3, 15))
+            relevance_scores = [float(r.get('score', 0.0)) for r in results[:scores_to_consider]]
             avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0
             relevance_prob = avg_relevance
             
+            # Scale source count expectation with rerank_count
+            expected_sources = max(5, min(rerank_count // 4, 20))
             source_count = len(sources)
-            source_prob = min(source_count / 5, 1.0)  # Normalized by expected sources (5)
+            source_prob = min(source_count / expected_sources, 1.0)
             
+            # Scale expected answer length with rerank_count
+            expected_length = min(1000 * (rerank_count / 15), 3000)  # Scale up to 3000 chars max
             answer_length = len(english_answer) if english_answer else 0
-            length_prob = min(answer_length / 1000, 1.0)  # Normalized by expected length (1000)
+            length_prob = min(answer_length / expected_length, 1.0)
             
             # Calculate raw multiplicative confidence
             raw_confidence = relevance_prob * source_prob * length_prob
@@ -268,6 +276,12 @@ Please provide a clear and accurate answer based solely on the information provi
             MAX_CONFIDENCE = 95
             RANGE = MAX_CONFIDENCE - MIN_CONFIDENCE
             confidence = int(MIN_CONFIDENCE + (raw_confidence * RANGE))
+            
+            # Log detailed calculation with dynamic scaling info
+            logger.info(f"Dynamic confidence calculation:")
+            logger.info(f"- Using {scores_to_consider} scores for relevance calculation")
+            logger.info(f"- Expected sources scaled to {expected_sources}")
+            logger.info(f"- Expected length scaled to {expected_length} characters")
             
             # Log detailed calculation
             logger.info(f"Confidence calculation:")

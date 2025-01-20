@@ -207,15 +207,20 @@ def search():
         # Detect if query is Arabic
         is_arabic = translator.is_arabic(query)
         
+        # Get rerank count from request, default to 15 if not provided or invalid
+        rerank_count = max(min(int(data.get('rerank_count', 15)), 80), 5)
+        logger.info(f"Using rerank count: {rerank_count}")
+
         if is_arabic:
             logger.info(f"Processing Arabic query: {query}")
             # Translate query to English for internal processing only
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
             # Pass original query without translation and respect translation preference
-            result = run_hybrid_search(english_query, original_lang='ar', original_query=query, translate=translate_enabled)
+            result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
+                                     translate=translate_enabled, rerank_count=rerank_count)
         else:
             logger.info(f"Processing English query: {query}")
-            result = run_hybrid_search(query, translate=translate_enabled)
+            result = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count)
 
         # Generate HTML content without saving
         if result.get('answer'):
