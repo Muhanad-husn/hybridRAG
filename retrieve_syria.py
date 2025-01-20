@@ -184,6 +184,8 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             for match in matches:
                 source = match.strip()
                 if source != 'graph_relationships':  # Exclude graph relationships
+                    # Remove file extension if present
+                    source = os.path.splitext(source)[0]
                     sources.add(source)
         sources = sorted(list(sources))
         

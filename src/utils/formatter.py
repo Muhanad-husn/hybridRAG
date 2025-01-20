@@ -46,10 +46,15 @@ class ResultFormatter:
         source = re.sub(r'\.txt\.txt$', '.txt', source)
         # Get just the filename without path
         return os.path.basename(source)
+
+    def _clean_line_numbers(self, text: str) -> str:
+        """Remove line numbers from the beginning of lines."""
+        return re.sub(r'^\d+\s*\|\s*', '', text, flags=re.MULTILINE)
         
     def format_document_result(self, doc: Any, score: float) -> str:
         """Format document search results."""
-        content = self._truncate_text(doc.page_content.strip())
+        content = self._clean_line_numbers(doc.page_content.strip())
+        content = self._truncate_text(content)
         source = self._clean_source_path(doc.metadata.get('source', 'unknown'))
         
         sections = [
@@ -91,9 +96,10 @@ class ResultFormatter:
         if not text and 'page_content' in result:
             text = result.get('page_content', '')
         
-        # Clean and truncate text
+        # Clean, remove line numbers, and truncate text
         if isinstance(text, str):
-            text = self._truncate_text(text.strip())
+            text = self._clean_line_numbers(text.strip())
+            text = self._truncate_text(text)
         else:
             return ""  # Return empty string if no valid text found
             
