@@ -65,18 +65,17 @@ class HybridRetrieval:
 
     def build_index(self, documents: List[Document]) -> None:
         """
-        Add documents to the Chroma vector store.
+        Add documents to the vector store.
         
         Args:
             documents: List of documents with embeddings in metadata
         """
         try:
-            logger.info(f"Adding {len(documents)} documents to vector store")
-            self.embedding_generator.save_embeddings(documents)
-            logger.info("Documents successfully added to vector store")
+            # Skip building index since save_embeddings already handles this
+            logger.info("Skipping index build - already handled by save_embeddings")
             
         except Exception as e:
-            logger.error(f"Error building index: {str(e)}")
+            logger.error(f"Error in build_index: {str(e)}")
             raise
 
     def similarity_search(
@@ -85,7 +84,7 @@ class HybridRetrieval:
         k: int = 100
     ) -> List[Tuple[Document, float]]:
         """
-        Perform similarity search using Chroma vector store.
+        Perform similarity search using FAISS vector store with inner product similarity.
         
         Args:
             query: Query text
@@ -95,9 +94,53 @@ class HybridRetrieval:
             List of (document, score) tuples
         """
         try:
-            # Use vector store's similarity search
+            # Get raw index for direct search if available
+            raw_index = getattr(self.embedding_generator, 'raw_index', None)
+            
+            if raw_index is not None:
+                try:
+                    # Generate query embedding
+                    query_embedding = self.embedding_generator.generate_embedding(query)
+                    
+                    # Normalize query vector for inner product search
+                    query_embedding = query_embedding / np.linalg.norm(query_embedding)
+                    
+                    # Perform search with raw index
+                    scores, indices = raw_index.search(
+                        query_embedding.reshape(1, -1).astype('float32'),
+                        k
+                    )
+                    
+                    # Log search statistics
+                    logger.info(f"Raw search found {len(indices[0])} results")
+                    logger.info(f"Score range: {scores[0].min():.4f} to {scores[0].max():.4f}")
+                    
+                    # Get documents from vector store
+                    docs = []
+                    total_docs = len(self.embedding_generator.vector_store.docstore._dict)
+                    for idx, score in zip(indices[0], scores[0]):
+                        if idx != -1 and idx < total_docs:  # Valid index within bounds
+                            try:
+                                doc_id = str(idx)
+                                if doc_id in self.embedding_generator.vector_store.docstore._dict:
+                                    doc = self.embedding_generator.vector_store.docstore._dict[doc_id]
+                                    docs.append((doc, float(score)))
+                            except KeyError:
+                                logger.warning(f"Document not found for index {idx}")
+                                continue
+                    
+                    if docs:
+                        logger.info(f"Retrieved {len(docs)} valid documents")
+                        return docs
+                    else:
+                        logger.warning("No valid documents found in raw search")
+                
+                except Exception as e:
+                    logger.error(f"Error in raw index search: {str(e)}")
+                    # Fall back to standard search
+            
+            # Standard vector store search as fallback
             try:
-                # First try similarity_search_with_score
                 results = self.embedding_generator.vector_store.similarity_search_with_score(
                     query,
                     k=k
@@ -105,26 +148,24 @@ class HybridRetrieval:
                 
                 if not results:
                     logger.warning("No results found with similarity_search_with_score, trying similarity_search")
-                    # Try regular similarity_search as fallback
                     docs = self.embedding_generator.vector_store.similarity_search(
                         query,
                         k=k
                     )
                     if docs:
-                        # Assign default scores if no scores available
                         results = [(doc, 0.9) for doc in docs]
                     else:
                         logger.warning("No results found in vector store")
                         return []
                 
                 logger.info(f"Found {len(results)} results in vector store")
-                # Ensure proper formatting of results
+                
+                # Format results
                 formatted_results = []
                 for doc, score in results:
                     if hasattr(doc, 'page_content'):
                         formatted_results.append((doc, float(score)))
                     else:
-                        # Create Document object if needed
                         formatted_doc = Document(
                             page_content=str(doc),
                             metadata={'source': 'unknown'}

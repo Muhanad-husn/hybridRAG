@@ -95,12 +95,35 @@ class EmbeddingGenerator:
 
             # Load existing index if it exists
             if os.path.exists(index_path):
+                # Load and verify the index type
+                index = faiss.read_index(index_path)
+                logger.info(f"Loaded FAISS index type: {type(index).__name__}")
+                
+                # Verify it's an IndexFlatIP
+                if not isinstance(index, faiss.IndexFlatIP):
+                    logger.warning(f"Expected IndexFlatIP but found {type(index).__name__}")
+                    # Convert to IndexFlatIP if needed
+                    dimension = index.d
+                    new_index = faiss.IndexFlatIP(dimension)
+                    if index.ntotal > 0:  # If index has vectors
+                        new_index.add(faiss.vector_to_array(index))
+                    index = new_index
+                    logger.info("Converted index to IndexFlatIP")
+                
+                # Get index stats
+                logger.info(f"Index contains {index.ntotal} vectors of dimension {index.d}")
+                
+                # Load the vector store with verified index
                 self.vector_store = FAISS.load_local(
                     self.embeddings_dir,
                     self.embedding_function,
                     allow_dangerous_deserialization=True
                 )
                 logger.info("Loaded existing vector store")
+                
+                # Store the raw index for direct access if needed
+                self.raw_index = index
+                
             else:
                 # Create new empty vector store
                 self._create_new_vector_store()
@@ -158,17 +181,18 @@ class EmbeddingGenerator:
             
             # Create new empty FAISS index
             dimension = 384  # GTE-small embedding dimension
-            index = faiss.IndexFlatIP(dimension)
+            self.raw_index = faiss.IndexFlatIP(dimension)
             
             # Create new FAISS vector store
             self.vector_store = FAISS(
                 embedding_function=self.embedding_function,
-                index=index,
+                index=self.raw_index,
                 docstore=InMemoryDocstore({}),
                 index_to_docstore_id={}
             )
             
-            # Save the empty index
+            # Save the empty index and store
+            faiss.write_index(self.raw_index, os.path.join(self.embeddings_dir, 'index.faiss'))
             self.vector_store.save_local(self.embeddings_dir)
             
             # Verify the index was saved
@@ -176,6 +200,7 @@ class EmbeddingGenerator:
                 raise ValueError("Failed to save FAISS index")
             
             logger.info("Vector store reset successfully")
+            logger.info(f"Created empty index with dimension {dimension}")
         except Exception as e:
             logger.error(f"Error resetting vector store: {str(e)}")
             raise
@@ -318,7 +343,10 @@ class EmbeddingGenerator:
             texts = []
             metadatas = []
             ids = []
+            embeddings = []
             
+            # Generate embeddings in batch
+            logger.info(f"Generating embeddings for {len(documents)} documents")
             for idx, doc in enumerate(documents):
                 texts.append(doc.page_content)
                 
@@ -332,15 +360,49 @@ class EmbeddingGenerator:
                 # Store all metadata except the embedding itself
                 meta = {k: v for k, v in doc.metadata.items() if k != 'embedding'}
                 metadatas.append(meta)
+                
+                # Generate embedding
+                embedding = self.generate_embedding(doc.page_content)
+                embeddings.append(embedding)
             
-            # Add documents to vector store
-            self.vector_store.add_texts(
-                texts=texts,
-                metadatas=metadatas,
-                ids=ids
+            # Add embeddings directly to FAISS index
+            if hasattr(self, 'raw_index'):
+                embeddings_array = np.array(embeddings).astype('float32')
+                self.raw_index.add(embeddings_array)
+                logger.info(f"Added {len(embeddings)} vectors to FAISS index")
+            
+            # Reset index and store before adding new embeddings
+            dimension = 384  # GTE-small embedding dimension
+            self.raw_index = faiss.IndexFlatIP(dimension)
+            self.vector_store = FAISS(
+                embedding_function=self.embedding_function,
+                index=self.raw_index,
+                docstore=InMemoryDocstore({}),
+                index_to_docstore_id={}
             )
             
-            logger.info(f"Saved {len(documents)} embeddings to vector store")
+            # Add embeddings to fresh index
+            embeddings_array = np.array(embeddings).astype('float32')
+            self.raw_index.add(embeddings_array)
+            logger.info(f"Added {len(embeddings)} vectors to FAISS index")
+                
+            # Reset document store and index mapping
+            self.vector_store.docstore._dict = {}
+            self.vector_store.index_to_docstore_id = {}
+            
+            # Add documents with sequential IDs starting from 0
+            for i, (text, metadata) in enumerate(zip(texts, metadatas)):
+                self.vector_store.docstore._dict[str(i)] = Document(
+                    page_content=text,
+                    metadata=metadata
+                )
+                self.vector_store.index_to_docstore_id[i] = str(i)
+                
+                # Save the updated index and store
+                faiss.write_index(self.raw_index, os.path.join(self.embeddings_dir, 'index.faiss'))
+                self.vector_store.save_local(self.embeddings_dir)
+                logger.info(f"Saved {len(documents)} embeddings to vector store")
+                logger.info(f"Index now contains {self.raw_index.ntotal} vectors")
             
         except Exception as e:
             logger.error(f"Error saving embeddings: {str(e)}")
