@@ -243,31 +243,36 @@ Please provide a clear and accurate answer based solely on the information provi
                 # Don't fallback to English for Arabic answer
                 arabic_answer = None
         
-        # Calculate confidence score based on multiple factors
+        # Calculate UI-optimized confidence score
         confidence = 0
         if results:
-            # Factor 1: Relevance scores from search results (30%)
+            # Get base probabilities (0-1 range)
             relevance_scores = [float(r.get('score', 0.0)) for r in results[:5]]
             avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0
-            relevance_confidence = min(avg_relevance * 30, 30)  # Max 30% from relevance
-
-            # Factor 2: Number of sources (30%)
-            source_count = len(sources)
-            source_confidence = min(source_count * 6, 30)  # 6% per source, max 30%
-
-            # Factor 3: Answer completeness (40%)
-            answer_length = len(english_answer) if english_answer else 0
-            length_confidence = min(answer_length / 1000 * 40, 40)  # Max 40% for 1000+ chars
-
-            # Combine factors
-            confidence = int(relevance_confidence + source_confidence + length_confidence)
+            relevance_prob = avg_relevance
             
-            # Log confidence calculation
+            source_count = len(sources)
+            source_prob = min(source_count / 5, 1.0)  # Normalized by expected sources (5)
+            
+            answer_length = len(english_answer) if english_answer else 0
+            length_prob = min(answer_length / 1000, 1.0)  # Normalized by expected length (1000)
+            
+            # Calculate raw multiplicative confidence
+            raw_confidence = relevance_prob * source_prob * length_prob
+            
+            # Scale confidence for UI display (65-95 range)
+            MIN_CONFIDENCE = 65
+            MAX_CONFIDENCE = 95
+            RANGE = MAX_CONFIDENCE - MIN_CONFIDENCE
+            confidence = int(MIN_CONFIDENCE + (raw_confidence * RANGE))
+            
+            # Log detailed calculation
             logger.info(f"Confidence calculation:")
-            logger.info(f"- Relevance confidence: {relevance_confidence:.1f}%")
-            logger.info(f"- Source confidence: {source_confidence:.1f}%")
-            logger.info(f"- Length confidence: {length_confidence:.1f}%")
-            logger.info(f"- Total confidence: {confidence}%")
+            logger.info(f"- Relevance score: {relevance_prob:.3f} ({relevance_prob*100:.1f}%)")
+            logger.info(f"- Source coverage: {source_prob:.3f} ({source_prob*100:.1f}%)")
+            logger.info(f"- Answer completeness: {length_prob:.3f} ({length_prob*100:.1f}%)")
+            logger.info(f"- Raw confidence: {raw_confidence:.3f} ({raw_confidence*100:.1f}%)")
+            logger.info(f"- UI-scaled confidence: {confidence}%")
 
         # Extract vector data from results
         vector_data = []
