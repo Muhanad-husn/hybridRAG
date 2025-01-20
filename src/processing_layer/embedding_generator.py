@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import faiss
 import shutil
+import traceback
 from typing import List, Dict, Union, Optional
 from transformers import AutoTokenizer, AutoModel
 from langchain.schema import Document
@@ -94,7 +95,7 @@ class EmbeddingGenerator:
 
             # Try to load and verify existing index
             if os.path.exists(index_path) and os.path.getsize(index_path) > 0:
-                if self._verify_and_repair_vector_store(embeddings_dir):
+                if self._verify_and_repair_vector_store(self.embeddings_dir):
                     return
                     
             # Create new empty index if verification failed or no index exists
