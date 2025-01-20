@@ -41,7 +41,7 @@ class OpenRouterClient(BaseModel):
         prompt: str,
         system_prompt: Optional[str] = None,
         temperature: float = 0.0,
-        max_tokens: int = 1000,
+        max_tokens: int = 6000,
         top_p: float = 0.95,
     ) -> Dict[str, Any]:
         """
