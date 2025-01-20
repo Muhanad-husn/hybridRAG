@@ -438,7 +438,18 @@ class HybridRetrieval:
             # Get scores from model
             with torch.no_grad():
                 outputs = self.model(**features)
-                scores = torch.nn.functional.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
+                # Handle both single and batch predictions
+                logits = outputs.logits
+                if logits.dim() == 1:
+                    # Single prediction case - reshape to [1, num_classes]
+                    logits = logits.unsqueeze(0)
+                scores = torch.nn.functional.softmax(logits, dim=1)
+                # Ensure we have the right dimension before indexing
+                if scores.shape[1] > 1:
+                    scores = scores[:, 1]
+                else:
+                    scores = scores[:, 0]
+                scores = scores.cpu().numpy()
 
             # Create reranked results
             reranked_results = [
