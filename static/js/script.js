@@ -98,8 +98,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadSearchHistory();
             } else if (viewName === 'saved') {
                 loadSavedResults();
-            } else if (viewName === 'tutorial') {
-                loadTutorial();
             }
         });
     });
@@ -198,40 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (savedResultsGrid) {
                 savedResultsGrid.innerHTML = '<p>Error loading saved results.</p>';
             }
-        }
-    }
-
-    // Load tutorial content
-    function loadTutorial() {
-        updateOperationStatus('Loading tutorial content...');
-        const tutorialSteps = document.querySelector('.tutorial-steps');
-        const tutorialExamples = document.querySelector('.tutorial-examples');
-        
-        if (tutorialSteps && tutorialExamples) {
-            tutorialSteps.innerHTML = `
-                <div class="tutorial-step">
-                    <h3>1. Enter Your Query</h3>
-                    <p>Type your question or search query in English or Arabic.</p>
-                </div>
-                <div class="tutorial-step">
-                    <h3>2. Review Results</h3>
-                    <p>View responses in both languages and check sources.</p>
-                </div>
-                <div class="tutorial-step">
-                    <h3>3. Save and Share</h3>
-                    <p>Download results as HTML files for future reference.</p>
-                </div>
-            `;
-
-            tutorialExamples.innerHTML = `
-                <h3>Example Queries:</h3>
-                <ul>
-                    <li>What are the main causes of the Syrian conflict?</li>
-                    <li>How has the conflict affected education in Syria?</li>
-                    <li>What humanitarian aid efforts are ongoing in Syria?</li>
-                </ul>
-            `;
-            updateOperationStatus('Tutorial content loaded');
         }
     }
 
