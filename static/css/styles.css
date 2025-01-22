@@ -81,8 +81,8 @@ header h1 {
 
 .results-count {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .results-count input[type="number"] {
@@ -93,7 +93,7 @@ header h1 {
     font-size: 0.9em;
 }
 
-.results-count span {
+.results-label {
     color: var(--text-primary);
     font-size: 0.9em;
 }
