@@ -25,9 +25,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const statusElement = document.getElementById('operationStatus');
                 const latestLog = data.logs[data.logs.length - 1];
                 
-                // Only update if it's a new message
-                if (latestLog !== statusElement.textContent) {
+                // Only update if it's a new message and different from last timestamp
+                if (latestLog !== lastLogTimestamp) {
+                    lastLogTimestamp = latestLog;
                     statusElement.textContent = latestLog;
+                    console.log('Log updated:', latestLog); // Debug log
                 }
             }
         } catch (error) {
@@ -61,10 +63,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                // Show loading indicator and start log polling
+                // Reset log state and start polling
+                lastLogTimestamp = '';
                 loadingIndicator.classList.remove('hidden');
                 startLogPolling();
                 processFilesBtn.disabled = true;
+                
+                // Clear any previous content
+                const statusElement = document.getElementById('operationStatus');
+                statusElement.textContent = 'Starting file processing...';
 
                 const response = await fetch('/process-documents', {
                     method: 'POST',
