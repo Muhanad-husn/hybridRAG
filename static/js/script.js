@@ -116,4 +116,67 @@ document.addEventListener('DOMContentLoaded', function() {
         errorDiv.classList.remove('hidden');
         resultsDiv.classList.add('hidden');
     }
+
+    // Search form handler
+    searchForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        errorDiv.classList.add('hidden');
+        resultsDiv.classList.add('hidden');
+        loadingIndicator.classList.remove('hidden');
+        searchButton.disabled = true;
+
+        try {
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    translate: document.getElementById('translateToggle').checked,
+                    rerank_count: Math.min(Math.max(parseInt(document.getElementById('resultsCount').value) || 15, 5), 80)
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                loadingIndicator.classList.add('hidden');
+                resultsDiv.classList.remove('hidden');
+                
+                // Display English response
+                const englishContent = document.querySelector('#englishResponse .response-content');
+                if (englishContent && data.answer) {
+                    englishContent.textContent = data.answer;
+                }
+
+                // Display Arabic response if available
+                const arabicContent = document.querySelector('#arabicResponse .response-content');
+                if (arabicContent && data.arabic_answer) {
+                    arabicContent.textContent = data.arabic_answer;
+                }
+
+                // Update sources
+                sourcesList.innerHTML = '';
+                if (data.sources) {
+                    data.sources.forEach(source => {
+                        const li = document.createElement('li');
+                        li.textContent = source;
+                        sourcesList.appendChild(li);
+                    });
+                }
+            } else {
+                throw new Error(data.error || 'An error occurred while processing your query');
+            }
+        } catch (error) {
+            console.error('[Search] Error:', error);
+            displayError(error.message);
+        } finally {
+            searchButton.disabled = false;
+        }
+    });
 });
