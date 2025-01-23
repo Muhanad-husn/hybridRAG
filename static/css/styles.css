@@ -169,6 +169,42 @@ textarea:focus {
     box-shadow: var(--shadow-sm);
 }
 
+/* Progress Bar */
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: var(--background-color);
+    border-radius: var(--border-radius);
+    margin: 15px 0;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--accent-color);
+    transition: width 0.3s ease-in-out;
+}
+
+/* Process Stats */
+.process-stats {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: var(--background-color);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--accent-color);
+}
+
+.process-stats h3 {
+    color: var(--accent-color);
+    margin-bottom: 10px;
+}
+
+.process-stats p {
+    margin: 5px 0;
+    color: var(--text-primary);
+}
+
 #operationStatus {
     color: var(--text-primary);
     font-size: 1.1em;

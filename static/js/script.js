@@ -479,15 +479,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const processFilesBtn = document.getElementById('processFilesBtn');
     if (processFilesBtn) {
         processFilesBtn.addEventListener('click', async () => {
+            // Show warning dialog
+            if (!confirm('Warning: Processing files will reset all existing data in both vector store and graph store. This action cannot be undone. Do you want to continue?')) {
+                return;
+            }
+
             try {
                 // Show loading state
                 loadingIndicator.classList.remove('hidden');
                 resultsDiv.classList.add('hidden');
                 errorDiv.classList.add('hidden');
                 processFilesBtn.disabled = true;
-                updateOperationStatus('Processing files...');
+
+                // Add progress bar if it doesn't exist
+                let progressBar = document.getElementById('processProgress');
+                if (!progressBar) {
+                    progressBar = document.createElement('div');
+                    progressBar.id = 'processProgress';
+                    progressBar.className = 'progress-bar';
+                    progressBar.innerHTML = '<div class="progress-fill"></div>';
+                    loadingIndicator.insertBefore(progressBar, document.getElementById('operationStatus'));
+                }
+
+                // Reset progress
+                const progressFill = progressBar.querySelector('.progress-fill');
+                progressFill.style.width = '0%';
                 
-                // Start polling for logs
+                updateOperationStatus('Initializing file processing...');
                 startLogPolling();
 
                 const response = await fetch('/process-documents', {
@@ -505,18 +523,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
 
                 if (response.ok) {
+                    progressFill.style.width = '100%';
                     updateOperationStatus('Files processed successfully!');
+
+                    // Show stats
+                    const statsDiv = document.createElement('div');
+                    statsDiv.className = 'process-stats';
+                    statsDiv.innerHTML = `
+                        <h3>Processing Complete</h3>
+                        <p>Documents in Vector Store: ${data.vector_count || 0}</p>
+                        <p>Graph Nodes: ${data.node_count || 0}</p>
+                        <p>Graph Edges: ${data.edge_count || 0}</p>
+                    `;
+                    loadingIndicator.appendChild(statsDiv);
+
+                    // Auto-navigate to search after 5 seconds
+                    setTimeout(() => {
+                        // Remove stats and progress bar
+                        statsDiv.remove();
+                        progressBar.remove();
+                        loadingIndicator.classList.add('hidden');
+                        // Navigate to search view
+                        document.querySelector('[data-view="search"]').click();
+                    }, 5000);
                 } else {
                     throw new Error(data.error || 'Failed to process files');
                 }
             } catch (error) {
                 console.error('[Process Files] Error:', error);
                 displayError(error.message);
-            } finally {
-                // Stop polling for logs
-                stopLogPolling();
                 processFilesBtn.disabled = false;
                 loadingIndicator.classList.add('hidden');
+            } finally {
+                stopLogPolling();
             }
         });
     }
