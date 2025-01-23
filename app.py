@@ -3,6 +3,7 @@ import sys
 import logging
 import io
 import os
+import json
 from datetime import datetime
 from collections import deque
 from retrieve_syria import run_hybrid_search
@@ -22,8 +23,51 @@ logger = get_logger(__name__)
 
 # Initialize translator and search history
 translator = Translator()
-search_history = []  # List to store unique search queries
-saved_results = []  # List to store saved result filenames
+
+def load_history_and_results():
+    try:
+        history_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'search_history.json')
+        results_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'saved_results.json')
+        
+        # Create history directory if it doesn't exist
+        os.makedirs(os.path.join(os.path.dirname(__file__), 'data', 'history'), exist_ok=True)
+        
+        # Load search history
+        if os.path.exists(history_file):
+            with open(history_file, 'r', encoding='utf-8') as f:
+                search_history = json.load(f)
+        else:
+            search_history = []
+            
+        # Load saved results
+        if os.path.exists(results_file):
+            with open(results_file, 'r', encoding='utf-8') as f:
+                saved_results = json.load(f)
+        else:
+            saved_results = []
+            
+        return search_history, saved_results
+    except Exception as e:
+        logger.error(f"Error loading history and results: {str(e)}")
+        return [], []
+
+def save_history_and_results(search_history, saved_results):
+    try:
+        history_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'search_history.json')
+        results_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'saved_results.json')
+        
+        # Save search history
+        with open(history_file, 'w', encoding='utf-8') as f:
+            json.dump(search_history, f, ensure_ascii=False, indent=2)
+            
+        # Save saved results
+        with open(results_file, 'w', encoding='utf-8') as f:
+            json.dump(saved_results, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error saving history and results: {str(e)}")
+
+# Initialize history and results from files
+search_history, saved_results = load_history_and_results()
 
 def log_request(f):
     @wraps(f)
@@ -137,6 +181,7 @@ def save_result():
             if len(saved_results) >= 25:
                 saved_results.pop()  # Remove oldest entry
             saved_results.insert(0, filename)  # Add new entry at the beginning
+            save_history_and_results(search_history, saved_results)  # Persist changes
             
         logger.info(f"Result saved: {filename}")
         return jsonify({
@@ -188,6 +233,7 @@ def search():
             if len(search_history) >= 25:
                 search_history.pop()  # Remove oldest entry
             search_history.insert(0, query)  # Add new query at the beginning
+            save_history_and_results(search_history, saved_results)  # Persist changes
 
         # Detect if query is Arabic
         is_arabic = translator.is_arabic(query)
