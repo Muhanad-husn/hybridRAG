@@ -9,12 +9,14 @@
 <body>
     <div class="container">
         <header>
-            <h1>GraphMind</h1>
+            <div class="header-top">
+                <h1>GraphMind</h1>
+                <button class="nav-btn" data-view="settings">Settings</button>
+            </div>
             <nav class="main-nav">
                 <button class="nav-btn active" data-view="search">Search</button>
                 <button class="nav-btn" data-view="history">Search History</button>
                 <button class="nav-btn" data-view="saved">Saved Results</button>
-                <button class="nav-btn" data-view="settings">Settings</button>
                 <div class="file-actions">
                     <input type="file" id="fileInput" multiple style="display: none">
                     <button id="loadFilesBtn" class="nav-btn">Load Files</button>
@@ -42,15 +44,22 @@
                             </div>
                         </div>
                         <div class="search-controls">
-                            <label class="results-count">
-                                <div class="results-label">Results:</div>
-                                <input type="number" id="resultsCount" min="5" max="80" value="15" title="Number of results (5-80)">
-                            </label>
-                            <label class="translate-toggle">
-                                <input type="checkbox" id="translateToggle" checked>
-                                <span class="toggle-label">العربية</span>
-                            </label>
-                            <button type="submit" id="searchButton">Search<br>بحث</button>
+                            <div class="search-options">
+                                <div class="search-options-group">
+                                    <label class="results-count">
+                                        <span class="results-label">Results:</span>
+                                        <input type="number" id="resultsCount" min="5" max="80" value="15" title="Number of results (5-80)">
+                                    </label>
+                                    <label class="translate-toggle">
+                                        <input type="checkbox" id="translateToggle" checked>
+                                        <span class="toggle-label">العربية</span>
+                                    </label>
+                                </div>
+                                <button type="submit" id="searchButton" class="search-btn">
+                                    <span class="btn-text-en">Search</span>
+                                    <span class="btn-text-ar">بحث</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>

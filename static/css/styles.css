@@ -36,14 +36,35 @@ body {
 
 /* Header and Navigation */
 header {
-    text-align: center;
     margin-bottom: 30px;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 0 20px;
 }
 
 header h1 {
     color: var(--primary-color);
-    margin-bottom: 20px;
     font-size: 2.5em;
+    margin: 0;
+}
+
+.header-top .nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--primary-color);
+    font-size: 1em;
+    padding: 8px 16px;
+    transition: all var(--transition-speed);
+}
+
+.header-top .nav-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--primary-color);
 }
 
 .main-nav {
@@ -89,19 +110,99 @@ header h1 {
 
 /* Search Form */
 .search-form {
-    margin-bottom: 30px;
+    margin-bottom: 40px;
 }
 
 .search-controls {
+    margin-top: 15px;
+}
+
+.query-builder {
+    margin-bottom: 10px;
+}
+
+.search-options {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 15px;
+    padding: 8px;
+    background: transparent;
+    border-radius: var(--border-radius);
+    margin-top: 10px;
+}
+
+.input-group {
+    position: relative;
+    margin-bottom: 60px;
+}
+
+.search-options-group {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 6px 15px;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    margin-right: 10px;
 }
 
 .results-count {
     display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.results-count input {
+    width: 60px;
+    padding: 4px 8px;
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.translate-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.translate-toggle:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+/* Enhanced Search Button */
+.search-btn {
+    padding: 8px 24px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    box-shadow: var(--shadow-sm);
+    display: flex;
     flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 2px;
+}
+
+.search-btn .btn-text-en {
+    font-size: 1em;
+}
+
+.search-btn .btn-text-ar {
+    font-size: 0.9em;
+}
+
+.search-btn:hover {
+    background: var(--primary-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .results-count input[type="number"] {
