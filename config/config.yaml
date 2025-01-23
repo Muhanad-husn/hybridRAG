@@ -1,75 +1,59 @@
-# API Endpoints
 llm_sherpa:
   api_url: http://localhost:5010/api/parseDocument?renderFormat=all
-
-# OpenRouter Settings
 openrouter:
-  api_key: ""  # Add your OpenRouter API key here
-  site_url: http://localhost:3000  # Optional: Your site URL
-  site_name: HybridRAG  # Optional: Your site name
+  api_key: ''
+  site_url: http://localhost:3000
+  site_name: HybridRAG
   model: anthropic/claude-3.5-haiku-20241022
-
-# LLM Settings
 llm:
-  extraction_model: anthropic/claude-3.5-haiku-20241022  # For graph construction
-  answer_model: microsoft/phi-4      # For answer generation
-
-# Graph Settings
+  extraction_model: anthropic/claude-3.5-haiku-20241022:beta
+  answer_model: microsoft/phi-4
 graph:
   storage:
     nodes_file: data/graphs/nodes.csv
     edges_file: data/graphs/edges.csv
-
-# Model Settings
 embedding:
   model_name: thenlper/gte-small
   max_length: 512
   cache_dir: /fastembed_cache
-
 ranking:
   model_name: cross-encoder/ms-marco-MiniLM-L-12-v2
   cache_dir: data/cache/reranker
-
-# Processing Settings
 document:
   supported_formats:
-    - pdf
-    - docx
-    - txt
+  - pdf
+  - docx
+  - txt
   chunk_size: 512
   chunk_overlap: 50
-
-# Cache Settings
 cache:
   directory: data/cache
-  ttl_hours: 24  # Time-to-live for cached documents
-  max_size_gb: 10  # Maximum cache size in gigabytes
-
-# Processing Optimization
+  ttl_hours: 24
+  max_size_gb: 10
 processing:
-  batch_size: 1000  # Number of chunks to process in parallel
-  max_workers: null  # null means use CPU count
-  use_process_pool: true  # Use ProcessPoolExecutor for CPU-intensive tasks
-  use_thread_pool: true   # Use ThreadPoolExecutor for I/O-bound tasks
-
-# Logging Settings
+  batch_size: 1000
+  max_workers: null
+  use_process_pool: true
+  use_thread_pool: true
 logging:
   log_level: INFO
-  max_log_size: 5242880  # 5 MB
+  max_log_size: 5242880
   backup_count: 3
   loggers:
-    werkzeug:  # Flask's logger
+    werkzeug:
       level: WARNING
       propagate: false
     flask:
       level: INFO
       propagate: false
-    src.processing_layer.graph_constructor:  # Graph constructor logger
+    src.processing_layer.graph_constructor:
       level: WARNING
       propagate: true
     root:
       level: INFO
-      handlers: [file, console]
+      handlers:
+      - file
+      - console
   handlers:
     file:
       class: logging.handlers.RotatingFileHandler
@@ -91,14 +75,10 @@ logging:
     ignore_repeated:
       class: logging.Filter
       name: repeated_filter
-
-# Timeout Settings
 timeouts:
-  document_processing: 20  # seconds
-  query_processing: 30    # seconds
-  embedding_generation: 60 # seconds
-
-# Storage Paths
+  document_processing: 20
+  query_processing: 30
+  embedding_generation: 60
 paths:
   embeddings: data/embeddings
   graphs: data/graphs
