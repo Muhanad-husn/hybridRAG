@@ -207,6 +207,98 @@ initializeResponseTabs();
 const navButtons = document.querySelectorAll('.nav-btn');
 const views = document.querySelectorAll('.view');
 
+// Function to fetch and display saved results
+async function updateSavedResultsView() {
+    const savedResultsGrid = document.querySelector('.saved-results-grid');
+    if (!savedResultsGrid) return;
+
+    try {
+        const response = await fetch('/saved-results');
+        const data = await response.json();
+
+        savedResultsGrid.innerHTML = '';
+
+        if (data.results && data.results.length > 0) {
+            data.results.forEach(filename => {
+                const resultCard = document.createElement('div');
+                resultCard.className = 'result-card';
+                
+                const downloadLink = document.createElement('a');
+                downloadLink.href = `/results/${filename}`;
+                downloadLink.textContent = filename;
+                downloadLink.download = filename;
+                
+                resultCard.appendChild(downloadLink);
+                savedResultsGrid.appendChild(resultCard);
+            });
+        } else {
+            savedResultsGrid.innerHTML = '<p>No saved results yet</p>';
+        }
+    } catch (error) {
+        console.error('[Saved Results] Error:', error);
+        savedResultsGrid.innerHTML = '<p>Error loading saved results</p>';
+    }
+}
+
+// Function to fetch and display search history
+async function updateSearchHistoryView() {
+    const historyList = document.querySelector('.history-list');
+    const historySearch = document.querySelector('.history-search');
+    if (!historyList) return;
+
+    try {
+        const response = await fetch('/search-history');
+        const data = await response.json();
+
+        function renderHistory(queries) {
+            historyList.innerHTML = '';
+            if (queries && queries.length > 0) {
+                queries.forEach(query => {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    
+                    const queryText = document.createElement('span');
+                    queryText.textContent = query;
+                    
+                    const rerunButton = document.createElement('button');
+                    rerunButton.textContent = 'Search Again';
+                    rerunButton.className = 'rerun-btn';
+                    rerunButton.onclick = () => {
+                        // Fill the search input and submit
+                        queryInput.value = query;
+                        document.querySelector('[data-view="search"]').click();
+                        setTimeout(() => searchForm.dispatchEvent(new Event('submit')), 100);
+                    };
+                    
+                    historyItem.appendChild(queryText);
+                    historyItem.appendChild(rerunButton);
+                    historyList.appendChild(historyItem);
+                });
+            } else {
+                historyList.innerHTML = '<p>No search history yet</p>';
+            }
+        }
+
+        // Initial render
+        renderHistory(data.history);
+
+        // Setup search filter
+        if (historySearch) {
+            historySearch.oninput = (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const filteredHistory = data.history.filter(query =>
+                    query.toLowerCase().includes(searchTerm)
+                );
+                renderHistory(filteredHistory);
+            };
+        }
+
+    } catch (error) {
+        console.error('[Search History] Error:', error);
+        historyList.innerHTML = '<p>Error loading search history</p>';
+    }
+}
+
 navButtons.forEach(button => {
     button.addEventListener('click', () => {
         const viewName = button.dataset.view;
@@ -218,6 +310,13 @@ navButtons.forEach(button => {
             view.classList.toggle('active', view.id === `${viewName}View`);
             view.classList.toggle('hidden', view.id !== `${viewName}View`);
         });
+
+        // Update content based on view
+        if (viewName === 'saved') {
+            updateSavedResultsView();
+        } else if (viewName === 'history') {
+            updateSearchHistoryView();
+        }
     });
 });
 
@@ -390,4 +489,88 @@ if (apiKeyForm) {
         errorDiv.classList.remove('hidden');
         resultsDiv.classList.add('hidden');
     }
+
+    // Save button handlers
+    document.querySelectorAll('.save-btn').forEach(button => {
+        button.addEventListener('click', async () => {
+            const lang = button.dataset.lang;
+            const responseSection = document.getElementById(`${lang === 'en' ? 'english' : 'arabic'}Response`);
+            const content = responseSection.querySelector('.response-content').textContent;
+            
+            try {
+                // Get the query and translated query
+                const query = queryInput.value.trim();
+                const translatedQuery = lang === 'ar' ? query : ''; // For Arabic, use original query
+                
+                // Get sources
+                const sources = Array.from(sourcesList.children).map(li => li.textContent);
+                
+                // Generate HTML content
+                const result = await fetch('/generate-result', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        query: query,
+                        translatedQuery: translatedQuery,
+                        sources: sources,
+                        isArabic: lang === 'ar'
+                    })
+                });
+                
+                const htmlData = await result.json();
+                
+                if (!result.ok) {
+                    throw new Error(htmlData.error || 'Failed to generate HTML');
+                }
+
+                // Save to server for saved results panel
+                const saveResponse = await fetch('/save-result', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        filename: htmlData.filename,
+                        html: htmlData.html
+                    })
+                });
+                
+                const saveData = await saveResponse.json();
+                
+                if (!saveResponse.ok) {
+                    throw new Error(saveData.error || 'Failed to save result');
+                }
+
+                // Create a blob from the HTML content for browser download
+                const blob = new Blob([htmlData.html], { type: 'text/html;charset=utf-8' });
+                
+                // Create a temporary link to trigger download
+                const downloadLink = document.createElement('a');
+                downloadLink.href = URL.createObjectURL(blob);
+                downloadLink.download = htmlData.filename;
+                
+                // Append link to body, click it, and remove it
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                // Clean up the URL object
+                URL.revokeObjectURL(downloadLink.href);
+
+                // Update saved results list if on saved results view
+                const savedView = document.getElementById('savedView');
+                if (!savedView.classList.contains('hidden')) {
+                    // Refresh saved results view
+                    document.querySelector('[data-view="saved"]').click();
+                }
+            } catch (error) {
+                console.error('[Save Result] Error:', error);
+                alert('Failed to save result: ' + error.message);
+            }
+        });
+    });
 });
