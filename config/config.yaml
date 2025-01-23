@@ -7,12 +7,12 @@ openrouter:
   api_key: ""  # Add your OpenRouter API key here
   site_url: http://localhost:3000  # Optional: Your site URL
   site_name: HybridRAG  # Optional: Your site name
-  model: anthropic/claude-3-haiku-20240307
+  model: anthropic/claude-3.5-haiku-20241022
 
 # LLM Settings
 llm:
-  extraction_model: anthropic/claude-3-haiku-20240307  # For graph construction
-  answer_model: anthropic/claude-3-haiku-20240307      # For answer generation
+  extraction_model: anthropic/claude-3.5-haiku-20241022  # For graph construction
+  answer_model: anthropic/claude-3.5-haiku-20241022      # For answer generation
 
 # Graph Settings
 graph:
@@ -83,10 +83,10 @@ logging:
       level: INFO
   formatters:
     detailed:
-      format: %(asctime)s - %(levelname)s - %(message)s
-      datefmt: %Y-%m-%d %H:%M:%S
+      format: '%(asctime)s - %(levelname)s - %(message)s'
+      datefmt: '%Y-%m-%d %H:%M:%S'
     simple:
-      format: %(levelname)s - %(message)s
+      format: '%(levelname)s - %(message)s'
   filters:
     ignore_repeated:
       class: logging.Filter
