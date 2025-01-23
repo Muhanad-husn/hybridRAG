@@ -129,6 +129,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingIndicator.classList.remove('hidden');
         searchButton.disabled = true;
 
+        // Start polling for logs
+        lastLogTimestamp = '';
+        startLogPolling();
+
         try {
             const response = await fetch('/search', {
                 method: 'POST',
@@ -176,6 +180,8 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('[Search] Error:', error);
             displayError(error.message);
         } finally {
+            // Stop polling for logs
+            stopLogPolling();
             searchButton.disabled = false;
         }
     });
