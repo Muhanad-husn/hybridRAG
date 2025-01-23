@@ -109,13 +109,41 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Error display
-    function displayError(message) {
-        const errorMessage = errorDiv.querySelector('.error-message');
-        errorMessage.textContent = message;
-        errorDiv.classList.remove('hidden');
-        resultsDiv.classList.add('hidden');
+    // Initialize response tabs
+    function initializeResponseTabs() {
+        const tabs = document.querySelectorAll('.response-tabs .tab-btn');
+        const englishSection = document.getElementById('englishResponse');
+        const arabicSection = document.getElementById('arabicResponse');
+        const rawDataSection = document.getElementById('rawDataResponse');
+        
+        function switchTab(type) {
+            if (!['en', 'ar', 'raw'].includes(type)) return;
+            
+            // Update tab buttons
+            tabs.forEach(t => t.classList.toggle('active', t.dataset.type === type));
+            
+            // Update section visibility
+            englishSection.classList.toggle('hidden', type !== 'en');
+            englishSection.classList.toggle('active', type === 'en');
+            arabicSection.classList.toggle('hidden', type !== 'ar');
+            arabicSection.classList.toggle('active', type === 'ar');
+            rawDataSection.classList.toggle('hidden', type !== 'raw');
+            rawDataSection.classList.toggle('active', type === 'raw');
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const type = tab.dataset.type;
+                if (type) switchTab(type);
+            });
+        });
+
+        // Set initial tab
+        switchTab('en');
     }
+
+    // Initialize tabs
+    initializeResponseTabs();
 
     // Search form handler
     searchForm.addEventListener('submit', async function(e) {
@@ -158,10 +186,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     englishContent.textContent = data.answer;
                 }
 
-                // Display Arabic response if available
+                // Display Arabic response
                 const arabicContent = document.querySelector('#arabicResponse .response-content');
-                if (arabicContent && data.arabic_answer) {
-                    arabicContent.textContent = data.arabic_answer;
+                if (arabicContent) {
+                    if (data.arabic_answer) {
+                        arabicContent.textContent = data.arabic_answer;
+                        arabicContent.dir = 'rtl';
+                        arabicContent.style.textAlign = 'right';
+                        arabicContent.style.fontFamily = "'Noto Naskh Arabic', Arial, sans-serif";
+                    } else {
+                        arabicContent.textContent = 'المحتوى العربي غير متوفر';
+                        arabicContent.dir = 'rtl';
+                        arabicContent.style.textAlign = 'right';
+                    }
+                }
+
+                // Display raw data
+                const vectorContent = document.querySelector('.vector-content');
+                if (vectorContent && data.llm_input) {
+                    try {
+                        const context = data.llm_input.context || 'No context available';
+                        const formattedInput = context.split('\n')
+                            .filter(line => line.trim())
+                            .join('\n');
+                        vectorContent.textContent = formattedInput;
+                    } catch (error) {
+                        console.error('[Display] Error:', error);
+                        vectorContent.textContent = 'Error displaying raw data';
+                    }
                 }
 
                 // Update sources
@@ -185,4 +237,12 @@ document.addEventListener('DOMContentLoaded', function() {
             searchButton.disabled = false;
         }
     });
+
+    // Error display
+    function displayError(message) {
+        const errorMessage = errorDiv.querySelector('.error-message');
+        errorMessage.textContent = message;
+        errorDiv.classList.remove('hidden');
+        resultsDiv.classList.add('hidden');
+    }
 });
