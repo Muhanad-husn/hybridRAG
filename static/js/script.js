@@ -53,8 +53,64 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Process Files functionality
+    // File Upload functionality
+    const loadFilesBtn = document.getElementById('loadFilesBtn');
     const processFilesBtn = document.getElementById('processFilesBtn');
+    const fileInput = document.getElementById('fileInput');
+
+    if (loadFilesBtn && fileInput) {
+        // Trigger file input when Load Files button is clicked
+        loadFilesBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Handle file selection
+        fileInput.addEventListener('change', async (event) => {
+            if (!event.target.files.length) return;
+
+            try {
+                // Reset log state and start polling
+                lastLogTimestamp = '';
+                loadingIndicator.classList.remove('hidden');
+                startLogPolling();
+                loadFilesBtn.disabled = true;
+                processFilesBtn.disabled = true;
+                
+                // Clear any previous content
+                const statusElement = document.getElementById('operationStatus');
+                statusElement.textContent = 'Uploading files...';
+
+                // Upload the files
+                const formData = new FormData();
+                for (const file of event.target.files) {
+                    formData.append('files', file);
+                }
+
+                const uploadResponse = await fetch('/upload-files', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadResponse.ok) {
+                    const uploadData = await uploadResponse.json();
+                    throw new Error(uploadData.error || 'Failed to upload files');
+                }
+
+                statusElement.textContent = 'Files uploaded successfully';
+            } catch (error) {
+                console.error('[Load Files] Error:', error);
+                displayError(error.message);
+            } finally {
+                stopLogPolling();
+                loadFilesBtn.disabled = false;
+                processFilesBtn.disabled = false;
+                loadingIndicator.classList.add('hidden');
+                fileInput.value = ''; // Clear file input
+            }
+        });
+    }
+
+    // Process Files functionality
     if (processFilesBtn) {
         processFilesBtn.addEventListener('click', async () => {
             // Show warning dialog
@@ -67,13 +123,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 lastLogTimestamp = '';
                 loadingIndicator.classList.remove('hidden');
                 startLogPolling();
+                loadFilesBtn.disabled = true;
                 processFilesBtn.disabled = true;
                 
                 // Clear any previous content
                 const statusElement = document.getElementById('operationStatus');
-                statusElement.textContent = 'Starting file processing...';
+                statusElement.textContent = 'Processing files...';
 
-                const response = await fetch('/process-documents', {
+                const processResponse = await fetch('/process-documents', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -85,24 +142,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                 });
 
-                const data = await response.json();
+                const processData = await processResponse.json();
 
-                if (response.ok) {
+                if (processResponse.ok) {
                     // Wait 5 seconds to show final logs
                     await new Promise(resolve => setTimeout(resolve, 5000));
                     
                     // Update stats and navigate to search
-                    document.getElementById('docCount').textContent = data.vector_count || 0;
-                    document.getElementById('nodeCount').textContent = data.node_count || 0;
+                    document.getElementById('docCount').textContent = processData.vector_count || 0;
+                    document.getElementById('nodeCount').textContent = processData.node_count || 0;
                     document.querySelector('[data-view="search"]').click();
                 } else {
-                    throw new Error(data.error || 'Failed to process files');
+                    throw new Error(processData.error || 'Failed to process files');
                 }
             } catch (error) {
                 console.error('[Process Files] Error:', error);
                 displayError(error.message);
             } finally {
                 stopLogPolling();
+                loadFilesBtn.disabled = false;
                 processFilesBtn.disabled = false;
                 loadingIndicator.classList.add('hidden');
             }

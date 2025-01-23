@@ -302,6 +302,38 @@ def generate_result():
 # Initialize HyperRAG with app logger
 rag_system = HyperRAG(logger=logger)
 
+@app.route('/upload-files', methods=['POST'])
+@log_request
+def upload_files():
+    try:
+        # Get the raw_documents directory path
+        raw_docs_dir = os.path.join("data", "raw_documents")
+        
+        # Delete existing files in raw_documents
+        for filename in os.listdir(raw_docs_dir):
+            file_path = os.path.join(raw_docs_dir, filename)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+            except Exception as e:
+                logger.error(f"Error deleting file {file_path}: {str(e)}")
+        
+        # Process uploaded files
+        uploaded_files = request.files.getlist('files')
+        if not uploaded_files:
+            return jsonify({'error': 'No files uploaded'}), 400
+            
+        # Save uploaded files
+        for file in uploaded_files:
+            if file.filename:
+                file.save(os.path.join(raw_docs_dir, file.filename))
+                
+        return jsonify({'message': 'Files uploaded successfully'})
+        
+    except Exception as e:
+        logger.error(f"File upload error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/process-documents', methods=['POST'])
 @log_request
 def process_documents():
