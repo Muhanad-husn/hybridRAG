@@ -2,6 +2,7 @@ import os
 import sys
 import re
 import json
+import yaml
 import logging
 import traceback
 import tiktoken
@@ -51,8 +52,12 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         Dict containing retrieved context and LLM-generated answer
     """
     try:
-        # Initialize components
+        # Load config
         config_path = "config/config.yaml"
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        # Initialize components
         document_processor = DocumentProcessor(config_path)
         embedding_generator = EmbeddingGenerator(config_path)
         graph_constructor = GraphConstructor(config_path)
@@ -220,8 +225,9 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                     sources.add(source)
         sources = sorted(list(sources))
         
-        # Initialize OpenRouter client
-        llm_client = OpenRouterClient()
+        # Initialize OpenRouter client with answer model from config
+        llm_client = OpenRouterClient(model=config['llm']['answer_model'])
+        logger.info(f"Using answer model: {config['llm']['answer_model']}")
         
         # Create system prompt
         system_prompt = """You are a well-informed academic assistant. Your goal is to provide structured, educational, and accessible responses in a semi-academic tone. Specifically:

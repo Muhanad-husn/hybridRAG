@@ -1,6 +1,7 @@
 import asyncio
 import json
 import string
+import yaml
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union, cast
 from collections import defaultdict
 import logging
@@ -19,6 +20,7 @@ from langchain_core.prompts import (
 )
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field, create_model
+from .openrouter_client import OpenRouterClient
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -302,7 +304,7 @@ class LLMGraphTransformer:
     
     def __init__(
         self,
-        llm: BaseLanguageModel,
+        llm: Optional[BaseLanguageModel] = None,
         allowed_nodes: List[str] = [],
         allowed_relationships: List[str] = [],
         prompt: Optional[ChatPromptTemplate] = None,
@@ -310,8 +312,15 @@ class LLMGraphTransformer:
         node_properties: Union[bool, List[str]] = False,
         relationship_properties: Union[bool, List[str]] = False,
         ignore_tool_usage: bool = False,
+        config_path: str = "config/config.yaml"
     ) -> None:
-        self.llm = llm
+        # Load config
+        with open(config_path, 'r') as f:
+            self.config = yaml.safe_load(f)
+            
+        # Initialize OpenRouter client with extraction model
+        self.llm = OpenRouterClient(model=self.config['llm']['extraction_model'])
+        
         self.allowed_nodes = allowed_nodes
         self.allowed_relationships = allowed_relationships
         self.strict_mode = False  # Always disable strict mode to allow all types
@@ -319,6 +328,7 @@ class LLMGraphTransformer:
         
         # Add logging for initialization
         logger.info("Initializing LLMGraphTransformer")
+        logger.info(f"Using extraction model: {self.config['llm']['extraction_model']}")
         logger.info(f"Allowed nodes: {allowed_nodes}")
         logger.info(f"Allowed relationships: {allowed_relationships}")
         logger.info(f"Strict mode: {self.strict_mode}")
@@ -335,7 +345,7 @@ class LLMGraphTransformer:
             # Get raw model response using predict
             if hasattr(self.llm, 'client'):
                 # Note: OpenRouter client doesn't have async methods yet
-                response = self.llm.client.get_completion(
+                response = self.llm.get_completion(
                     prompt=user_prompt_template.format(text=text),
                     system_prompt=system_prompt,
                     temperature=0.0,
