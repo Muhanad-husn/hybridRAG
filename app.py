@@ -153,36 +153,18 @@ def save_result():
 def get_logs():
     try:
         with open('logs/app.log', 'r', encoding='utf-8') as f:
-            # Get last 50 lines
-            lines = deque(maxlen=50)
+            # Get all lines from the log file
+            lines = []
             for line in f:
-                if 'INFO' in line and any(x in line for x in [
-                    'Processing',
-                    'Completed processing',
-                    'Saved',
-                    'Generated',
-                    'Added',
-                    'Index',
-                    'Initializing',
-                    'Successfully',
-                    'Storage reset',
-                    'Document processing'
-                ]):
-                    # Extract timestamp and message
-                    parts = line.split(' - ')
-                    if len(parts) >= 3:
-                        timestamp = parts[0].strip()
-                        message = parts[2].strip()
-                        lines.append(f"[{timestamp}] {message}")
+                # Extract timestamp and message
+                parts = line.split(' - ')
+                if len(parts) >= 3:
+                    timestamp = parts[0].strip()
+                    message = parts[2].strip()
+                    lines.append(f"[{timestamp}] {message}")
             
-            # Remove duplicates while preserving order
-            seen = set()
-            unique_logs = []
-            for log in lines:
-                msg = log.split('] ', 1)[1] if '] ' in log else log
-                if msg not in seen:
-                    seen.add(msg)
-                    unique_logs.append(log)
+            # Return the last 50 lines
+            unique_logs = lines[-50:]
             
             return jsonify({'logs': unique_logs})
     except Exception as e:
