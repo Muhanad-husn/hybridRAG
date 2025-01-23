@@ -365,23 +365,7 @@ class EmbeddingGenerator:
                 embedding = self.generate_embedding(doc.page_content)
                 embeddings.append(embedding)
             
-            # Add embeddings directly to FAISS index
-            if hasattr(self, 'raw_index'):
-                embeddings_array = np.array(embeddings).astype('float32')
-                self.raw_index.add(embeddings_array)
-                logger.info(f"Added {len(embeddings)} vectors to FAISS index")
-            
-            # Reset index and store before adding new embeddings
-            dimension = 384  # GTE-small embedding dimension
-            self.raw_index = faiss.IndexFlatIP(dimension)
-            self.vector_store = FAISS(
-                embedding_function=self.embedding_function,
-                index=self.raw_index,
-                docstore=InMemoryDocstore({}),
-                index_to_docstore_id={}
-            )
-            
-            # Add embeddings to fresh index
+            # Add embeddings to FAISS index
             embeddings_array = np.array(embeddings).astype('float32')
             self.raw_index.add(embeddings_array)
             logger.info(f"Added {len(embeddings)} vectors to FAISS index")

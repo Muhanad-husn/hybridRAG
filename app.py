@@ -334,7 +334,11 @@ def process_documents():
         if not os.listdir(input_dir):
             return jsonify({'error': f'No documents found in {input_dir}'}), 400
 
-        # Process documents using asyncio.run()
+        # Reset storage first
+        rag_system.reset_storage()
+        logger.info("Storage reset completed")
+
+        # Then process documents
         asyncio.run(rag_system.aprocess_documents(
             input_dir=input_dir,
             save_chunks=save_chunks,
