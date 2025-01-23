@@ -208,39 +208,6 @@ initializeResponseTabs();
 const navButtons = document.querySelectorAll('.nav-btn');
 const views = document.querySelectorAll('.view');
 
-// Function to fetch and display saved results
-async function updateSavedResultsView() {
-    const savedResultsGrid = document.querySelector('.saved-results-grid');
-    if (!savedResultsGrid) return;
-
-    try {
-        const response = await fetch('/saved-results');
-        const data = await response.json();
-
-        savedResultsGrid.innerHTML = '';
-
-        if (data.results && data.results.length > 0) {
-            data.results.forEach(filename => {
-                const resultCard = document.createElement('div');
-                resultCard.className = 'result-card';
-                
-                const downloadLink = document.createElement('a');
-                downloadLink.href = `/results/${filename}`;
-                downloadLink.textContent = filename;
-                downloadLink.download = filename;
-                
-                resultCard.appendChild(downloadLink);
-                savedResultsGrid.appendChild(resultCard);
-            });
-        } else {
-            savedResultsGrid.innerHTML = '<p>No saved results yet</p>';
-        }
-    } catch (error) {
-        console.error('[Saved Results] Error:', error);
-        savedResultsGrid.innerHTML = '<p>Error loading saved results</p>';
-    }
-}
-
 // Function to fetch and display search history
 async function updateSearchHistoryView() {
     const historyList = document.querySelector('.history-list');
@@ -313,9 +280,7 @@ navButtons.forEach(button => {
         });
 
         // Update content based on view
-        if (viewName === 'saved') {
-            updateSavedResultsView();
-        } else if (viewName === 'history') {
+        if (viewName === 'history') {
             updateSearchHistoryView();
         }
     });
@@ -575,7 +540,7 @@ if (modelSettingsForm) {
                     throw new Error(htmlData.error || 'Failed to generate HTML');
                 }
 
-                // Save to server for saved results panel
+                // Trigger file download through server
                 const saveResponse = await fetch('/save-result', {
                     method: 'POST',
                     headers: {
@@ -587,35 +552,21 @@ if (modelSettingsForm) {
                         html: htmlData.html
                     })
                 });
-                
-                const saveData = await saveResponse.json();
-                
+
                 if (!saveResponse.ok) {
-                    throw new Error(saveData.error || 'Failed to save result');
+                    throw new Error('Failed to save result');
                 }
 
-                // Create a blob from the HTML content for browser download
-                const blob = new Blob([htmlData.html], { type: 'text/html;charset=utf-8' });
-                
-                // Create a temporary link to trigger download
-                const downloadLink = document.createElement('a');
-                downloadLink.href = URL.createObjectURL(blob);
-                downloadLink.download = htmlData.filename;
-                
-                // Append link to body, click it, and remove it
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-                
-                // Clean up the URL object
-                URL.revokeObjectURL(downloadLink.href);
-
-                // Update saved results list if on saved results view
-                const savedView = document.getElementById('savedView');
-                if (!savedView.classList.contains('hidden')) {
-                    // Refresh saved results view
-                    document.querySelector('[data-view="saved"]').click();
-                }
+                // Get the blob from the response and trigger download
+                const blob = await saveResponse.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = htmlData.filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
             } catch (error) {
                 console.error('[Save Result] Error:', error);
                 alert('Failed to save result: ' + error.message);

@@ -25,10 +25,9 @@ logger = get_logger(__name__)
 # Initialize translator and search history
 translator = Translator()
 
-def load_history_and_results():
+def load_search_history():
     try:
         history_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'search_history.json')
-        results_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'saved_results.json')
         
         # Create history directory if it doesn't exist
         os.makedirs(os.path.join(os.path.dirname(__file__), 'data', 'history'), exist_ok=True)
@@ -40,35 +39,23 @@ def load_history_and_results():
         else:
             search_history = []
             
-        # Load saved results
-        if os.path.exists(results_file):
-            with open(results_file, 'r', encoding='utf-8') as f:
-                saved_results = json.load(f)
-        else:
-            saved_results = []
-            
-        return search_history, saved_results
+        return search_history
     except Exception as e:
-        logger.error(f"Error loading history and results: {str(e)}")
-        return [], []
+        logger.error(f"Error loading search history: {str(e)}")
+        return []
 
-def save_history_and_results(search_history, saved_results):
+def save_search_history(search_history):
     try:
         history_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'search_history.json')
-        results_file = os.path.join(os.path.dirname(__file__), 'data', 'history', 'saved_results.json')
         
         # Save search history
         with open(history_file, 'w', encoding='utf-8') as f:
             json.dump(search_history, f, ensure_ascii=False, indent=2)
-            
-        # Save saved results
-        with open(results_file, 'w', encoding='utf-8') as f:
-            json.dump(saved_results, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logger.error(f"Error saving history and results: {str(e)}")
+        logger.error(f"Error saving search history: {str(e)}")
 
-# Initialize history and results from files
-search_history, saved_results = load_history_and_results()
+# Initialize search history from file
+search_history = load_search_history()
 
 def log_request(f):
     @wraps(f)
@@ -151,11 +138,6 @@ def home():
 def get_search_history():
     return jsonify({'history': search_history})
 
-@app.route('/saved-results', methods=['GET'])
-@log_request
-def get_saved_results():
-    return jsonify({'results': saved_results})
-
 @app.route('/save-result', methods=['POST'])
 @log_request
 def save_result():
@@ -168,28 +150,14 @@ def save_result():
         if not all([content, filename, html]):
             return jsonify({'error': 'Missing required fields'}), 400
             
-        # Create results directory if it doesn't exist
-        results_dir = os.path.join(os.path.dirname(__file__), 'docs')
-        os.makedirs(results_dir, exist_ok=True)
-        filepath = os.path.join(results_dir, filename)
-        
-        # Save HTML file
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(html)
-            
-        # Add to saved results (maintain uniqueness and limit to 25)
-        if filename not in saved_results:
-            if len(saved_results) >= 25:
-                saved_results.pop()  # Remove oldest entry
-            saved_results.insert(0, filename)  # Add new entry at the beginning
-            save_history_and_results(search_history, saved_results)  # Persist changes
-            
-        logger.info(f"Result saved: {filename}")
-        return jsonify({
-            'message': 'Result saved successfully',
-            'saved_results': saved_results,
-            'filepath': filepath
-        })
+        # Create HTML response for browser download
+        logger.info(f"Sending result for download: {filename}")
+        return send_file(
+            io.BytesIO(html.encode('utf-8')),
+            mimetype='text/html',
+            as_attachment=True,
+            download_name=filename
+        )
     except Exception as e:
         logger.error(f"Error saving result: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -234,7 +202,7 @@ def search():
             if len(search_history) >= 25:
                 search_history.pop()  # Remove oldest entry
             search_history.insert(0, query)  # Add new query at the beginning
-            save_history_and_results(search_history, saved_results)  # Persist changes
+            save_search_history(search_history)  # Persist changes
 
         # Detect if query is Arabic
         is_arabic = translator.is_arabic(query)
@@ -282,32 +250,6 @@ def search():
         
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/results/<path:filename>')
-@log_request
-def serve_result(filename):
-    try:
-        docs_dir = os.path.join(os.path.dirname(__file__), 'docs')
-        filepath = os.path.join(docs_dir, filename)
-        
-        if not os.path.exists(filepath):
-            logger.error(f"File not found: {filepath}")
-            return jsonify({'error': 'File not found'}), 404
-            
-        try:
-            response = send_file(
-                filepath,
-                mimetype='text/html',
-                as_attachment=True,
-                download_name=filename
-            )
-            return response
-        except Exception as serve_error:
-            raise serve_error
-            
-    except Exception as e:
-        logger.error(f"Error serving result file: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/generate-result', methods=['POST'])
