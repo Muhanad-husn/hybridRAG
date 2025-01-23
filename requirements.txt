@@ -1,0 +1,60 @@
+# Core Dependencies
+langchain
+langchain_core
+langchain_community
+langchain_anthropic
+langchain_openai
+langchain_openrouter
+transformers
+torch
+sentence-transformers
+
+# Document Processing
+llmsherpa
+python-docx
+PyPDF2
+fpdf2
+arabic-reshaper
+python-bidi
+pdfkit
+jinja2
+
+# Embedding and Vector Search
+faiss-cpu
+fastembed
+
+# Graph Processing
+networkx
+pandas
+scikit-learn
+thefuzz
+python-Levenshtein  # Optional but recommended for better performance with thefuzz
+
+# Ranking and Reranking
+flashrank
+
+# Web Interface
+Flask
+termcolor
+
+# Utilities
+pydantic
+numpy
+json-repair
+fake-useragent
+python-dotenv
+requests
+
+# Translation
+langdetect
+cachetools
+pyyaml
+
+# Testing
+pytest
+pytest-benchmark
+pytest-cov
+pytest-html
+
+# Packaging
+pyinstaller
