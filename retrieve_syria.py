@@ -371,17 +371,24 @@ Please provide a clear and accurate answer based solely on the information provi
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             safe_title = ''.join(c for c in content.split('\n')[0] if c.isalnum() or c in (' ', '-', '_'))[:50]
             filename = f"{safe_title}.html"
-            return {
-                'html': f"""<html>
+            html_template = """<html>
 <body>
-<h1>{content.split('\n')[0]}</h1>
+<h1>{title}</h1>
 {content}
 <hr>
 <p>Query: {query}</p>
-<p>Sources: {', '.join(sources)}</p>
+<p>Sources: {sources}</p>
 <p>Generated: {timestamp}</p>
 </body>
-</html>""",
+</html>"""
+            return {
+                'html': html_template.format(
+                    title=content.split('\n')[0],
+                    content=content,
+                    query=query,
+                    sources=', '.join(sources),
+                    timestamp=timestamp
+                ),
                 'filename': filename
             }
 
