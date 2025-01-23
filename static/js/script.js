@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const searchForm = document.getElementById('searchForm');
     const apiKeyForm = document.getElementById('apiKeyForm');
+    const modelSettingsForm = document.getElementById('modelSettingsForm');
     const queryInput = document.getElementById('queryInput');
     const searchButton = document.getElementById('searchButton');
     const loadingIndicator = document.getElementById('loadingIndicator');
@@ -364,8 +365,56 @@ if (apiKeyForm) {
     });
 }
 
+// Model Settings form handler
+if (modelSettingsForm) {
+    modelSettingsForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const extractionModelInput = document.getElementById('extractionModel');
+        const answerModelInput = document.getElementById('answerModel');
+        const messageDiv = document.getElementById('modelSettingsMessage');
+        const submitButton = modelSettingsForm.querySelector('button[type="submit"]');
+        
+        const extractionModel = extractionModelInput.value.trim();
+        const answerModel = answerModelInput.value.trim();
+        
+        if (!extractionModel || !answerModel) return;
+
+        try {
+            submitButton.disabled = true;
+            messageDiv.textContent = 'Updating model settings...';
+            messageDiv.className = 'settings-message';
+
+            const response = await fetch('/update-model-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    extraction_model: extractionModel,
+                    answer_model: answerModel
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                messageDiv.textContent = 'Model settings updated successfully';
+                messageDiv.className = 'settings-message success';
+            } else {
+                throw new Error(data.error || 'Failed to update model settings');
+            }
+        } catch (error) {
+            console.error('[Model Settings Update] Error:', error);
+            messageDiv.textContent = error.message;
+            messageDiv.className = 'settings-message error';
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+}
+
 // Search form handler
-    // Search form handler
     searchForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         

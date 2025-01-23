@@ -4,6 +4,7 @@ import logging
 import io
 import os
 import json
+import yaml
 from datetime import datetime
 from collections import deque
 from retrieve_syria import run_hybrid_search
@@ -477,6 +478,41 @@ def update_api_key():
         
     except Exception as e:
         logger.error(f"Error updating API key: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/update-model-settings', methods=['POST'])
+@log_request
+def update_model_settings():
+    try:
+        data = request.get_json()
+        extraction_model = data.get('extraction_model', '').strip()
+        answer_model = data.get('answer_model', '').strip()
+        
+        if not extraction_model or not answer_model:
+            return jsonify({'error': 'Both extraction_model and answer_model must be provided'}), 400
+            
+        # Read current config
+        config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            
+        # Update model settings
+        config['llm']['extraction_model'] = extraction_model
+        config['llm']['answer_model'] = answer_model
+        
+        # Write back to config file
+        with open(config_path, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            
+        logger.info(f"Model settings updated - Extraction: {extraction_model}, Answer: {answer_model}")
+        return jsonify({
+            'message': 'Model settings updated successfully',
+            'extraction_model': extraction_model,
+            'answer_model': answer_model
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating model settings: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

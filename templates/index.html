@@ -159,6 +159,28 @@
                         <div id="apiKeyMessage" class="settings-message"></div>
                     </form>
                 </div>
+
+                <div class="settings-section">
+                    <h3>Model Settings</h3>
+                    <form id="modelSettingsForm" class="settings-form">
+                        <div class="input-group">
+                            <label for="extractionModel">Extraction Model:</label>
+                            <input type="text"
+                                   id="extractionModel"
+                                   placeholder="e.g., anthropic/claude-3.5-haiku-20241022"
+                                   required>
+                        </div>
+                        <div class="input-group">
+                            <label for="answerModel">Answer Model:</label>
+                            <input type="text"
+                                   id="answerModel"
+                                   placeholder="e.g., microsoft/phi-4"
+                                   required>
+                        </div>
+                        <button type="submit" class="settings-btn">Update Models</button>
+                        <div id="modelSettingsMessage" class="settings-message"></div>
+                    </form>
+                </div>
             </div>
 
         </main>

@@ -814,7 +814,7 @@ footer {
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-sm);
     max-width: 600px;
-    margin: 0 auto;
+    margin: 0 auto 20px;
 }
 
 .settings-form {
@@ -823,15 +823,30 @@ footer {
 
 .settings-form .input-group {
     display: flex;
+    flex-direction: column;
     gap: 10px;
+    margin-bottom: 15px;
 }
 
-.settings-form input[type="password"] {
+.settings-form label {
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.settings-form input[type="password"],
+.settings-form input[type="text"] {
     flex: 1;
     padding: 10px;
     border: 2px solid var(--primary-color);
     border-radius: var(--border-radius);
     font-size: 16px;
+    width: 100%;
+}
+
+.settings-form input[type="text"]::placeholder {
+    color: var(--text-secondary);
+    font-size: 0.9em;
 }
 
 .settings-btn {
@@ -842,6 +857,8 @@ footer {
     border-radius: var(--border-radius);
     cursor: pointer;
     transition: all var(--transition-speed);
+    width: 100%;
+    margin-top: 10px;
 }
 
 .settings-btn:hover {
