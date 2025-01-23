@@ -345,9 +345,30 @@ def process_documents():
             save_embeddings=save_embeddings
         ))
 
+        # Get vector store stats
+        vector_count = len(os.listdir(os.path.join("data", "embeddings"))) - 1  # Subtract 1 for index.faiss
+
+        # Get graph stats
+        nodes_file = os.path.join("data", "graphs", "nodes.csv")
+        edges_file = os.path.join("data", "graphs", "edges.csv")
+        
+        node_count = 0
+        edge_count = 0
+        
+        if os.path.exists(nodes_file):
+            with open(nodes_file, 'r') as f:
+                node_count = sum(1 for line in f) - 1  # Subtract 1 for header
+                
+        if os.path.exists(edges_file):
+            with open(edges_file, 'r') as f:
+                edge_count = sum(1 for line in f) - 1  # Subtract 1 for header
+
         return jsonify({
             'message': 'Documents processed successfully',
-            'input_dir': input_dir
+            'input_dir': input_dir,
+            'vector_count': vector_count,
+            'node_count': node_count,
+            'edge_count': edge_count
         })
 
     except Exception as e:
