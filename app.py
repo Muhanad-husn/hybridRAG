@@ -158,14 +158,15 @@ def get_logs():
             for line in f:
                 if 'INFO' in line and any(x in line for x in [
                     'Processing',
-                    'Translating',
-                    'Translation',
-                    'Saving',
-                    'response saved',
-                    'Verified',
-                    'Adding',
-                    'Confidence',
-                    'Request received'
+                    'Completed processing',
+                    'Saved',
+                    'Generated',
+                    'Added',
+                    'Index',
+                    'Initializing',
+                    'Successfully',
+                    'Storage reset',
+                    'Document processing'
                 ]):
                     # Extract timestamp and message
                     parts = line.split(' - ')
