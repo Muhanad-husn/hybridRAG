@@ -390,6 +390,49 @@ def process_documents():
         logger.error(f"Document processing error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/update-api-key', methods=['POST'])
+@log_request
+def update_api_key():
+    try:
+        data = request.get_json()
+        new_api_key = data.get('api_key', '').strip()
+        
+        if not new_api_key:
+            return jsonify({'error': 'API key cannot be empty'}), 400
+            
+        if not new_api_key.startswith('sk-or-v1-'):
+            return jsonify({'error': 'Invalid OpenRouter API key format'}), 400
+            
+        # Read current .env content
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        try:
+            with open(env_path, 'r') as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            lines = []
+            
+        # Update or add API key
+        api_key_updated = False
+        for i, line in enumerate(lines):
+            if line.startswith('OPENROUTER_API_KEY='):
+                lines[i] = f'OPENROUTER_API_KEY={new_api_key}\n'
+                api_key_updated = True
+                break
+                
+        if not api_key_updated:
+            lines.append(f'OPENROUTER_API_KEY={new_api_key}\n')
+            
+        # Write back to .env
+        with open(env_path, 'w') as f:
+            f.writelines(lines)
+            
+        logger.info("OpenRouter API key updated successfully")
+        return jsonify({'message': 'API key updated successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error updating API key: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     try:
         port = 5000

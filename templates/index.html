@@ -14,6 +14,7 @@
                 <button class="nav-btn active" data-view="search">Search</button>
                 <button class="nav-btn" data-view="history">Search History</button>
                 <button class="nav-btn" data-view="saved">Saved Results</button>
+                <button class="nav-btn" data-view="settings">Settings</button>
                 <div class="file-actions">
                     <input type="file" id="fileInput" multiple style="display: none">
                     <button id="loadFilesBtn" class="nav-btn">Load Files</button>
@@ -140,6 +141,24 @@
             <div id="savedView" class="view hidden">
                 <h2>Saved Results</h2>
                 <div class="saved-results-grid"></div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settingsView" class="view hidden">
+                <h2>Settings</h2>
+                <div class="settings-section">
+                    <h3>OpenRouter API Key</h3>
+                    <form id="apiKeyForm" class="settings-form">
+                        <div class="input-group">
+                            <input type="password"
+                                   id="apiKeyInput"
+                                   placeholder="Enter OpenRouter API key"
+                                   required>
+                            <button type="submit" class="settings-btn">Update API Key</button>
+                        </div>
+                        <div id="apiKeyMessage" class="settings-message"></div>
+                    </form>
+                </div>
             </div>
 
         </main>

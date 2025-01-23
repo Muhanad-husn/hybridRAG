@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const searchForm = document.getElementById('searchForm');
+    const apiKeyForm = document.getElementById('apiKeyForm');
     const queryInput = document.getElementById('queryInput');
     const searchButton = document.getElementById('searchButton');
     const loadingIndicator = document.getElementById('loadingIndicator');
@@ -199,10 +200,72 @@ document.addEventListener('DOMContentLoaded', function() {
         // Set initial tab
         switchTab('en');
     }
+// Initialize tabs
+initializeResponseTabs();
 
-    // Initialize tabs
-    initializeResponseTabs();
+// View switching
+const navButtons = document.querySelectorAll('.nav-btn');
+const views = document.querySelectorAll('.view');
 
+navButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const viewName = button.dataset.view;
+        if (!viewName) return;
+
+        // Update active states
+        navButtons.forEach(btn => btn.classList.toggle('active', btn === button));
+        views.forEach(view => {
+            view.classList.toggle('active', view.id === `${viewName}View`);
+            view.classList.toggle('hidden', view.id !== `${viewName}View`);
+        });
+    });
+});
+
+// API Key form handler
+if (apiKeyForm) {
+    apiKeyForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const messageDiv = document.getElementById('apiKeyMessage');
+        const submitButton = apiKeyForm.querySelector('button[type="submit"]');
+        
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) return;
+
+        try {
+            submitButton.disabled = true;
+            messageDiv.textContent = 'Updating API key...';
+            messageDiv.className = 'settings-message';
+
+            const response = await fetch('/update-api-key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ api_key: apiKey })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                messageDiv.textContent = 'API key updated successfully';
+                messageDiv.className = 'settings-message success';
+                apiKeyInput.value = ''; // Clear the input
+            } else {
+                throw new Error(data.error || 'Failed to update API key');
+            }
+        } catch (error) {
+            console.error('[API Key Update] Error:', error);
+            messageDiv.textContent = error.message;
+            messageDiv.className = 'settings-message error';
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+}
+
+// Search form handler
     // Search form handler
     searchForm.addEventListener('submit', async function(e) {
         e.preventDefault();
