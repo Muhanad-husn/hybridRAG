@@ -491,32 +491,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorDiv.classList.add('hidden');
                 processFilesBtn.disabled = true;
 
-                // Create status container
-                const statusContainer = document.createElement('div');
-                statusContainer.className = 'status-container';
-                
-                // Add progress bar
-                const progressBar = document.createElement('div');
-                progressBar.className = 'progress-bar';
-                progressBar.innerHTML = '<div class="progress-fill"></div>';
-                statusContainer.appendChild(progressBar);
-                
-                // Add log display
-                const logDisplay = document.createElement('div');
-                logDisplay.className = 'log-display';
-                logDisplay.id = 'operationStatus';
-                statusContainer.appendChild(logDisplay);
-                
-                // Clear and add to loading indicator
-                loadingIndicator.innerHTML = '';
-                loadingIndicator.appendChild(statusContainer);
+                // Show loading indicator
+                loadingIndicator.classList.remove('hidden');
+                resultsDiv.classList.add('hidden');
+                errorDiv.classList.add('hidden');
 
-                // Initialize progress tracking
+                // Get or create progress bar
+                let progressBar = loadingIndicator.querySelector('.progress-bar');
+                if (!progressBar) {
+                    progressBar = document.createElement('div');
+                    progressBar.className = 'progress-bar';
+                    progressBar.innerHTML = '<div class="progress-fill"></div>';
+                    loadingIndicator.insertBefore(progressBar, loadingIndicator.firstChild);
+                }
+
+                // Get operation status element
+                const operationStatus = document.getElementById('operationStatus');
+                
+                // Initialize progress
                 const progressFill = progressBar.querySelector('.progress-fill');
                 progressFill.style.width = '0%';
                 let progress = 0;
                 
-                // Custom log polling for process files
+                // Start log polling with progress updates
                 const processLogPolling = setInterval(async () => {
                     try {
                         const response = await fetch('/logs');
@@ -524,7 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         if (data.logs && data.logs.length > 0) {
                             const latestLog = data.logs[data.logs.length - 1];
-                            logDisplay.textContent = latestLog;
+                            operationStatus.textContent = latestLog;
                             
                             // Update progress based on log messages
                             if (latestLog.includes('Processing file:')) progress = 20;
@@ -540,8 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }, 500);
 
-                // Start processing
-                updateOperationStatus('Initializing file processing...');
+                operationStatus.textContent = 'Initializing file processing...';
 
                 const response = await fetch('/process-documents', {
                     method: 'POST',
@@ -558,28 +554,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Clear custom polling interval
+                    // Clear polling interval
                     clearInterval(processLogPolling);
                     
                     // Show completion status
                     progressFill.style.width = '100%';
-                    logDisplay.textContent = 'Files processed successfully!';
+                    operationStatus.textContent = 'Files processed successfully!';
 
-                    // Show stats
-                    const statsDiv = document.createElement('div');
-                    statsDiv.className = 'process-stats';
-                    statsDiv.innerHTML = `
-                        <h3>Processing Complete</h3>
-                        <p>Documents in Vector Store: ${data.vector_count || 0}</p>
-                        <p>Graph Nodes: ${data.node_count || 0}</p>
-                        <p>Graph Edges: ${data.edge_count || 0}</p>
+                    // Update footer stats
+                    document.getElementById('docCount').textContent = data.vector_count || 0;
+                    document.getElementById('nodeCount').textContent = data.node_count || 0;
+
+                    // Show stats in loading indicator
+                    const statsHtml = `
+                        <div class="process-stats">
+                            <h3>Processing Complete</h3>
+                            <p>Documents in Vector Store: ${data.vector_count || 0}</p>
+                            <p>Graph Nodes: ${data.node_count || 0}</p>
+                            <p>Graph Edges: ${data.edge_count || 0}</p>
+                        </div>
                     `;
-                    statusContainer.appendChild(statsDiv);
+                    loadingIndicator.insertAdjacentHTML('beforeend', statsHtml);
 
                     // Auto-navigate to search after 5 seconds
                     setTimeout(() => {
-                        loadingIndicator.innerHTML = ''; // Clear all content
+                        // Remove progress bar and stats
+                        const progressBar = loadingIndicator.querySelector('.progress-bar');
+                        const statsDiv = loadingIndicator.querySelector('.process-stats');
+                        if (progressBar) progressBar.remove();
+                        if (statsDiv) statsDiv.remove();
+                        
+                        // Reset operation status and hide loading
+                        operationStatus.textContent = 'Processing query...';
                         loadingIndicator.classList.add('hidden');
+                        
                         // Navigate to search view
                         document.querySelector('[data-view="search"]').click();
                     }, 5000);
@@ -589,10 +597,9 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 console.error('[Process Files] Error:', error);
                 displayError(error.message);
-                processFilesBtn.disabled = false;
-                loadingIndicator.classList.add('hidden');
             } finally {
-                clearInterval(processLogPolling); // Ensure polling is stopped
+                clearInterval(processLogPolling);
+                processFilesBtn.disabled = false;
             }
         });
     }
