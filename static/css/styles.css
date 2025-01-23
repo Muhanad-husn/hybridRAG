@@ -169,13 +169,24 @@ textarea:focus {
     box-shadow: var(--shadow-sm);
 }
 
+/* Status Container */
+.status-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+    padding: 15px;
+    background-color: var(--card-background);
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+}
+
 /* Progress Bar */
 .progress-bar {
     width: 100%;
     height: 20px;
     background-color: var(--background-color);
     border-radius: var(--border-radius);
-    margin: 15px 0;
     overflow: hidden;
 }
 
@@ -184,6 +195,19 @@ textarea:focus {
     width: 0;
     background-color: var(--accent-color);
     transition: width 0.3s ease-in-out;
+}
+
+/* Log Display */
+.log-display {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9em;
+    padding: 10px;
+    background-color: var(--background-color);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--primary-color);
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 /* Process Stats */

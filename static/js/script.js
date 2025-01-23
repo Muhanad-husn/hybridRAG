@@ -491,22 +491,57 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorDiv.classList.add('hidden');
                 processFilesBtn.disabled = true;
 
-                // Add progress bar if it doesn't exist
-                let progressBar = document.getElementById('processProgress');
-                if (!progressBar) {
-                    progressBar = document.createElement('div');
-                    progressBar.id = 'processProgress';
-                    progressBar.className = 'progress-bar';
-                    progressBar.innerHTML = '<div class="progress-fill"></div>';
-                    loadingIndicator.insertBefore(progressBar, document.getElementById('operationStatus'));
-                }
+                // Create status container
+                const statusContainer = document.createElement('div');
+                statusContainer.className = 'status-container';
+                
+                // Add progress bar
+                const progressBar = document.createElement('div');
+                progressBar.className = 'progress-bar';
+                progressBar.innerHTML = '<div class="progress-fill"></div>';
+                statusContainer.appendChild(progressBar);
+                
+                // Add log display
+                const logDisplay = document.createElement('div');
+                logDisplay.className = 'log-display';
+                logDisplay.id = 'operationStatus';
+                statusContainer.appendChild(logDisplay);
+                
+                // Clear and add to loading indicator
+                loadingIndicator.innerHTML = '';
+                loadingIndicator.appendChild(statusContainer);
 
-                // Reset progress
+                // Initialize progress tracking
                 const progressFill = progressBar.querySelector('.progress-fill');
                 progressFill.style.width = '0%';
+                let progress = 0;
                 
+                // Custom log polling for process files
+                const processLogPolling = setInterval(async () => {
+                    try {
+                        const response = await fetch('/logs');
+                        const data = await response.json();
+                        
+                        if (data.logs && data.logs.length > 0) {
+                            const latestLog = data.logs[data.logs.length - 1];
+                            logDisplay.textContent = latestLog;
+                            
+                            // Update progress based on log messages
+                            if (latestLog.includes('Processing file:')) progress = 20;
+                            else if (latestLog.includes('chunks created')) progress = 40;
+                            else if (latestLog.includes('Generated embeddings')) progress = 60;
+                            else if (latestLog.includes('Added vectors to FAISS index')) progress = 80;
+                            else if (latestLog.includes('Document processing completed')) progress = 100;
+                            
+                            progressFill.style.width = `${progress}%`;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching logs:', error);
+                    }
+                }, 500);
+
+                // Start processing
                 updateOperationStatus('Initializing file processing...');
-                startLogPolling();
 
                 const response = await fetch('/process-documents', {
                     method: 'POST',
@@ -523,8 +558,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
 
                 if (response.ok) {
+                    // Clear custom polling interval
+                    clearInterval(processLogPolling);
+                    
+                    // Show completion status
                     progressFill.style.width = '100%';
-                    updateOperationStatus('Files processed successfully!');
+                    logDisplay.textContent = 'Files processed successfully!';
 
                     // Show stats
                     const statsDiv = document.createElement('div');
@@ -535,13 +574,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         <p>Graph Nodes: ${data.node_count || 0}</p>
                         <p>Graph Edges: ${data.edge_count || 0}</p>
                     `;
-                    loadingIndicator.appendChild(statsDiv);
+                    statusContainer.appendChild(statsDiv);
 
                     // Auto-navigate to search after 5 seconds
                     setTimeout(() => {
-                        // Remove stats and progress bar
-                        statsDiv.remove();
-                        progressBar.remove();
+                        loadingIndicator.innerHTML = ''; // Clear all content
                         loadingIndicator.classList.add('hidden');
                         // Navigate to search view
                         document.querySelector('[data-view="search"]').click();
@@ -555,7 +592,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 processFilesBtn.disabled = false;
                 loadingIndicator.classList.add('hidden');
             } finally {
-                stopLogPolling();
+                clearInterval(processLogPolling); // Ensure polling is stopped
             }
         });
     }
