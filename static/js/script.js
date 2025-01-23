@@ -179,6 +179,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 loadingIndicator.classList.add('hidden');
                 resultsDiv.classList.remove('hidden');
+
+                // Update confidence if available
+                if (data.confidence !== undefined) {
+                    updateConfidence(data.confidence);
+                }
                 
                 // Display English response
                 const englishContent = document.querySelector('#englishResponse .response-content');
@@ -237,6 +242,25 @@ document.addEventListener('DOMContentLoaded', function() {
             searchButton.disabled = false;
         }
     });
+
+    // Confidence indicator management
+    function updateConfidence(confidence) {
+        const confidenceIndicator = document.getElementById('confidenceIndicator');
+        const confidenceFill = confidenceIndicator.querySelector('.confidence-fill');
+        const confidencePercentage = confidenceIndicator.querySelector('.confidence-percentage');
+        
+        if (confidenceFill && confidencePercentage) {
+            // Convert confidence to percentage if needed
+            const confidenceValue = typeof confidence === 'number' ? confidence :
+                                  typeof confidence === 'string' ? parseFloat(confidence) : 0;
+            
+            // Ensure value is between 0-100
+            const percentage = Math.min(Math.max(confidenceValue, 0), 100);
+            
+            confidenceFill.style.width = `${percentage}%`;
+            confidencePercentage.textContent = `${Math.round(percentage)}%`;
+        }
+    }
 
     // Error display
     function displayError(message) {
