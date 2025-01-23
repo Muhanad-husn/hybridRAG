@@ -491,29 +491,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorDiv.classList.add('hidden');
                 processFilesBtn.disabled = true;
 
-                // Show loading indicator
-                loadingIndicator.classList.remove('hidden');
-                resultsDiv.classList.add('hidden');
-                errorDiv.classList.add('hidden');
-
-                // Get or create progress bar
-                let progressBar = loadingIndicator.querySelector('.progress-bar');
-                if (!progressBar) {
-                    progressBar = document.createElement('div');
-                    progressBar.className = 'progress-bar';
-                    progressBar.innerHTML = '<div class="progress-fill"></div>';
-                    loadingIndicator.insertBefore(progressBar, loadingIndicator.firstChild);
-                }
-
                 // Get operation status element
                 const operationStatus = document.getElementById('operationStatus');
+                operationStatus.textContent = 'Initializing file processing...';
                 
-                // Initialize progress
-                const progressFill = progressBar.querySelector('.progress-fill');
-                progressFill.style.width = '0%';
-                let progress = 0;
-                
-                // Start log polling with progress updates
+                // Start log polling
                 const processLogPolling = setInterval(async () => {
                     try {
                         const response = await fetch('/logs');
@@ -522,22 +504,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (data.logs && data.logs.length > 0) {
                             const latestLog = data.logs[data.logs.length - 1];
                             operationStatus.textContent = latestLog;
-                            
-                            // Update progress based on log messages
-                            if (latestLog.includes('Processing file:')) progress = 20;
-                            else if (latestLog.includes('chunks created')) progress = 40;
-                            else if (latestLog.includes('Generated embeddings')) progress = 60;
-                            else if (latestLog.includes('Added vectors to FAISS index')) progress = 80;
-                            else if (latestLog.includes('Document processing completed')) progress = 100;
-                            
-                            progressFill.style.width = `${progress}%`;
                         }
                     } catch (error) {
                         console.error('Error fetching logs:', error);
                     }
                 }, 500);
-
-                operationStatus.textContent = 'Initializing file processing...';
 
                 const response = await fetch('/process-documents', {
                     method: 'POST',
@@ -554,36 +525,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Clear polling interval
-                    clearInterval(processLogPolling);
-                    
                     // Show completion status
-                    progressFill.style.width = '100%';
                     operationStatus.textContent = 'Files processed successfully!';
 
                     // Update footer stats
                     document.getElementById('docCount').textContent = data.vector_count || 0;
                     document.getElementById('nodeCount').textContent = data.node_count || 0;
 
-                    // Show stats in loading indicator
-                    const statsHtml = `
-                        <div class="process-stats">
-                            <h3>Processing Complete</h3>
-                            <p>Documents in Vector Store: ${data.vector_count || 0}</p>
-                            <p>Graph Nodes: ${data.node_count || 0}</p>
-                            <p>Graph Edges: ${data.edge_count || 0}</p>
-                        </div>
-                    `;
-                    loadingIndicator.insertAdjacentHTML('beforeend', statsHtml);
-
                     // Auto-navigate to search after 5 seconds
                     setTimeout(() => {
-                        // Remove progress bar and stats
-                        const progressBar = loadingIndicator.querySelector('.progress-bar');
-                        const statsDiv = loadingIndicator.querySelector('.process-stats');
-                        if (progressBar) progressBar.remove();
-                        if (statsDiv) statsDiv.remove();
-                        
                         // Reset operation status and hide loading
                         operationStatus.textContent = 'Processing query...';
                         loadingIndicator.classList.add('hidden');
