@@ -475,6 +475,52 @@ document.addEventListener('DOMContentLoaded', function() {
         updateOperationStatus(`Error: ${message}`);
     }
 
+    // Process Files functionality
+    const processFilesBtn = document.getElementById('processFilesBtn');
+    if (processFilesBtn) {
+        processFilesBtn.addEventListener('click', async () => {
+            try {
+                // Show loading state
+                loadingIndicator.classList.remove('hidden');
+                resultsDiv.classList.add('hidden');
+                errorDiv.classList.add('hidden');
+                processFilesBtn.disabled = true;
+                updateOperationStatus('Processing files...');
+                
+                // Start polling for logs
+                startLogPolling();
+
+                const response = await fetch('/process-documents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        input_dir: 'data/raw_documents',
+                        save_chunks: true,
+                        save_embeddings: true
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    updateOperationStatus('Files processed successfully!');
+                } else {
+                    throw new Error(data.error || 'Failed to process files');
+                }
+            } catch (error) {
+                console.error('[Process Files] Error:', error);
+                displayError(error.message);
+            } finally {
+                // Stop polling for logs
+                stopLogPolling();
+                processFilesBtn.disabled = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+    }
+
     // Set initial tab
     switchTab('en');
 });

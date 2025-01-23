@@ -68,6 +68,25 @@ header h1 {
     color: white;
 }
 
+/* Process Files Button */
+.nav-btn.process-files {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+.nav-btn.process-files:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.nav-btn.process-files:disabled {
+    background-color: var(--text-secondary);
+    border-color: var(--text-secondary);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
 /* Search Form */
 .search-form {
     margin-bottom: 30px;
