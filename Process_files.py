@@ -15,11 +15,10 @@ from src.utils.formatter import format_result
 class HyperRAG:
     """Main class for the Hyper RAG system."""
     
-    def __init__(self, config_path: str = "config/config.yaml"):
+    def __init__(self, config_path: str = "config/config.yaml", logger=None):
         """Initialize the Hyper RAG system."""
-        # Setup logging
-        setup_logger()
-        self.logger = logging.getLogger(__name__)
+        # Use provided logger or get a new one
+        self.logger = logger or logging.getLogger(__name__)
         
         # Initialize components
         self.document_processor = DocumentProcessor(config_path)
@@ -160,59 +159,3 @@ class HyperRAG:
         
         self.logger.info(f"Query processed successfully, found {len(results)} results")
         return results
-
-
-async def amain():
-    """Async main entry point for the application."""
-    try:
-        # Setup logging first, before any operations
-        setup_logger()
-        
-        # Get root logger for main script
-        logger = logging.getLogger()
-        logger.info("=" * 60)
-        logger.info("Starting document processing")
-        logger.info("-" * 60)
-        
-        # Initialize the system
-        logger.info("Initializing RAG system...")
-        rag_system = HyperRAG()
-        
-        # Reset storage since this is initial setup
-        logger.info("Resetting storage for initial setup...")
-        rag_system.reset_storage()
-        logger.info("Storage reset completed")
-        
-        # Process documents from raw_documents directory
-        input_dir = os.path.join("data", "raw_documents")
-        logger.info(f"Checking for documents in {input_dir}")
-        
-        if not os.path.exists(input_dir) or not os.listdir(input_dir):
-            logger.error(f"No documents found in {input_dir}")
-            raise ValueError(f"No documents found in {input_dir}")
-        
-        logger.info("Found documents to process")
-            
-        # Process documents (this will trigger LLM extraction and graph construction)
-        logger.info("Starting document processing pipeline...")
-        await rag_system.aprocess_documents(
-            input_dir=input_dir,
-            save_chunks=True,
-            save_embeddings=True
-        )
-        
-        logger.info("=" * 60)
-        logger.info("Document processing completed successfully")
-        logger.info("=" * 60)
-        
-    except Exception as e:
-        logger.error("=" * 60)
-        logger.error("Document processing failed")
-        logger.error("-" * 60)
-        logger.error(f"Error: {str(e)}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        logger.error("=" * 60)
-        raise
-
-if __name__ == "__main__":
-    asyncio.run(amain())

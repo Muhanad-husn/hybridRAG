@@ -9,6 +9,8 @@ from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
 from functools import wraps
+from Process_files import HyperRAG
+import asyncio
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -313,6 +315,40 @@ def generate_result():
             'error': 'Failed to process request',
             'details': str(e)
         }), 400
+
+# Initialize HyperRAG with app logger
+rag_system = HyperRAG(logger=logger)
+
+@app.route('/process-documents', methods=['POST'])
+@log_request
+def process_documents():
+    try:
+        data = request.get_json()
+        input_dir = data.get('input_dir', os.path.join("data", "raw_documents"))
+        save_chunks = data.get('save_chunks', True)
+        save_embeddings = data.get('save_embeddings', True)
+
+        if not os.path.exists(input_dir):
+            return jsonify({'error': f'Directory not found: {input_dir}'}), 404
+
+        if not os.listdir(input_dir):
+            return jsonify({'error': f'No documents found in {input_dir}'}), 400
+
+        # Process documents using asyncio.run()
+        asyncio.run(rag_system.aprocess_documents(
+            input_dir=input_dir,
+            save_chunks=save_chunks,
+            save_embeddings=save_embeddings
+        ))
+
+        return jsonify({
+            'message': 'Documents processed successfully',
+            'input_dir': input_dir
+        })
+
+    except Exception as e:
+        logger.error(f"Document processing error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     try:
