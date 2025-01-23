@@ -340,29 +340,17 @@ class LLMGraphTransformer:
         """Asynchronously process a single document."""
         try:
             text = document.page_content
-            #logger.info(f"Async processing document: {document.metadata.get('source', 'unknown')}")
             
-            # Get raw model response using predict
-            if hasattr(self.llm, 'client'):
-                # Note: OpenRouter client doesn't have async methods yet
-                response = self.llm.get_completion(
-                    prompt=user_prompt_template.format(text=text),
-                    system_prompt=system_prompt,
-                    temperature=0.0,
-                    max_tokens=2000
-                )
-                raw_response = response.get('content', '')
-            else:
-                # Fallback to standard apredict
-                raw_response = await self.llm.apredict(text=f"{system_prompt}\n\n{user_prompt_template.format(text=text)}")
+            # Get raw model response using OpenRouter client's get_completion directly
+            response = self.llm.get_completion(
+                prompt=user_prompt_template.format(text=text),
+                system_prompt=system_prompt,
+                temperature=0.0,
+                max_tokens=2000
+            )
+            raw_response = response.get('content', '')
             
-            # Log raw response
-            #logger.info("Raw model response (async):")
-            #logger.info("-" * 80)
-            #logger.info(raw_response)
-            #logger.info("-" * 80)
-            
-            # Extract nodes and relationships (similar to sync version)
+            # Extract nodes and relationships
             nodes = []
             relationships = []
             node_map = {}  # Keep track of created nodes to avoid duplicates
@@ -426,7 +414,6 @@ class LLMGraphTransformer:
             
             # Perform node deduplication
             if nodes and relationships:
-                #logger.info("Starting node deduplication...")
                 # Convert Node objects to dictionaries for deduplication
                 node_dicts = [{'id': node.id, 'type': node.type, 'properties': node.properties} for node in nodes]
                 
