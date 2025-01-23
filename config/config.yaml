@@ -12,7 +12,7 @@ openrouter:
 # LLM Settings
 llm:
   extraction_model: anthropic/claude-3.5-haiku-20241022  # For graph construction
-  answer_model: anthropic/claude-3.5-haiku-20241022      # For answer generation
+  answer_model: microsoft/phi-4      # For answer generation
 
 # Graph Settings
 graph:
