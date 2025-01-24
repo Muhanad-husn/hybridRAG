@@ -11,6 +11,16 @@ from functools import wraps
 from Process_files import HyperRAG
 import asyncio
 
+def manage_results_directory():
+    results_dir = os.path.join(os.path.dirname(__file__), 'results')
+    files = [os.path.join(results_dir, f) for f in os.listdir(results_dir) if f.endswith('.html')]
+    files.sort(key=os.path.getmtime, reverse=True)
+    
+    while len(files) > 15:
+        oldest_file = files.pop()
+        os.remove(oldest_file)
+        logger.info(f"Removed old result file: {oldest_file}")
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
@@ -155,6 +165,9 @@ def save_result():
         file_path = os.path.join(results_dir, filename)
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(html)
+        
+        # Manage results directory after saving
+        manage_results_directory()
             
         # Create HTML response for browser download
         logger.info(f"Saving and sending result for download: {filename}")
@@ -182,11 +195,12 @@ def get_saved_results():
                 file_path = os.path.join(results_dir, filename)
                 results.append({
                     'filename': filename,
-                    'timestamp': os.path.getctime(file_path)
+                    'timestamp': os.path.getmtime(file_path)
                 })
-                
-        # Sort by timestamp, newest first
+        
+        # Sort by timestamp, newest first, and limit to 15
         results.sort(key=lambda x: x['timestamp'], reverse=True)
+        results = results[:15]
         return jsonify({'results': results})
     except Exception as e:
         logger.error(f"Error getting saved results: {str(e)}")
@@ -503,6 +517,7 @@ def update_model_settings():
 
 if __name__ == '__main__':
     try:
+        manage_results_directory()  # Manage results directory at startup
         port = 5000
         logger.info("=" * 60)
         logger.info("HybridRAG Server Starting")
