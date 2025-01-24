@@ -208,6 +208,47 @@ initializeResponseTabs();
 const navButtons = document.querySelectorAll('.nav-btn');
 const views = document.querySelectorAll('.view');
 
+// Function to fetch and display saved results
+async function updateSavedResultsView() {
+    const savedResultsGrid = document.querySelector('.saved-results-grid');
+    if (!savedResultsGrid) return;
+
+    try {
+        const response = await fetch('/get-saved-results');
+        const data = await response.json();
+
+        if (!data.results) {
+            throw new Error('Invalid response format');
+        }
+
+        const resultsList = document.createElement('ul');
+        resultsList.style.listStyle = 'none';
+        resultsList.style.padding = '0';
+        resultsList.style.margin = '0';
+
+        if (data.results.length > 0) {
+            data.results.forEach(result => {
+                const li = document.createElement('li');
+                li.style.padding = '8px';
+                li.style.borderBottom = '1px solid #eee';
+                li.textContent = result.filename;
+                resultsList.appendChild(li);
+            });
+        } else {
+            const li = document.createElement('li');
+            li.style.padding = '8px';
+            li.textContent = 'No saved results yet';
+            resultsList.appendChild(li);
+        }
+
+        savedResultsGrid.innerHTML = '';
+        savedResultsGrid.appendChild(resultsList);
+    } catch (error) {
+        console.error('[Saved Results] Error:', error);
+        savedResultsGrid.innerHTML = `<p style="margin:0; padding:8px;">Error: ${error.message}</p>`;
+    }
+}
+
 // Function to fetch and display search history
 async function updateSearchHistoryView() {
     const historyList = document.querySelector('.history-list');
@@ -282,6 +323,8 @@ navButtons.forEach(button => {
         // Update content based on view
         if (viewName === 'history') {
             updateSearchHistoryView();
+        } else if (viewName === 'saved') {
+            updateSavedResultsView();
         }
     });
 });

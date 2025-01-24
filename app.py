@@ -150,8 +150,17 @@ def save_result():
         if not all([content, filename, html]):
             return jsonify({'error': 'Missing required fields'}), 400
             
+        # Ensure results directory exists
+        results_dir = os.path.join(os.path.dirname(__file__), 'results')
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Save file to results directory
+        file_path = os.path.join(results_dir, filename)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(html)
+            
         # Create HTML response for browser download
-        logger.info(f"Sending result for download: {filename}")
+        logger.info(f"Saving and sending result for download: {filename}")
         return send_file(
             io.BytesIO(html.encode('utf-8')),
             mimetype='text/html',
@@ -160,6 +169,30 @@ def save_result():
         )
     except Exception as e:
         logger.error(f"Error saving result: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get-saved-results', methods=['GET'])
+@log_request
+def get_saved_results():
+    try:
+        results_dir = os.path.join(os.path.dirname(__file__), 'results')
+        # Create directory if it doesn't exist
+        os.makedirs(results_dir, exist_ok=True)
+            
+        results = []
+        for filename in os.listdir(results_dir):
+            if filename.endswith('.html'):
+                file_path = os.path.join(results_dir, filename)
+                results.append({
+                    'filename': filename,
+                    'timestamp': os.path.getctime(file_path)
+                })
+                
+        # Sort by timestamp, newest first
+        results.sort(key=lambda x: x['timestamp'], reverse=True)
+        return jsonify({'results': results})
+    except Exception as e:
+        logger.error(f"Error getting saved results: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/logs', methods=['GET'])
