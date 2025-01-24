@@ -63,8 +63,8 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             # Verify vector store exists
             if not (os.path.exists(embedding_generator.embeddings_dir) and
                    os.listdir(embedding_generator.embeddings_dir)):
-                logger.error("Vector store not found. Please run src/main.py first to initialize the system.")
-                raise ValueError("Vector store not initialized. Run src/main.py first.")
+                logger.error("Vector store not found. Please process documents using HyperRAG to initialize the system.")
+                raise ValueError("Vector store not initialized. Please process documents using HyperRAG to initialize the system.")
                 
             logger.info("Using existing embeddings")
         except Exception as e:

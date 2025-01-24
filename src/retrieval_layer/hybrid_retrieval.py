@@ -29,7 +29,7 @@ class HybridRetrieval:
         embeddings_dir = os.path.join('data', 'embeddings')
         index_path = os.path.join(embeddings_dir, 'index.faiss')
         if not os.path.exists(index_path):
-            raise ValueError("Vector store not initialized. Please run src/main.py first to initialize the system.")
+            raise ValueError("Vector store not initialized. Please process documents using HyperRAG to initialize the system.")
         logger.info(f"Found existing FAISS index at {index_path}")
         
     def _load_config(self, config_path: str) -> Dict:
