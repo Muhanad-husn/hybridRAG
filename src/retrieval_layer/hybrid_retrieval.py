@@ -8,7 +8,6 @@ import torch
 from ..processing_layer.embedding_generator import EmbeddingGenerator
 from ..processing_layer.graph_constructor import GraphConstructor
 import logging
-from concurrent.futures import ThreadPoolExecutor
 import traceback
 
 # Get logger instance

@@ -1,12 +1,9 @@
 from flask import Flask, render_template, request, jsonify, send_file
-import sys
-import logging
 import io
 import os
 import json
 import yaml
 from datetime import datetime
-from collections import deque
 from retrieve_syria import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger

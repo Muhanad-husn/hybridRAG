@@ -1,6 +1,5 @@
-import os
 import logging
-from typing import Optional, List, Mapping, Any, Dict, ClassVar
+from typing import Optional, List, Mapping, Any
 from pydantic import Field, ConfigDict
 from langchain.llms.base import LLM
 from openrouter_client import OpenRouterClient

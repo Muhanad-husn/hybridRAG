@@ -1,12 +1,11 @@
 import os
 import yaml
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional
 import hashlib
 from langchain_community.document_loaders.llmsherpa import LLMSherpaFileLoader
 from langchain.schema import Document
 import logging
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from functools import partial
 import pickle
 from datetime import datetime, timedelta
 

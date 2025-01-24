@@ -1,16 +1,12 @@
 import os
 import logging
 import shutil
-import asyncio
-import traceback
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any
 from src.input_layer.document_processor import DocumentProcessor
 from src.processing_layer.embedding_generator import EmbeddingGenerator
 from src.processing_layer.graph_constructor import GraphConstructor
 from src.retrieval_layer.hybrid_retrieval import HybridRetrieval
-from src.utils.logger import setup_logger
 from src.utils.error_handler import log_errors
-from src.utils.formatter import format_result
 
 class HyperRAG:
     """Main class for the Hyper RAG system."""

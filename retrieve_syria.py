@@ -1,14 +1,11 @@
 import os
 import sys
 import re
-import json
 import yaml
 import logging
 import traceback
 import tiktoken
-from typing import Dict, Any, List, Optional
-from contextlib import redirect_stderr
-from io import StringIO
+from typing import Dict, Any, Optional
 from datetime import datetime
 # Suppress warnings
 import warnings
@@ -17,7 +14,6 @@ os.environ['LOGURU_LEVEL'] = 'CRITICAL'
 os.environ['FAISS_LOGGING_LEVEL'] = '0'  # Suppress FAISS logging
 
 # Import dependencies
-from langchain.schema import Document
 from src.input_layer.document_processor import DocumentProcessor
 from src.processing_layer.embedding_generator import EmbeddingGenerator
 from src.processing_layer.graph_constructor import GraphConstructor

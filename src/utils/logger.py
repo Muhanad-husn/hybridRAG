@@ -1,9 +1,7 @@
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import yaml
 from typing import Optional
-from datetime import datetime
 
 class DuplicateFilter(logging.Filter):
     """Filter to prevent repeated log messages within a short time window."""

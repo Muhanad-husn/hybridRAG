@@ -7,13 +7,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchButton = document.getElementById('searchButton');
     const loadingIndicator = document.getElementById('loadingIndicator');
     const resultsDiv = document.getElementById('results');
-    const englishResponse = document.getElementById('englishResponse');
-    const arabicResponse = document.getElementById('arabicResponse');
     const errorDiv = document.getElementById('error');
     const sourcesList = document.querySelector('.sources-list');
-    const historyList = document.querySelector('.history-list');
-    const historySearch = document.querySelector('.history-search');
-    const historySort = document.querySelector('.history-sort');
 
     // Operation status management
     let lastLogTimestamp = '';

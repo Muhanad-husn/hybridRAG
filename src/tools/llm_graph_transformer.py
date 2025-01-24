@@ -11,15 +11,9 @@ from thefuzz import fuzz
 from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    PromptTemplate,
-)
+from langchain_core.prompts import ChatPromptTemplate
+
 from langchain_core.runnables import RunnableConfig
-from pydantic import BaseModel, Field, create_model
 from .openrouter_client import OpenRouterClient
 
 # Setup logging

@@ -4,8 +4,7 @@ import torch
 import numpy as np
 import faiss
 import shutil
-import traceback
-from typing import List, Dict, Union, Optional
+from typing import List, Dict, Optional
 from transformers import AutoTokenizer, AutoModel
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
