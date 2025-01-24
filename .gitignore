@@ -8,3 +8,4 @@ __pycache__/
 .vscode/
 .benchmarks/
 results/
+requirements_1.txt
