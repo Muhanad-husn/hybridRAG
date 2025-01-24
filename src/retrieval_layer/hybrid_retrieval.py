@@ -81,8 +81,10 @@ class HybridRetrieval:
     def similarity_search(
         self,
         query: str,
-        k: int = 100
+        k: Optional[int] = None
     ) -> List[Tuple[Document, float]]:
+        # Use configured pool size or default to 100
+        k = k or self.config.get('retrieval', {}).get('initial_pool_size', 100)
         """
         Perform similarity search using FAISS vector store with inner product similarity.
         
@@ -185,8 +187,10 @@ class HybridRetrieval:
         self,
         graph: GraphConstructor,
         query: str,
-        limit: int = 85
+        limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
+        # Use configured limit or default
+        limit = limit or self.config.get('graph', {}).get('node_limit', 150)
         """
         Perform query-relevant graph-based search using NetworkX.
         
@@ -278,7 +282,10 @@ class HybridRetrieval:
                 text_score = float(similarities[i])
                 centrality_score = float(centrality_scores[node])
                 # Weighted combination of scores with higher weight on text similarity
-                node_scores[node] = (0.7 * text_score + 0.3 * centrality_score)
+                # Use configured weights or defaults
+                text_weight = self.config.get('graph', {}).get('text_weight', 0.6)
+                centrality_weight = self.config.get('graph', {}).get('centrality_weight', 0.4)
+                node_scores[node] = (text_weight * text_score + centrality_weight * centrality_score)
             
             # Sort nodes by combined score
             sorted_nodes = sorted(
@@ -381,12 +388,40 @@ class HybridRetrieval:
             logger.error(f"Error in deduplication: {str(e)}")
             raise
 
+    def _get_source_type(self, result: Dict[str, Any]) -> str:
+        """Determine the source type of a result."""
+        if isinstance(result, dict):
+            if 'node' in result:
+                return 'graph'
+            if 'meta' in result and isinstance(result['meta'], str):
+                if 'graph_relationships' in result['meta']:
+                    return 'relationship'
+                if result['meta'].endswith(('.pdf', '.docx', '.txt')):
+                    return 'document'
+            return 'unknown'
+        return 'unknown'
+
+    def _apply_diversity_penalty(self, score: float, source_type: str, source_counts: Dict[str, int]) -> float:
+        """Apply diversity penalty based on source type frequency."""
+        config = self.config.get('diversity', {})
+        if not config.get('enable_penalty', True):
+            return score
+            
+        penalty_factor = config.get('penalty_factor', 0.05)
+        max_penalty = config.get('max_penalty', 0.3)
+        
+        # Calculate penalty based on how many times this source type has been seen
+        penalty = min(source_counts[source_type] * penalty_factor, max_penalty)
+        return score * (1 - penalty)
+
     def rerank_results(
         self,
         query: str,
         results: List[Dict[str, Any]],
         top_k: Optional[int] = None
     ) -> List[Dict[str, Any]]:
+        # Use configured rerank size if top_k not specified
+        top_k = top_k or self.config.get('retrieval', {}).get('rerank_size', 50)
         """
         Rerank search results using the ranking model.
         
@@ -492,16 +527,45 @@ class HybridRetrieval:
                 for passage, score in zip(passages, scores)
             ]
             
-            # Sort by score
+            # Track source types and apply diversity penalty
+            source_counts = {}
+            diversity_adjusted_results = []
+            
+            for result in reranked_results:
+                source_type = self._get_source_type(result)
+                source_counts[source_type] = source_counts.get(source_type, 0) + 1
+                
+                # Apply diversity penalty to score
+                adjusted_score = self._apply_diversity_penalty(
+                    result['score'],
+                    source_type,
+                    source_counts
+                )
+                
+                result['original_score'] = result['score']
+                result['score'] = adjusted_score
+                diversity_adjusted_results.append(result)
+            
+            # Sort by adjusted score
             sorted_results = sorted(
-                reranked_results,
+                diversity_adjusted_results,
                 key=lambda x: x['score'],
                 reverse=True
             )
             
-            # Apply top_k if specified
+            # Apply top_k and log diversity metrics
             if top_k:
                 sorted_results = sorted_results[:top_k]
+                
+            # Log diversity metrics
+            final_source_counts = {}
+            for result in sorted_results:
+                source_type = self._get_source_type(result)
+                final_source_counts[source_type] = final_source_counts.get(source_type, 0) + 1
+            
+            logger.info(f"Source type distribution in final results: {final_source_counts}")
+            coverage = len(final_source_counts) / self.config.get('diversity', {}).get('min_source_types', 3)
+            logger.info(f"Source type coverage: {coverage:.2%}")
             
             # Convert to standard format with both old and new fields
             formatted_results = []
@@ -591,33 +655,62 @@ class HybridRetrieval:
                 relationships = []
                 high_degree_nodes = 0
                 
-                # Get nodes with many relationships (similar to Neo4j COUNT query)
+                # Get minimum degree from config
+                min_degree = self.config.get('graph', {}).get('min_degree', 2)
+                
+                # Get nodes with significant relationships
                 for node in graph.graph.nodes():
                     degree = graph.graph.degree(node)
-                    if degree > 3:
+                    if degree > min_degree:
                         high_degree_nodes += 1
                         node_data = graph.graph.nodes[node]
                         node_type = node_data.get('type', 'unknown')
-                        #logger.info(f"Found high-degree node: {node} ({node_type}) with {degree} connections")
+                        logger.debug(f"Found high-degree node: {node} ({node_type}) with {degree} connections")
                         
                         # Get all relationships for this node
                         for neighbor in graph.graph.neighbors(node):
                             edge = graph.graph.get_edge_data(node, neighbor)
                             if edge:
                                 rel_type = edge.get('type', 'unknown')
-                                relationships.append(f"{node} ({node_type}) -{rel_type}-> {neighbor}")
+                                # Dynamic scoring based on degree and relationship type
+                                rel_score = min(0.9, 0.7 + (degree - min_degree) * 0.05)
+                                relationships.append({
+                                    'text': f"{node} ({node_type}) -{rel_type}-> {neighbor}",
+                                    'score': rel_score,
+                                    'type': rel_type
+                                })
                 
                 logger.info(f"Found {high_degree_nodes} high-degree nodes with {len(relationships)} relationships")
                 
                 if relationships:
-                    # Create a document from graph relationships
-                    graph_context = "\n".join(relationships)
-                    combined_results.append({
-                        'text': f"Graph Analysis:\n{graph_context}",
-                        'meta': 'graph_relationships',
-                        'score': 0.9  # High score for graph-based context
-                    })
-                    logger.info("Added graph relationships to results")
+                    # Group relationships by type for better organization
+                    rel_by_type = {}
+                    for rel in relationships:
+                        rel_type = rel['type']
+                        if rel_type not in rel_by_type:
+                            rel_by_type[rel_type] = []
+                        rel_by_type[rel_type].append(rel)
+                    
+                    # Add each relationship group as a separate result
+                    for rel_type, rels in rel_by_type.items():
+                        # Sort relationships by score
+                        sorted_rels = sorted(rels, key=lambda x: x['score'], reverse=True)
+                        
+                        # Create context with relationships of this type
+                        rel_texts = [r['text'] for r in sorted_rels]
+                        graph_context = f"Graph Analysis ({rel_type}):\n" + "\n".join(rel_texts)
+                        
+                        # Use maximum relationship score for this group
+                        group_score = sorted_rels[0]['score'] if sorted_rels else 0.7
+                        
+                        combined_results.append({
+                            'text': graph_context,
+                            'meta': f'graph_relationships_{rel_type}',
+                            'score': group_score,
+                            'source_type': 'relationship'
+                        })
+                    
+                    logger.info(f"Added {len(rel_by_type)} relationship groups to results")
 
             # Deduplicate results
             unique_results = self.deduplicate_results(combined_results)

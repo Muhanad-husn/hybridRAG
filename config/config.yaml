@@ -12,6 +12,10 @@ graph:
   storage:
     nodes_file: data/graphs/nodes.csv
     edges_file: data/graphs/edges.csv
+  node_limit: 150
+  min_degree: 2
+  text_weight: 0.6
+  centrality_weight: 0.4
 embedding:
   model_name: thenlper/gte-small
   max_length: 512
@@ -79,6 +83,17 @@ timeouts:
   document_processing: 20
   query_processing: 30
   embedding_generation: 60
+
+retrieval:
+  initial_pool_size: 250
+  score_threshold: 0.75
+  rerank_size: 75
+
+diversity:
+  enable_penalty: true
+  penalty_factor: 0.05
+  max_penalty: 0.3
+  min_source_types: 3
 paths:
   embeddings: data/embeddings
   graphs: data/graphs
