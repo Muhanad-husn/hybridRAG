@@ -1,4 +1,4 @@
-cachetools==5.3.2
+cachetools==5.5.1
 faiss_cpu==1.9.0.post1
 Flask==3.1.0
 langchain==0.3.15
@@ -11,8 +11,8 @@ pandas==2.2.3
 pydantic==2.10.6
 PyYAML==6.0.2
 Requests==2.32.3
-scikit_learn==1.4.0
+scikit_learn==1.6.1
 thefuzz==0.22.1
 tiktoken==0.8.0
 torch==2.5.1
-transformers==4.47.1
+transformers==4.48.1
