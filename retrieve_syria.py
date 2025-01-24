@@ -180,10 +180,10 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             context_tokens = len(enc.encode(context))
             logger.info(f"Context length: {context_tokens} tokens")
             
-            if context_tokens > 6000:
+            if context_tokens > 10000:
                 # Calculate new rerank count to maintain roughly the same tokens per result
                 tokens_per_result = context_tokens / len(context_parts)
-                target_results = int(6000 / tokens_per_result)
+                target_results = int(10000 / tokens_per_result)
                 
                 # Ensure minimum results
                 new_rerank_count = max(5, min(target_results, rerank_count))

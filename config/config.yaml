@@ -7,7 +7,7 @@ openrouter:
   model: anthropic/claude-3.5-haiku-20241022
 llm:
   extraction_model: anthropic/claude-3.5-haiku-20241022:beta
-  answer_model: microsoft/phi-4
+  answer_model: openai/gpt-4o-mini-2024-07-18
 graph:
   storage:
     nodes_file: data/graphs/nodes.csv

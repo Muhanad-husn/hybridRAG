@@ -331,7 +331,23 @@ def upload_files():
         # Get the raw_documents directory path
         raw_docs_dir = os.path.join("data", "raw_documents")
         
-        # Delete existing files in raw_documents
+        # Get uploaded files
+        uploaded_files = request.files.getlist('files')
+        if not uploaded_files:
+            return jsonify({'error': 'No files uploaded'}), 400
+
+        # Store files in memory first
+        files_to_save = []
+        for file in uploaded_files:
+            if file.filename:
+                # Store file content and name
+                content = file.read()
+                files_to_save.append((file.filename, content))
+                
+        if not files_to_save:
+            return jsonify({'error': 'No valid files to upload'}), 400
+            
+        # Now that we have all files, clear the target directory
         for filename in os.listdir(raw_docs_dir):
             file_path = os.path.join(raw_docs_dir, filename)
             try:
@@ -340,17 +356,15 @@ def upload_files():
             except Exception as e:
                 logger.error(f"Error deleting file {file_path}: {str(e)}")
         
-        # Process uploaded files
-        uploaded_files = request.files.getlist('files')
-        if not uploaded_files:
-            return jsonify({'error': 'No files uploaded'}), 400
-            
-        # Save uploaded files
-        for file in uploaded_files:
-            if file.filename:
-                file.save(os.path.join(raw_docs_dir, file.filename))
+        # Save all files at once
+        for filename, content in files_to_save:
+            with open(os.path.join(raw_docs_dir, filename), 'wb') as f:
+                f.write(content)
                 
-        return jsonify({'message': 'Files uploaded successfully'})
+        return jsonify({
+            'message': 'Files uploaded successfully',
+            'count': len(files_to_save)
+        })
         
     except Exception as e:
         logger.error(f"File upload error: {str(e)}")

@@ -41,7 +41,7 @@ class OpenRouterClient(BaseModel):
         prompt: str,
         system_prompt: Optional[str] = None,
         temperature: float = 0.0,
-        max_tokens: int = 6000,
+        max_tokens: int = 10000,
         top_p: float = 0.95,
     ) -> Dict[str, Any]:
         """
@@ -124,6 +124,7 @@ class OpenRouterClient(BaseModel):
 
                 # Parse successful response
                 response_data = response.json()
+                #logger.info(f"Raw API response: {response_data}")
             
                 # Validate response structure
                 if not response_data or "choices" not in response_data or not response_data["choices"]:
