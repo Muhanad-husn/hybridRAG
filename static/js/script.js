@@ -169,40 +169,40 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Initialize response tabs
-    function initializeResponseTabs() {
-        const tabs = document.querySelectorAll('.response-tabs .tab-btn');
-        const englishSection = document.getElementById('englishResponse');
-        const arabicSection = document.getElementById('arabicResponse');
-        const rawDataSection = document.getElementById('rawDataResponse');
-        
-        function switchTab(type) {
-            if (!['en', 'ar', 'raw'].includes(type)) return;
-            
-            // Update tab buttons
-            tabs.forEach(t => t.classList.toggle('active', t.dataset.type === type));
-            
-            // Update section visibility
-            englishSection.classList.toggle('hidden', type !== 'en');
-            englishSection.classList.toggle('active', type === 'en');
-            arabicSection.classList.toggle('hidden', type !== 'ar');
-            arabicSection.classList.toggle('active', type === 'ar');
-            rawDataSection.classList.toggle('hidden', type !== 'raw');
-            rawDataSection.classList.toggle('active', type === 'raw');
+    // Initialize language toggle
+    function initializeLanguageToggle() {
+        const langButtons = document.querySelectorAll('.lang-btn');
+        const translateToggle = document.getElementById('translateToggle');
+        const englishResponse = document.getElementById('englishResponse');
+        const arabicResponse = document.getElementById('arabicResponse');
+
+        function switchLanguage(lang) {
+            // Update button states
+            langButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+
+            // Update response visibility
+            englishResponse.classList.toggle('hidden', lang !== 'en');
+            arabicResponse.classList.toggle('hidden', lang !== 'ar');
+
+            // Update translate toggle
+            translateToggle.checked = lang === 'ar';
         }
 
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const type = tab.dataset.type;
-                if (type) switchTab(type);
+        langButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lang = btn.dataset.lang;
+                if (lang) switchLanguage(lang);
             });
         });
 
-        // Set initial tab
-        switchTab('en');
+        // Set initial language
+        switchLanguage('en');
     }
-// Initialize tabs
-initializeResponseTabs();
+
+    // Initialize language toggle
+    initializeLanguageToggle();
 
 // View switching
 const navButtons = document.querySelectorAll('.nav-btn');
