@@ -11,7 +11,13 @@
         <header>
             <div class="header-top">
                 <h1>GraphMind</h1>
-                <button class="nav-btn" data-view="settings">Settings</button>
+                <button class="nav-btn settings-icon-btn" data-view="settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                </button>
             </div>
             <nav class="main-nav">
                 <button class="nav-btn active" data-view="search">Search</button>
@@ -32,11 +38,11 @@
                 <form id="searchForm" class="search-form">
                     <div class="input-group">
                         <div class="query-builder">
-                            <textarea 
-                                id="queryInput" 
-                                name="query" 
+                            <textarea
+                                id="queryInput"
+                                name="query"
                                 placeholder="Enter your query here..."
-                                rows="3"
+                                rows="6"
                                 required></textarea>
                             <div class="query-suggestions hidden">
                                 <h3>Query Suggestions:</h3>
@@ -45,7 +51,7 @@
                         </div>
                         <div class="search-controls">
                             <div class="search-options">
-                                <div class="search-options-group">
+                                <div class="search-options-right">
                                     <label class="results-count">
                                         <span class="results-label">Results:</span>
                                         <input type="number" id="resultsCount" min="5" max="80" value="15" title="Number of results (5-80)">
@@ -55,11 +61,11 @@
                                         <span class="toggle-label">العربية</span>
                                     </label>
                                 </div>
-                                <button type="submit" id="searchButton" class="search-btn">
-                                    <span class="btn-text-en">Search</span>
-                                    <span class="btn-text-ar">بحث</span>
-                                </button>
                             </div>
+                            <button type="submit" id="searchButton" class="search-btn">
+                                <span class="btn-text-en">Search</span>
+                                <span class="btn-text-ar">بحث</span>
+                            </button>
                         </div>
                     </div>
                 </form>
