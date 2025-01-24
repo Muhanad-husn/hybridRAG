@@ -30,32 +30,36 @@
             <div id="searchView" class="view active">
 
                 <form id="searchForm" class="search-form">
-                    <div class="search-card">
-                        <div class="search-header">
-                            <div class="language-toggle">
-                                <button type="button" class="lang-btn active" data-lang="en">English</button>
-                                <button type="button" class="lang-btn" data-lang="ar">عربي</button>
-                            </div>
-                            <div class="search-options-group">
-                                <label class="results-count">
-                                    <span class="results-label">Results:</span>
-                                    <input type="number" id="resultsCount" min="5" max="80" value="15" title="Number of results (5-80)">
-                                </label>
-                            </div>
-                        </div>
+                    <div class="input-group">
                         <div class="query-builder">
-                            <textarea
-                                id="queryInput"
-                                name="query"
+                            <textarea 
+                                id="queryInput" 
+                                name="query" 
                                 placeholder="Enter your query here..."
                                 rows="3"
                                 required></textarea>
+                            <div class="query-suggestions hidden">
+                                <h3>Query Suggestions:</h3>
+                                <div class="suggestion-chips"></div>
+                            </div>
                         </div>
                         <div class="search-controls">
-                            <button type="submit" id="searchButton" class="search-btn">
-                                <span class="btn-text-en">Search</span>
-                                <span class="btn-text-ar">بحث</span>
-                            </button>
+                            <div class="search-options">
+                                <div class="search-options-group">
+                                    <label class="results-count">
+                                        <span class="results-label">Results:</span>
+                                        <input type="number" id="resultsCount" min="5" max="80" value="15" title="Number of results (5-80)">
+                                    </label>
+                                    <label class="translate-toggle">
+                                        <input type="checkbox" id="translateToggle" checked>
+                                        <span class="toggle-label">العربية</span>
+                                    </label>
+                                </div>
+                                <button type="submit" id="searchButton" class="search-btn">
+                                    <span class="btn-text-en">Search</span>
+                                    <span class="btn-text-ar">بحث</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -65,53 +69,52 @@
                 </div>
 
                 <div id="results" class="results hidden">
-                    <!-- English Result Card -->
-                    <div id="englishResponse" class="result-card">
-                        <div class="result-header">
-                            <div class="result-title">English Response</div>
-                            <div class="result-actions">
-                                <button class="save-btn" data-lang="en">Save as HTML</button>
-                            </div>
+                    <div class="responses-container">
+                        <div class="response-tabs">
+                            <button class="tab-btn active" data-type="en">English</button>
+                            <button class="tab-btn" data-type="ar">عربي</button>
+                            <button class="tab-btn" data-type="raw">Raw Data</button>
                         </div>
-                        <div class="result-content english"></div>
-                        <div class="result-footer">
-                            <div class="confidence-section">
-                                <div id="confidenceIndicator" class="confidence-indicator">
-                                    <span class="confidence-label">Answer Confidence:</span>
-                                    <div class="confidence-progress">
-                                        <div class="confidence-fill"></div>
-                                    </div>
-                                    <span class="confidence-percentage">0%</span>
+
+                        <div id="confidenceIndicator" class="confidence-indicator">
+                            <span class="confidence-label">Answer Confidence:</span>
+                            <div class="confidence-progress">
+                                <div class="confidence-fill"></div>
+                            </div>
+                            <span class="confidence-percentage">0%</span>
+                        </div>
+                        
+                        <div class="response-panels">
+                            <!-- English Response -->
+                            <div id="englishResponse" class="response-section active">
+                                <div class="response-content"></div>
+                                <div class="save-controls">
+                                    <button class="save-btn" data-lang="en">Save as HTML</button>
                                 </div>
+                            </div>
+<!-- Arabic Response -->
+<div id="arabicResponse" class="response-section" dir="rtl">
+    <div class="response-content"></div>
+    <div class="save-controls">
+        <button class="save-btn" data-lang="ar">حفظ كملف HTML</button>
+    </div>
+</div>
+
+<!-- Raw Data Response -->
+<div id="rawDataResponse" class="response-section">
+    <div class="raw-data-container">
+        <div class="raw-data-pane">
+            <h3>Source Context</h3>
+            <pre class="vector-content code-block"></pre>
+        </div>
+    </div>
+</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Arabic Result Card -->
-                    <div id="arabicResponse" class="result-card" dir="rtl">
-                        <div class="result-header">
-                            <div class="result-title">الإجابة بالعربية</div>
-                            <div class="result-actions">
-                                <button class="save-btn" data-lang="ar">حفظ كملف HTML</button>
-                            </div>
-                        </div>
-                        <div class="result-content arabic"></div>
-                        <div class="result-footer">
-                            <div class="confidence-section">
-                                <div class="confidence-indicator">
-                                    <span class="confidence-label">دقة الإجابة:</span>
-                                    <div class="confidence-progress">
-                                        <div class="confidence-fill"></div>
-                                    </div>
-                                    <span class="confidence-percentage">0%</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sources Section -->
                     <div id="sources" class="sources-section">
-                        <h3>Sources & Evidence</h3>
+                        <h2>Sources & Evidence</h2>
                         <ul class="sources-list"></ul>
                     </div>
 

@@ -146,50 +146,15 @@ header h1 {
 
 /* Search Form */
 .search-form {
-    margin: var(--section-spacing) auto;
-    max-width: 900px;
-}
-
-.search-card {
+    margin-bottom: var(--section-spacing);
     background: var(--card-background);
     padding: var(--container-padding);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-md);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.search-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--element-spacing);
-    padding-bottom: var(--element-spacing);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.language-toggle {
-    display: flex;
-    gap: 1rem;
-}
-
-.lang-btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: var(--border-radius);
-    background: var(--background-color);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-speed);
-}
-
-.lang-btn.active {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
 }
 
 .search-controls {
-    margin-top: var(--section-spacing);
+    margin-top: var(--element-spacing);
 }
 
 .query-builder {
@@ -199,7 +164,7 @@ header h1 {
 .search-options {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     gap: var(--element-spacing);
     padding: var(--element-spacing);
     background: var(--background-color);
@@ -423,112 +388,58 @@ textarea:focus {
 .confidence-indicator {
     display: flex;
     align-items: center;
-    gap: var(--element-spacing);
+    gap: 12px;
+    padding: 15px 20px;
+    margin: 10px 0;
+    background-color: var(--card-background);
+    border: 1px solid var(--primary-color);
+    border-radius: var(--border-radius);
 }
 
 .confidence-label {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
+    color: var(--primary-color);
     font-weight: 500;
     white-space: nowrap;
 }
 
 .confidence-progress {
     flex: 1;
-    height: 6px;
-    background-color: rgba(0, 0, 0, 0.1);
-    border-radius: var(--border-radius);
+    height: 8px;
+    background-color: #e0e0e0;
+    border-radius: 4px;
     overflow: hidden;
 }
 
 .confidence-fill {
     height: 100%;
     width: 0;
-    background-color: var(--primary-color);
-    transition: width 0.3s ease-out;
+    background-color: var(--success-color);
+    transition: width 0.3s ease-in-out;
 }
 
 .confidence-percentage {
     min-width: 48px;
     text-align: right;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
+    color: var(--primary-color);
     font-weight: 500;
-    font-variant-numeric: tabular-nums;
 }
 
-/* Sources Section */
-.sources-section {
-    background: var(--background-color);
+/* Results Section */
+.results {
+    background: var(--card-background);
     border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
     padding: var(--container-padding);
     margin-top: var(--section-spacing);
     border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.sources-section h3 {
-    color: var(--text-primary);
-    font-size: 1.1rem;
-    margin-bottom: var(--element-spacing);
-    padding-bottom: var(--element-spacing);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.sources-list {
-    display: flex;
-    flex-direction: column;
-    gap: calc(var(--element-spacing) / 2);
-}
-
-.sources-list li {
-    padding: var(--element-spacing);
-    background: var(--card-background);
-    border-radius: calc(var(--border-radius) / 2);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    font-size: 0.95rem;
-    color: var(--text-primary);
-    transition: all var(--transition-speed);
-}
-
-.sources-list li:hover {
-    border-color: rgba(0, 0, 0, 0.1);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
-}
-
-/* Results Section */
-.results {
-    max-width: 900px;
-    margin: var(--section-spacing) auto;
-}
-
-.result-card {
+.responses-container {
     background: var(--card-background);
     border-radius: var(--border-radius);
-    box-shadow: var(--shadow-md);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+    box-shadow: var(--shadow-sm);
     margin-bottom: var(--section-spacing);
-}
-
-.result-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--element-spacing) var(--container-padding);
-    background: var(--background-color);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.result-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.result-actions {
-    display: flex;
-    gap: 1rem;
+    overflow: hidden;
 }
 
 .response-tabs {
