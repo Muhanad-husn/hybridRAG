@@ -340,7 +340,7 @@ class LLMGraphTransformer:
                 prompt=user_prompt_template.format(text=text),
                 system_prompt=system_prompt,
                 temperature=0.0,
-                max_tokens=2000
+                max_tokens=4000
             )
             raw_response = response.get('content', '')
             

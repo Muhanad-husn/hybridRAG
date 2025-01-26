@@ -250,7 +250,7 @@ Please provide a clear and accurate answer based solely on the information provi
             prompt=user_prompt,
             system_prompt=system_prompt,
             temperature=0.5,  # Higher temperature for more creative and natural academic tone
-            #max_tokens=1000
+            #max_tokens=12000
         )
         
         # Get LLM response in English
