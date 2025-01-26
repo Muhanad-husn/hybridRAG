@@ -2,6 +2,7 @@ import os
 import time
 import random
 import requests
+import yaml
 from typing import Dict, Any, Optional, ClassVar
 from pydantic import BaseModel, Field, ConfigDict
 import logging
@@ -28,9 +29,19 @@ class OpenRouterClient(BaseModel):
     max_retries: int = Field(default=DEFAULT_MAX_RETRIES, description="Maximum retry attempts")
     base_delay: int = Field(default=DEFAULT_BASE_DELAY, description="Base delay between retries")
     timeout: int = Field(default=DEFAULT_TIMEOUT, description="Request timeout in seconds")
+    max_tokens: int = Field(description="Maximum tokens in response")
+    temperature: float = Field(description="Sampling temperature")
     
     def __init__(self, **data):
         """Initialize OpenRouter client with API key and configuration"""
+        # Load config
+        with open('config/config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        
+        # Set max_tokens and temperature from config
+        data['max_tokens'] = config['llm']['max_tokens']
+        data['temperature'] = config['llm']['temperature']
+        
         super().__init__(**data)
         self.api_key = os.environ.get('OPENROUTER_API_KEY')
         if not self.api_key:
@@ -40,8 +51,8 @@ class OpenRouterClient(BaseModel):
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.0,
-        max_tokens: int = 12000,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
         top_p: float = 0.95,
     ) -> Dict[str, Any]:
         """
@@ -50,8 +61,8 @@ class OpenRouterClient(BaseModel):
         Args:
             prompt: The user prompt
             system_prompt: Optional system prompt
-            temperature: Sampling temperature (0.0 for more deterministic outputs)
-            max_tokens: Maximum tokens in response
+            temperature: Sampling temperature (overrides instance value if provided)
+            max_tokens: Maximum tokens in response (overrides instance value if provided)
             top_p: Nucleus sampling parameter
             
         Returns:
@@ -70,8 +81,8 @@ class OpenRouterClient(BaseModel):
                 {"role": "system", "content": system_prompt} if system_prompt else None,
                 {"role": "user", "content": prompt}
             ],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
+            "temperature": temperature if temperature is not None else self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
             "top_p": top_p
         }
         
