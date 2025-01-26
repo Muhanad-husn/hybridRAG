@@ -9,7 +9,7 @@ llm:
   extraction_model: anthropic/claude-3.5-haiku-20241022:beta
   answer_model: openai/gpt-4o-mini-2024-07-18
   max_tokens: 3000  # Configuration for max tokens
-  temperature: 0.0  # New configuration for temperature
+  temperature: 0.5  # New configuration for temperature
 graph:
   storage:
     nodes_file: data/graphs/nodes.csv
