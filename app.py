@@ -255,9 +255,13 @@ def search():
         rerank_count = max(min(int(data.get('rerank_count', 15)), 80), 5)
         logger.info(f"Using rerank count: {rerank_count}")
 
-        # Get max_tokens and temperature from request, use default values if not provided
-        max_tokens = int(data.get('max_tokens', 3000))
-        temperature = float(data.get('temperature', 0.0))
+        # Load config to get max_tokens and temperature
+        config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        max_tokens = config['llm'].get('max_tokens', 3000)
+        temperature = config['llm'].get('temperature', 0.0)
         logger.info(f"Using max_tokens: {max_tokens}, temperature: {temperature}")
 
         if is_arabic:
