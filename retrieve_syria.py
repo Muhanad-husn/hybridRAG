@@ -34,7 +34,7 @@ def get_translator():
     return _translator
 
 def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None,
-                     translate: bool = True, rerank_count: int = 15) -> Dict[str, Any]:
+                     translate: bool = True, rerank_count: int = 15, max_tokens: int = 3000, temperature: float = 0.0) -> Dict[str, Any]:
     """
     Run hybrid search with both dense retrieval and graph analysis,
     then process results with LLM to generate an answer.
@@ -249,8 +249,8 @@ Please provide a clear and accurate answer based solely on the information provi
         llm_response = llm_client.get_completion(
             prompt=user_prompt,
             system_prompt=system_prompt,
-            temperature=0.5,  # Higher temperature for more creative and natural academic tone
-            #max_tokens=12000
+            temperature=temperature,
+            max_tokens=max_tokens
         )
         
         # Get LLM response in English
@@ -462,13 +462,22 @@ def main():
         # Detect language and translate if needed
         is_arabic = translator.is_arabic(original_query)
         
+        # Load config to get default max_tokens and temperature
+        config_path = "config/config.yaml"
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        max_tokens = config['llm'].get('max_tokens', 3000)
+        temperature = config['llm'].get('temperature', 0.0)
+
         if is_arabic:
             # Translate query to English
             english_query = translator.translate(original_query, source_lang='ar', target_lang='en')
             print(f"Translated query: {english_query}")
-            result = run_hybrid_search(english_query, original_lang='ar', original_query=original_query)
+            result = run_hybrid_search(english_query, original_lang='ar', original_query=original_query,
+                                       max_tokens=max_tokens, temperature=temperature)
         else:
-            result = run_hybrid_search(original_query)
+            result = run_hybrid_search(original_query, max_tokens=max_tokens, temperature=temperature)
         
         if result.get("error"):
             print(f"Error from LLM: {result['error']}")

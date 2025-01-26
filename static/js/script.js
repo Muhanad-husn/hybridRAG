@@ -380,8 +380,10 @@ if (modelSettingsForm) {
         
         const extractionModel = extractionModelInput.value.trim();
         const answerModel = answerModelInput.value.trim();
+        const maxTokens = document.getElementById('maxTokens').value.trim();
+        const temperature = document.getElementById('temperature').value.trim();
         
-        if (!extractionModel || !answerModel) return;
+        if (!extractionModel || !answerModel || !maxTokens || !temperature) return;
 
         try {
             submitButton.disabled = true;
@@ -395,7 +397,9 @@ if (modelSettingsForm) {
                 },
                 body: JSON.stringify({
                     extraction_model: extractionModel,
-                    answer_model: answerModel
+                    answer_model: answerModel,
+                    max_tokens: parseInt(maxTokens),
+                    temperature: parseFloat(temperature)
                 })
             });
 

@@ -255,16 +255,23 @@ def search():
         rerank_count = max(min(int(data.get('rerank_count', 15)), 80), 5)
         logger.info(f"Using rerank count: {rerank_count}")
 
+        # Get max_tokens and temperature from request, use default values if not provided
+        max_tokens = int(data.get('max_tokens', 3000))
+        temperature = float(data.get('temperature', 0.0))
+        logger.info(f"Using max_tokens: {max_tokens}, temperature: {temperature}")
+
         if is_arabic:
             logger.info(f"Processing Arabic query: {query}")
             # Translate query to English for internal processing only
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
             # Pass original query without translation and respect translation preference
             result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
-                                     translate=translate_enabled, rerank_count=rerank_count)
+                                     translate=translate_enabled, rerank_count=rerank_count,
+                                     max_tokens=max_tokens, temperature=temperature)
         else:
             logger.info(f"Processing English query: {query}")
-            result = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count)
+            result = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count,
+                                       max_tokens=max_tokens, temperature=temperature)
 
         # Generate HTML content without saving
         if result.get('answer'):
@@ -487,9 +494,11 @@ def update_model_settings():
         data = request.get_json()
         extraction_model = data.get('extraction_model', '').strip()
         answer_model = data.get('answer_model', '').strip()
+        max_tokens = data.get('max_tokens')
+        temperature = data.get('temperature')
         
-        if not extraction_model or not answer_model:
-            return jsonify({'error': 'Both extraction_model and answer_model must be provided'}), 400
+        if not extraction_model or not answer_model or max_tokens is None or temperature is None:
+            return jsonify({'error': 'All fields (extraction_model, answer_model, max_tokens, and temperature) must be provided'}), 400
             
         # Read current config
         config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
@@ -499,16 +508,20 @@ def update_model_settings():
         # Update model settings
         config['llm']['extraction_model'] = extraction_model
         config['llm']['answer_model'] = answer_model
+        config['llm']['max_tokens'] = max_tokens
+        config['llm']['temperature'] = temperature
         
         # Write back to config file
         with open(config_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
             
-        logger.info(f"Model settings updated - Extraction: {extraction_model}, Answer: {answer_model}")
+        logger.info(f"Model settings updated - Extraction: {extraction_model}, Answer: {answer_model}, Max Tokens: {max_tokens}, Temperature: {temperature}")
         return jsonify({
             'message': 'Model settings updated successfully',
             'extraction_model': extraction_model,
-            'answer_model': answer_model
+            'answer_model': answer_model,
+            'max_tokens': max_tokens,
+            'temperature': temperature
         })
         
     except Exception as e:
