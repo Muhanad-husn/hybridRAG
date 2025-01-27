@@ -11,10 +11,18 @@ from functools import wraps
 from Process_files import HyperRAG
 import asyncio
 import tiktoken
+import traceback
 
 def count_tokens(text):
-    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")  # or whichever model you're using
-    return len(encoding.encode(text))
+    if not isinstance(text, str):
+        logger.warning(f"count_tokens received non-string input: {type(text)}")
+        return 0  # Return 0 for non-string inputs
+    try:
+        encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")  # or whichever model you're using
+        return len(encoding.encode(text))
+    except Exception as e:
+        logger.error(f"Error in count_tokens: {str(e)}")
+        return 0  # Return 0 if there's an error in encoding
 
 def manage_results_directory():
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
@@ -270,36 +278,55 @@ def search():
         logger.info(f"Using rerank_count: {rerank_count}, max_tokens: {max_tokens}, context_length: {context_length}, temperature: {temperature}")
 
         def adjust_rerank_count(context, rerank_count, max_tokens, context_length):
-            context_tokens = count_tokens(context)
-            available_tokens = context_length - max_tokens
-            if context_tokens > available_tokens:
-                adjustment_factor = available_tokens / context_tokens
-                new_rerank_count = max(5, int(rerank_count * adjustment_factor))
-                logger.info(f"Adjusted rerank_count from {rerank_count} to {new_rerank_count} due to token limitations")
-                return new_rerank_count
-            return rerank_count
+            try:
+                context_tokens = count_tokens(context)
+                available_tokens = context_length - max_tokens
+                if context_tokens > available_tokens:
+                    adjustment_factor = available_tokens / max(context_tokens, 1)  # Avoid division by zero
+                    new_rerank_count = max(5, int(rerank_count * adjustment_factor))
+                    logger.info(f"Adjusted rerank_count from {rerank_count} to {new_rerank_count} due to token limitations")
+                    return new_rerank_count
+                return rerank_count
+            except Exception as e:
+                logger.error(f"Error in adjust_rerank_count: {str(e)}")
+                return rerank_count  # Return original rerank_count if there's an error
 
-        if is_arabic:
-            logger.info(f"Processing Arabic query: {query}")
-            english_query = translator.translate(query, source_lang='ar', target_lang='en')
-            initial_context = run_hybrid_search(english_query, original_lang='ar', original_query=query,
-                                                translate=translate_enabled, rerank_count=rerank_count,
-                                                max_tokens=max_tokens, temperature=temperature,
-                                                context_length=context_length)
+        try:
+            if is_arabic:
+                logger.info(f"Processing Arabic query: {query}")
+                english_query = translator.translate(query, source_lang='ar', target_lang='en')
+                initial_result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
+                                                    translate=translate_enabled, rerank_count=rerank_count,
+                                                    max_tokens=max_tokens, temperature=temperature,
+                                                    context_length=context_length)
+            else:
+                logger.info(f"Processing English query: {query}")
+                initial_result = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count,
+                                                    max_tokens=max_tokens, temperature=temperature,
+                                                    context_length=context_length)
+
+            initial_context = initial_result.get('llm_input', {}).get('context', '')
             adjusted_rerank_count = adjust_rerank_count(initial_context, rerank_count, max_tokens, context_length)
-            result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
-                                       translate=translate_enabled, rerank_count=adjusted_rerank_count,
-                                       max_tokens=max_tokens, temperature=temperature,
-                                       context_length=context_length)
-        else:
-            logger.info(f"Processing English query: {query}")
-            initial_context = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count,
-                                                max_tokens=max_tokens, temperature=temperature,
-                                                context_length=context_length)
-            adjusted_rerank_count = adjust_rerank_count(initial_context, rerank_count, max_tokens, context_length)
-            result = run_hybrid_search(query, translate=translate_enabled, rerank_count=adjusted_rerank_count,
-                                       max_tokens=max_tokens, temperature=temperature,
-                                       context_length=context_length)
+
+            # Run the search again with adjusted rerank_count
+            if is_arabic:
+                result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
+                                           translate=translate_enabled, rerank_count=adjusted_rerank_count,
+                                           max_tokens=max_tokens, temperature=temperature,
+                                           context_length=context_length)
+            else:
+                result = run_hybrid_search(query, translate=translate_enabled, rerank_count=adjusted_rerank_count,
+                                           max_tokens=max_tokens, temperature=temperature,
+                                           context_length=context_length)
+
+        except Exception as e:
+            logger.error(f"Error in search process: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return jsonify({'error': f"An error occurred during the search process: {str(e)}"}), 500
+
+        if not isinstance(result, dict):
+            logger.error(f"Unexpected result type from run_hybrid_search: {type(result)}")
+            return jsonify({'error': 'Unexpected result from search process'}), 500
 
         if adjusted_rerank_count != rerank_count:
             result['adjusted_rerank_count'] = adjusted_rerank_count
