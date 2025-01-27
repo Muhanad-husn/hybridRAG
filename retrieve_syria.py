@@ -75,135 +75,124 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         # Generate query embedding
         query_embedding = embedding_generator.generate_embedding(query)
         
-        try:
-            # Get vector store results first
-            logger.info("Retrieving dense vector results...")
-            vector_results = retrieval_system.hybrid_search(
-                query=query,
-                query_embedding=query_embedding,
-                graph=None,  # Don't include graph results yet
-                top_k=100,   # Get more results for better reranking
-                mode="Dense" # Only dense retrieval
-            )
-            
-            if not vector_results:
-                logger.warning("No vector results found")
-                return {
-                    "query": query,
-                    "answer": "I apologize, but I couldn't find any relevant information in the vector store.",
-                    "error": "No vector results found",
-                    "sources": [],
-                    "confidence": 0
-                }
-            
-            logger.info(f"Found {len(vector_results)} initial vector results")
-            
-            # Rerank vector results
-            logger.info("Reranking vector results...")
-            reranked_vector_results = retrieval_system.rerank_results(
-                query=query,
-                results=vector_results,
-                top_k=rerank_count  # Use dynamic rerank count
-            )
-            
-            if not reranked_vector_results:
-                logger.warning("No results after reranking")
-                return {
-                    "query": query,
-                    "answer": "I apologize, but the reranking process didn't yield any relevant results.",
-                    "error": "No results after reranking",
-                    "sources": [],
-                    "confidence": 0
-                }
-            
-            logger.info(f"Reranked to {len(reranked_vector_results)} results")
-            
-            # Get graph results - keep graph results proportional to rerank_count
-            graph_k = max(3, min(rerank_count // 3, 10))  # Scale graph results with rerank_count, min 3, max 10
-            graph_results = retrieval_system.hybrid_search(
-                query=query,
-                query_embedding=query_embedding,
-                graph=graph_constructor,
-                top_k=graph_k,
-                mode="Hybrid"  # Get graph results
-            )
-            
-            # Filter to keep only the graph analysis results
-            graph_analysis = [r for r in graph_results if r.get('meta') == 'graph_relationships']
-            
-            # Calculate how many graph results we can include while respecting the total limit
-            remaining_slots = rerank_count - len(reranked_vector_results)  # User's configured limit minus vector results
-            if remaining_slots > 0 and graph_analysis:
-                # Add graph results up to the remaining limit
-                graph_analysis = graph_analysis[:remaining_slots]
-                combined_results = reranked_vector_results + graph_analysis
-            else:
-                combined_results = reranked_vector_results
-            
-            # Sort by score (no need to deduplicate since we're controlling the counts)
-            results = sorted(
-                combined_results,
-                key=lambda x: float(x.get('score', 0.0)),
-                reverse=True
-            )
-            
-        except Exception as e:
-            print(f"Error in search pipeline: {str(e)}")
-            raise
+        # Initialize variables for the loop
+        current_rerank_count = rerank_count
+        context_tokens = float('inf')
+        available_tokens = context_length - max_tokens
+        enc = tiktoken.encoding_for_model("gpt-4")  # Using GPT-4 encoding as a standard
 
-        # Format results for LLM
-        context_parts = []
-        
-        # First add dense retrieval results
-        for result in reranked_vector_results:
-            if isinstance(result, dict) and 'text' in result:
-                formatted = format_result(result, format_type="text")
-                if formatted.strip():  # Only add non-empty results
-                    context_parts.append(formatted)
-                    
-        # Then add graph analysis if available
-        if graph_analysis:
-            for result in graph_analysis:
-                formatted = format_result(result, format_type="text")
-                if formatted.strip():
-                    context_parts.append(formatted)
-        
-        # Join all parts with double newlines
-        context = "\n\n".join(context_parts)
-        
-        # Check context length using tiktoken
-        try:
-            enc = tiktoken.encoding_for_model("gpt-4")  # Using GPT-4 encoding as a standard
-            context_tokens = len(enc.encode(context))
-            logger.info(f"Context length: {context_tokens} tokens")
-            
-            available_tokens = context_length - max_tokens
-            if context_tokens > available_tokens:
-                # Calculate new rerank count to maintain roughly the same tokens per result
-                tokens_per_result = context_tokens / len(context_parts)
-                target_results = int(available_tokens / tokens_per_result)
-                
-                # Ensure minimum results
-                new_rerank_count = max(5, min(target_results, rerank_count))
-                
-                logger.warning(f"Context length ({context_tokens} tokens) exceeds available tokens ({available_tokens}). "
-                             f"Reducing rerank_count from {rerank_count} to {new_rerank_count}")
-                
-                # Recursively call with new rerank_count
-                return run_hybrid_search(
+        while context_tokens > available_tokens and current_rerank_count >= 5:
+            try:
+                # Get vector store results
+                logger.info(f"Retrieving dense vector results with rerank_count: {current_rerank_count}...")
+                vector_results = retrieval_system.hybrid_search(
                     query=query,
-                    original_lang=original_lang,
-                    original_query=original_query,
-                    translate=translate,
-                    rerank_count=new_rerank_count,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    context_length=context_length
+                    query_embedding=query_embedding,
+                    graph=None,  # Don't include graph results yet
+                    top_k=100,   # Get more results for better reranking
+                    mode="Dense" # Only dense retrieval
                 )
-        except Exception as e:
-            logger.error(f"Error checking context length: {str(e)}")
-            # Continue with original context if token check fails
-        
+                
+                if not vector_results:
+                    logger.warning("No vector results found")
+                    return {
+                        "query": query,
+                        "answer": "I apologize, but I couldn't find any relevant information in the vector store.",
+                        "error": "No vector results found",
+                        "sources": [],
+                        "confidence": 0
+                    }
+                
+                logger.info(f"Found {len(vector_results)} initial vector results")
+                
+                # Rerank vector results
+                logger.info("Reranking vector results...")
+                reranked_vector_results = retrieval_system.rerank_results(
+                    query=query,
+                    results=vector_results,
+                    top_k=current_rerank_count
+                )
+                
+                if not reranked_vector_results:
+                    logger.warning("No results after reranking")
+                    return {
+                        "query": query,
+                        "answer": "I apologize, but the reranking process didn't yield any relevant results.",
+                        "error": "No results after reranking",
+                        "sources": [],
+                        "confidence": 0
+                    }
+                
+                logger.info(f"Reranked to {len(reranked_vector_results)} results")
+                
+                # Get graph results - keep graph results proportional to rerank_count
+                graph_k = max(3, min(current_rerank_count // 3, 10))  # Scale graph results with rerank_count, min 3, max 10
+                graph_results = retrieval_system.hybrid_search(
+                    query=query,
+                    query_embedding=query_embedding,
+                    graph=graph_constructor,
+                    top_k=graph_k,
+                    mode="Hybrid"  # Get graph results
+                )
+                
+                # Filter to keep only the graph analysis results
+                graph_analysis = [r for r in graph_results if r.get('meta') == 'graph_relationships']
+                
+                # Calculate how many graph results we can include while respecting the total limit
+                remaining_slots = current_rerank_count - len(reranked_vector_results)
+                if remaining_slots > 0 and graph_analysis:
+                    # Add graph results up to the remaining limit
+                    graph_analysis = graph_analysis[:remaining_slots]
+                    combined_results = reranked_vector_results + graph_analysis
+                else:
+                    combined_results = reranked_vector_results
+                
+                # Sort by score (no need to deduplicate since we're controlling the counts)
+                results = sorted(
+                    combined_results,
+                    key=lambda x: float(x.get('score', 0.0)),
+                    reverse=True
+                )
+                
+                # Format results for LLM
+                context_parts = []
+                
+                # First add dense retrieval results
+                for result in reranked_vector_results:
+                    if isinstance(result, dict) and 'text' in result:
+                        formatted = format_result(result, format_type="text")
+                        if formatted.strip():  # Only add non-empty results
+                            context_parts.append(formatted)
+                            
+                # Then add graph analysis if available
+                if graph_analysis:
+                    for result in graph_analysis:
+                        formatted = format_result(result, format_type="text")
+                        if formatted.strip():
+                            context_parts.append(formatted)
+                
+                # Join all parts with double newlines
+                context = "\n\n".join(context_parts)
+                
+                # Check context length
+                context_tokens = len(enc.encode(context))
+                logger.info(f"Context length: {context_tokens} tokens")
+                
+                if context_tokens <= available_tokens:
+                    break
+                
+                # Reduce rerank_count for next iteration
+                current_rerank_count = max(5, current_rerank_count - 5)
+                logger.warning(f"Context length ({context_tokens} tokens) exceeds available tokens ({available_tokens}). "
+                               f"Reducing rerank_count to {current_rerank_count}")
+                
+            except Exception as e:
+                logger.error(f"Error in search pipeline: {str(e)}")
+                raise
+
+        if context_tokens > available_tokens:
+            logger.warning(f"Could not reduce context length below the limit. Final context length: {context_tokens} tokens")
+
         if not context.strip():
             logger.warning("No context generated from search results")
             return {
