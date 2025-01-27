@@ -225,6 +225,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         # Create system prompt
         system_prompt = """You are a well-informed academic assistant. Your goal is to provide structured, educational, and accessible responses in a semi-academic tone. Specifically:
 
+    Start your response with a concise, relevant title on the first line, without prefixing it with 'Title:'.
     Base your content on the provided context. If the context does not contain enough information, acknowledge this.
     Adopt an article-like structure with paragraphs:
         Introduction: Briefly set the stage.
@@ -240,7 +241,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
 
 Question: {query}
 
-Please provide a clear and accurate answer based solely on the information provided in the context above."""
+Please provide a clear and accurate answer based solely on the information provided in the context above. Begin your response with a concise, relevant title on the first line, without prefixing it with 'Title:'."""
         
         # Get LLM response
         llm_response = llm_client.get_completion(
