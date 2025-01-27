@@ -285,7 +285,7 @@ def search():
             initial_context = run_hybrid_search(english_query, original_lang='ar', original_query=query,
                                                 translate=translate_enabled, rerank_count=rerank_count,
                                                 max_tokens=max_tokens, temperature=temperature,
-                                                context_length=context_length, get_context_only=True)
+                                                context_length=context_length)
             adjusted_rerank_count = adjust_rerank_count(initial_context, rerank_count, max_tokens, context_length)
             result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
                                        translate=translate_enabled, rerank_count=adjusted_rerank_count,
@@ -295,7 +295,7 @@ def search():
             logger.info(f"Processing English query: {query}")
             initial_context = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count,
                                                 max_tokens=max_tokens, temperature=temperature,
-                                                context_length=context_length, get_context_only=True)
+                                                context_length=context_length)
             adjusted_rerank_count = adjust_rerank_count(initial_context, rerank_count, max_tokens, context_length)
             result = run_hybrid_search(query, translate=translate_enabled, rerank_count=adjusted_rerank_count,
                                        max_tokens=max_tokens, temperature=temperature,

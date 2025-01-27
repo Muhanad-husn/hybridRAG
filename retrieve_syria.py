@@ -34,7 +34,8 @@ def get_translator():
     return _translator
 
 def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None,
-                     translate: bool = True, rerank_count: int = 15, max_tokens: int = 3000, temperature: float = 0.0) -> Dict[str, Any]:
+                     translate: bool = True, rerank_count: int = 15, max_tokens: int = 3000, temperature: float = 0.0,
+                     context_length: int = 16000) -> Dict[str, Any]:
     """
     Run hybrid search with both dense retrieval and graph analysis,
     then process results with LLM to generate an answer.
@@ -176,15 +177,16 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             context_tokens = len(enc.encode(context))
             logger.info(f"Context length: {context_tokens} tokens")
             
-            if context_tokens > 12000:
+            available_tokens = context_length - max_tokens
+            if context_tokens > available_tokens:
                 # Calculate new rerank count to maintain roughly the same tokens per result
                 tokens_per_result = context_tokens / len(context_parts)
-                target_results = int(12000 / tokens_per_result)
+                target_results = int(available_tokens / tokens_per_result)
                 
                 # Ensure minimum results
                 new_rerank_count = max(5, min(target_results, rerank_count))
                 
-                logger.warning(f"Context length ({context_tokens} tokens) exceeds 6k limit. "
+                logger.warning(f"Context length ({context_tokens} tokens) exceeds available tokens ({available_tokens}). "
                              f"Reducing rerank_count from {rerank_count} to {new_rerank_count}")
                 
                 # Recursively call with new rerank_count
@@ -193,7 +195,10 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                     original_lang=original_lang,
                     original_query=original_query,
                     translate=translate,
-                    rerank_count=new_rerank_count
+                    rerank_count=new_rerank_count,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    context_length=context_length
                 )
         except Exception as e:
             logger.error(f"Error checking context length: {str(e)}")
@@ -469,15 +474,16 @@ def main():
         
         max_tokens = config['llm'].get('max_tokens', 3000)
         temperature = config['llm'].get('temperature', 0.0)
+        context_length = config['llm'].get('context_length', 16000)
 
         if is_arabic:
             # Translate query to English
             english_query = translator.translate(original_query, source_lang='ar', target_lang='en')
             print(f"Translated query: {english_query}")
             result = run_hybrid_search(english_query, original_lang='ar', original_query=original_query,
-                                       max_tokens=max_tokens, temperature=temperature)
+                                       max_tokens=max_tokens, temperature=temperature, context_length=context_length)
         else:
-            result = run_hybrid_search(original_query, max_tokens=max_tokens, temperature=temperature)
+            result = run_hybrid_search(original_query, max_tokens=max_tokens, temperature=temperature, context_length=context_length)
         
         if result.get("error"):
             print(f"Error from LLM: {result['error']}")
