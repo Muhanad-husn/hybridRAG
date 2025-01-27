@@ -1,10 +1,12 @@
 import yaml
 import logging
 import hashlib
+import torch
 from typing import Optional, Dict, Any
 from transformers import MarianMTModel, MarianTokenizer
 from langdetect import detect, DetectorFactory
 from cachetools import TTLCache
+from src.utils.model_manager import model_manager
 
 # Set seed for consistent language detection
 DetectorFactory.seed = 0
@@ -21,13 +23,8 @@ class Translator:
         self.config = self._load_config(config_path)
         
         # Initialize translation models and tokenizers
-        logging_level = self.logger.getEffectiveLevel()  # Store current level
-        self.logger.setLevel(logging.ERROR)  # Temporarily set to ERROR level
-        try:
-            self.ar_to_en_model, self.ar_to_en_tokenizer = self._load_model("ar_to_en")
-            self.en_to_ar_model, self.en_to_ar_tokenizer = self._load_model("en_to_ar")
-        finally:
-            self.logger.setLevel(logging_level)  # Restore original level
+        self.ar_to_en_model, self.ar_to_en_tokenizer = self._load_model("ar_to_en")
+        self.en_to_ar_model, self.en_to_ar_tokenizer = self._load_model("en_to_ar")
         
         # Initialize cache if enabled
         if self.config["cache"]["enabled"]:
@@ -84,28 +81,14 @@ class Translator:
             }
             
             model_name = model_mapping[direction]
-            local_path = model_config["path"]
             
-            self.logger.info(f"Loading translation model from {local_path} or {model_name}")
+            self.logger.info(f"Loading translation model: {model_name}")
             
-            # Try loading from local path first
-            try:
-                tokenizer = MarianTokenizer.from_pretrained(local_path)
-                model = MarianMTModel.from_pretrained(local_path)
-            except Exception as local_error:
-                self.logger.warning(f"Could not load from local path: {str(local_error)}")
-                # If local loading fails, try downloading from HuggingFace
-                try:
-                    tokenizer = MarianTokenizer.from_pretrained(model_name)
-                    model = MarianMTModel.from_pretrained(model_name)
-                    # Save for future use
-                    tokenizer.save_pretrained(local_path)
-                    model.save_pretrained(local_path)
-                except Exception as remote_error:
-                    self.logger.error(f"Failed to load model from both local and remote: {str(remote_error)}")
-                    raise
+            # Use ModelManager to load the model
+            model = model_manager.get_model(model_name)
+            tokenizer = MarianTokenizer.from_pretrained(model_name)
             
-            # Set device
+            # Set device (ModelManager handles this, but we'll keep it for consistency)
             device = model_config["device"]
             model = model.to(device)
             
@@ -161,18 +144,21 @@ class Translator:
             # Detect source language if not provided
             if not source_lang:
                 source_lang = self.detect_language(text)
-                
+            
             # Determine target language if not provided
             if not target_lang:
                 target_lang = 'en' if source_lang == 'ar' else 'ar'
-                
+            
+            self.logger.info(f"Translating from {source_lang} to {target_lang}")
+            
             # Check cache first
             if self.cache is not None:
                 cache_key = self._get_cache_key(text, source_lang, target_lang)
                 cached = self.cache.get(cache_key)
                 if cached:
+                    self.logger.info("Using cached translation")
                     return cached
-                    
+            
             # Select appropriate model and tokenizer
             if source_lang == 'ar' and target_lang == 'en':
                 model = self.ar_to_en_model
@@ -182,7 +168,7 @@ class Translator:
                 tokenizer = self.en_to_ar_tokenizer
             else:
                 raise ValueError(f"Unsupported language pair: {source_lang} to {target_lang}")
-                
+            
             # Normalize and prepare text
             text = self._normalize_text(text)
             
@@ -196,16 +182,24 @@ class Translator:
             
             # Split text into paragraphs with UTF-8 awareness
             paragraphs = text.split('\n\n')
+            
+            # Prepare language token
+            lang_token = ">>ara<<" if target_lang == 'ar' else ">>en<<"
+            
+            # Batch process paragraphs
+            batch_size = self.config["models"][f"{source_lang}_to_{target_lang}"].get("batch_size", 8)
             translated_paragraphs = []
             
-            for paragraph in paragraphs:
-                if not paragraph.strip():
-                    translated_paragraphs.append('')
+            for i in range(0, len(paragraphs), batch_size):
+                batch = paragraphs[i:i+batch_size]
+                batch = [f"{lang_token} {p.strip()}" for p in batch if p.strip()]
+                
+                if not batch:
                     continue
                 
                 # Tokenize
                 inputs = tokenizer(
-                    paragraph.strip(),
+                    batch,
                     return_tensors="pt",
                     max_length=self.config["models"][f"{source_lang}_to_{target_lang}"]["max_length"],
                     truncation=True,
@@ -216,20 +210,25 @@ class Translator:
                 inputs = {k: v.to(model.device) for k, v in inputs.items()}
                 
                 # Generate translation
-                outputs = model.generate(**inputs)
+                with torch.no_grad():
+                    outputs = model.generate(**inputs)
                 
                 # Decode translation
-                translated_paragraph = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                translated_paragraphs.append(translated_paragraph)
+                translated_batch = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+                translated_paragraphs.extend(translated_batch)
             
             # Join paragraphs with double newlines to preserve formatting
             translation = '\n\n'.join(translated_paragraphs)
+            
+            # Preserve formatting with "**"
+            translation = self._preserve_formatting(text, translation)
             
             # Cache result if enabled
             if self.cache is not None:
                 cache_key = self._get_cache_key(text, source_lang, target_lang)
                 self.cache[cache_key] = translation
-                
+            
+            self.logger.info(f"Translation completed. Length: {len(translation)}")
             return translation
             
         except Exception as e:
@@ -242,9 +241,22 @@ class Translator:
                 import time
                 time.sleep(retry_delay)
                 return self.translate(text, source_lang, target_lang, retry_count + 1)
-                
+            
             # Fallback logic
             if self.config["error_handling"]["fallback_to_english"]:
                 return text  # Return original text
-                
+            
             raise  # Re-raise if no fallback
+
+    def _preserve_formatting(self, original_text: str, translated_text: str) -> str:
+        """Preserve formatting with "**" in the translated text."""
+        import re
+        
+        # Find all occurrences of "**" in the original text
+        formatting_positions = [m.start() for m in re.finditer(r'\*\*', original_text)]
+        
+        # Insert "**" at corresponding positions in the translated text
+        for pos in formatting_positions:
+            translated_text = translated_text[:pos] + '**' + translated_text[pos:]
+        
+        return translated_text

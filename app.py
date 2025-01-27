@@ -292,6 +292,7 @@ def search():
         adjusted_rerank_count = adjust_rerank_count(rerank_count, max_tokens, context_length)
 
         try:
+            logger.info(f"Calling run_hybrid_search with translate_enabled: {translate_enabled}")
             if is_arabic:
                 logger.info(f"Processing Arabic query: {query}")
                 english_query = translator.translate(query, source_lang='ar', target_lang='en')
@@ -304,6 +305,8 @@ def search():
                 result = run_hybrid_search(query, translate=translate_enabled, rerank_count=adjusted_rerank_count,
                                            max_tokens=max_tokens, temperature=temperature,
                                            context_length=context_length)
+
+            logger.info(f"Received result from run_hybrid_search. Contains Arabic answer: {bool(result.get('arabic_answer'))}")
 
         except Exception as e:
             logger.error(f"Error in search process: {str(e)}")
@@ -329,6 +332,7 @@ def search():
 
         # Generate HTML content without saving
         if result.get('answer'):
+            logger.info("Creating HTML content for English result")
             english_result = create_result_html(
                 content=result['answer'],
                 query=query,
@@ -339,8 +343,9 @@ def search():
             result['english_html'] = english_result['html']
             result['english_filename'] = english_result['filename']
 
-        # Only include Arabic translation if translation is enabled
+        # Only include Arabic translation if translation is enabled and Arabic answer exists
         if translate_enabled and result.get('arabic_answer'):
+            logger.info("Creating HTML content for Arabic result")
             arabic_result = create_result_html(
                 content=result['arabic_answer'],
                 query=result.get('original_query', query),
@@ -350,7 +355,8 @@ def search():
             )
             result['arabic_html'] = arabic_result['html']
             result['arabic_filename'] = arabic_result['filename']
-            
+        
+        logger.info("Completed processing search request")
         return jsonify(result)
         
     except Exception as e:

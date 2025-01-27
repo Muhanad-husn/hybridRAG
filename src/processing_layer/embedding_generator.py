@@ -5,13 +5,14 @@ import numpy as np
 import faiss
 import shutil
 from typing import List, Dict, Optional
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_core.embeddings import Embeddings
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from src.utils.model_manager import model_manager
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -72,12 +73,10 @@ class EmbeddingGenerator:
         try:
             logger.info(f"Loading model: {self.model_name}")
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModel.from_pretrained(self.model_name)
+            self.model = model_manager.get_model(self.model_name)
             
-            # Move model to GPU if available
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.model = self.model.to(self.device)
-            self.model.eval()  # Set model to evaluation mode
+            # Get the device from the model
+            self.device = next(self.model.parameters()).device
             
             logger.info(f"Model loaded successfully on {self.device}")
             

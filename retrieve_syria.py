@@ -48,6 +48,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
     Returns:
         Dict containing retrieved context and LLM-generated answer
     """
+    logger.info(f"Starting run_hybrid_search with query: {query}, translate: {translate}")
     try:
         # Load config
         config_path = "config/config.yaml"
@@ -72,7 +73,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 
             logger.info("Using existing embeddings")
         except Exception as e:
-            print(f"Error preparing documents: {str(e)}")
+            logger.error(f"Error preparing documents: {str(e)}")
             raise
         
         # Generate query embedding
@@ -262,10 +263,10 @@ Please provide a clear and accurate answer based solely on the information provi
         arabic_answer = None
         if english_answer and translate:
             try:
+                logger.info("Attempting to translate LLM response to Arabic")
                 translator = get_translator()
-                logger.info("Translating LLM response to Arabic...")
                 arabic_answer = translator.translate(english_answer, source_lang='en', target_lang='ar')
-                logger.info(f"Translation completed. Length: {len(arabic_answer)}")
+                logger.info(f"Arabic translation completed. Length: {len(arabic_answer)}")
 
                 if not arabic_answer:
                     raise ValueError("Arabic translation is empty")
@@ -321,96 +322,8 @@ Please provide a clear and accurate answer based solely on the information provi
             logger.info(f"- Raw confidence: {raw_confidence:.3f} ({raw_confidence*100:.1f}%)")
             logger.info(f"- UI-scaled confidence: {confidence}%")
 
-        # Extract vector data from results
-        vector_data = []
-        try:
-            for result in results:
-                if isinstance(result, dict):  # Ensure result is a dictionary
-                    vector = result.get('vector')
-                    if vector is not None:
-                        # Handle different vector formats
-                        if hasattr(vector, 'tolist'):
-                            values = vector.tolist()
-                        elif isinstance(vector, (list, tuple)):
-                            values = list(vector)
-                        else:
-                            continue  # Skip if vector is in unexpected format
-                            
-                        vector_data.append({
-                            'values': values,
-                            'score': float(result.get('score', 0.0))
-                        })
-        except Exception as e:
-            logger.error(f"Error extracting vector data: {str(e)}")
-
-        # Extract graph relationships
-        graph_data = []
-        try:
-            for result in results:
-                if isinstance(result, dict) and result.get('meta') == 'graph_relationships':
-                    content = result.get('content', '')
-                    if isinstance(content, str):
-                        relationships = content.split('\n')
-                        for rel in relationships:
-                            if ' -> ' in rel:
-                                parts = rel.strip().split(' -> ')
-                                if len(parts) == 3:
-                                    graph_data.append({
-                                        'subject': parts[0],
-                                        'predicate': parts[1],
-                                        'object': parts[2]
-                                    })
-        except Exception as e:
-            logger.error(f"Error extracting graph data: {str(e)}")
-
-        # Generate HTML content
-        english_result = None
-        arabic_result = None
-
-        def create_html_result(content, query, translated_query, sources, is_arabic):
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            safe_title = ''.join(c for c in content.split('\n')[0] if c.isalnum() or c in (' ', '-', '_'))[:50]
-            filename = f"{safe_title}.html"
-            html_template = """<html>
-<body>
-<h1>{title}</h1>
-{content}
-<hr>
-<p>Query: {query}</p>
-<p>Sources: {sources}</p>
-<p>Generated: {timestamp}</p>
-</body>
-</html>"""
-            return {
-                'html': html_template.format(
-                    title=content.split('\n')[0],
-                    content=content,
-                    query=query,
-                    sources=', '.join(sources),
-                    timestamp=timestamp
-                ),
-                'filename': filename
-            }
-
-        if english_answer:
-            english_result = create_html_result(
-                content=english_answer,
-                query=query,
-                translated_query="",
-                sources=sources,
-                is_arabic=False
-            )
-
-        if arabic_answer:
-            arabic_result = create_html_result(
-                content=arabic_answer,
-                query=original_query or query,
-                translated_query=query if original_query else "",
-                sources=sources,
-                is_arabic=True
-            )
-
         # Prepare base response
+        logger.info("Creating response dictionary")
         response = {
             "query": query,
             "original_query": original_query or query,
@@ -425,100 +338,18 @@ Please provide a clear and accurate answer based solely on the information provi
                 "context": context,
                 "context_tokens": context_tokens if 'context_tokens' in locals() else None
             },
-            "warning": f"Context length exceeded 6k tokens. Results automatically reduced from {rerank_count} to {new_rerank_count} for better processing."
-            if 'new_rerank_count' in locals() else None
+            "warning": f"Context length exceeded available tokens. Results automatically reduced from {rerank_count} to {current_rerank_count} for better processing."
+            if current_rerank_count < rerank_count else None
         }
 
-        # Add HTML content if available
-        if english_result:
-            response["english_html"] = english_result["html"]
-            response["english_filename"] = english_result["filename"]
-
-        if arabic_result:
-            response["arabic_html"] = arabic_result["html"]
-            response["arabic_filename"] = arabic_result["filename"]
-
+        logger.info("Completed run_hybrid_search")
         return response
             
     except Exception as e:
-        print(f"Error in hybrid search: {str(e)}")
-        raise
-
-def main():
-    """Main entry point for retrieval."""
-    try:
-        if len(sys.argv) < 2:
-            print("Please provide a query as a command line argument")
-            sys.exit(1)
-            
-        # Get query from command line
-        original_query = sys.argv[1]
-        
-        # Get translator instance
-        translator = get_translator()
-        
-        # Detect language and translate if needed
-        is_arabic = translator.is_arabic(original_query)
-        
-        # Load config to get default max_tokens and temperature
-        config_path = "config/config.yaml"
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        max_tokens = config['llm'].get('max_tokens', 3000)
-        temperature = config['llm'].get('temperature', 0.0)
-        context_length = config['llm'].get('context_length', 16000)
-
-        if is_arabic:
-            # Translate query to English
-            english_query = translator.translate(original_query, source_lang='ar', target_lang='en')
-            print(f"Translated query: {english_query}")
-            result = run_hybrid_search(english_query, original_lang='ar', original_query=original_query,
-                                       max_tokens=max_tokens, temperature=temperature, context_length=context_length)
-        else:
-            result = run_hybrid_search(original_query, max_tokens=max_tokens, temperature=temperature, context_length=context_length)
-        
-        if result.get("error"):
-            print(f"Error from LLM: {result['error']}")
-            return
-            
-        if not result["answer"]:
-            print("Warning: No answer received from LLM")
-            return
-            
-        # Get the answer
-        answer = result["answer"].strip()
-        
-        # Format answer
-        def format_answer(text: str) -> str:
-            text = re.sub(r'^(.*?)\n', r'\1\n\n', text)  # Add space after title
-            text = re.sub(r'([.!?])\n', r'\1\n\n', text)  # Add space between paragraphs
-            text = re.sub(r'\n{3,}', '\n\n', text)  # Remove extra newlines
-            text = re.sub(r'\n*Sources:', '\n\nSources:', text)  # Space before Sources
-            return text
-        
-        # Print responses
-        if result.get("language") == "ar":
-            print("\nEnglish Response:")
-            print("-" * 80)
-            print(format_answer(result.get("english_answer", "")))
-            print("-" * 80)
-            print("\nArabic Response:")
-            print("-" * 80)
-            print(format_answer(answer))
-        else:
-            print(format_answer(answer))
-        
-        # Print sources
-        print("\nSources:")
-        for source in sorted(result["sources"]):
-            print(f"- {source}")
-            
-    except Exception as e:
-        print(f"Error in retrieval: {str(e)}")
+        logger.error(f"Error in hybrid search: {str(e)}")
         raise
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support
     freeze_support()
-    main()
+    # Main function implementation here if needed

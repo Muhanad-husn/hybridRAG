@@ -609,125 +609,99 @@ class HybridRetrieval:
         Returns:
             Combined and ranked search results
         """
-        # Initialize results
         combined_results = []
         
         try:
-            try:
-                # First get dense retrieval results
-                logger.info(f"Processing dense retrieval results in {mode} mode")
-                embedding_results = self.similarity_search(query, k=top_k)
-                
-                if embedding_results:
-                    for doc, score in embedding_results:
-                        # Ensure we have valid content
-                        if not hasattr(doc, 'page_content') or not doc.page_content.strip():
-                            logger.warning(f"Skipping invalid document: {doc}")
-                            continue
-                            
-                        # Format the result with both old and new fields
-                        result = {
-                            'text': doc.page_content,
-                            'meta': doc.metadata.get('source', 'unknown'),
-                            'score': float(score),
-                            'page_content': doc.page_content,
-                            'metadata': doc.metadata
-                        }
-                        combined_results.append(result)
-                    
-                    if combined_results:
-                        logger.info(f"Added {len(combined_results)} valid dense retrieval results")
-                    else:
-                        logger.warning("No valid results after filtering")
-                        return []
-                else:
-                    logger.warning("No dense retrieval results found")
-                    return []  # Return empty list if no results found
-            except Exception as e:
-                logger.error(f"Error in dense retrieval: {str(e)}\n{traceback.format_exc()}")
-                return []  # Return empty list on error
+            # Get dense retrieval results
+            logger.info(f"Processing dense retrieval results in {mode} mode")
+            embedding_results = self.similarity_search(query, k=top_k)
+            
+            if not embedding_results:
+                logger.warning("No dense retrieval results found")
+                return []
 
-            # Then add graph-based results if in hybrid mode
+            # Process dense retrieval results
+            for doc, score in embedding_results:
+                if hasattr(doc, 'page_content') and doc.page_content.strip():
+                    combined_results.append({
+                        'text': doc.page_content,
+                        'meta': doc.metadata.get('source', 'unknown'),
+                        'score': float(score),
+                        'page_content': doc.page_content,
+                        'metadata': doc.metadata
+                    })
+
+            logger.info(f"Added {len(combined_results)} valid dense retrieval results")
+
+            # Add graph-based results if in hybrid mode
             if mode == "Hybrid" and graph is not None:
                 logger.info(f"Processing graph with {graph.graph.number_of_nodes()} nodes and {graph.graph.number_of_edges()} edges")
-                # Find important relationships in the graph
-                relationships = []
-                high_degree_nodes = 0
-                
-                # Get minimum degree from config
                 min_degree = self.config.get('graph', {}).get('min_degree', 2)
-                
-                # Get nodes with significant relationships
-                for node in graph.graph.nodes():
-                    degree = graph.graph.degree(node)
-                    if degree > min_degree:
-                        high_degree_nodes += 1
-                        node_data = graph.graph.nodes[node]
-                        node_type = node_data.get('type', 'unknown')
-                        logger.debug(f"Found high-degree node: {node} ({node_type}) with {degree} connections")
-                        
-                        # Get all relationships for this node
-                        for neighbor in graph.graph.neighbors(node):
-                            edge = graph.graph.get_edge_data(node, neighbor)
-                            if edge:
-                                rel_type = edge.get('type', 'unknown')
-                                # Dynamic scoring based on degree and relationship type
-                                rel_score = min(0.9, 0.7 + (degree - min_degree) * 0.05)
-                                relationships.append({
-                                    'text': f"{node} ({node_type}) -{rel_type}-> {neighbor}",
-                                    'score': rel_score,
-                                    'type': rel_type
-                                })
-                
-                logger.info(f"Found {high_degree_nodes} high-degree nodes with {len(relationships)} relationships")
+                relationships = self._process_graph_relationships(graph, min_degree)
                 
                 if relationships:
-                    # Group relationships by type for better organization
-                    rel_by_type = {}
-                    for rel in relationships:
-                        rel_type = rel['type']
-                        if rel_type not in rel_by_type:
-                            rel_by_type[rel_type] = []
-                        rel_by_type[rel_type].append(rel)
-                    
-                    # Add each relationship group as a separate result
-                    for rel_type, rels in rel_by_type.items():
-                        # Sort relationships by score
-                        sorted_rels = sorted(rels, key=lambda x: x['score'], reverse=True)
-                        
-                        # Create context with relationships of this type
-                        rel_texts = [r['text'] for r in sorted_rels]
-                        graph_context = f"Graph Analysis ({rel_type}):\n" + "\n".join(rel_texts)
-                        
-                        # Use maximum relationship score for this group
-                        group_score = sorted_rels[0]['score'] if sorted_rels else 0.7
-                        
-                        combined_results.append({
-                            'text': graph_context,
-                            'meta': f'graph_relationships_{rel_type}',
-                            'score': group_score,
-                            'source_type': 'relationship'
-                        })
-                    
-                    logger.info(f"Added {len(rel_by_type)} relationship groups to results")
+                    combined_results.extend(self._group_relationships(relationships))
 
-            # Deduplicate results
+            # Deduplicate and sort results
             unique_results = self.deduplicate_results(combined_results)
-            
-            # Sort by score in descending order
-            sorted_results = sorted(
-                unique_results,
-                key=lambda x: float(x.get('score', 0.0)),
-                reverse=True
-            )
+            sorted_results = sorted(unique_results, key=lambda x: float(x.get('score', 0.0)), reverse=True)
             
             # Apply top_k if specified
-            if rerank_top_k:
-                sorted_results = sorted_results[:rerank_top_k]
-            
-            return sorted_results
+            return sorted_results[:rerank_top_k] if rerank_top_k else sorted_results
             
         except Exception as e:
             logger.error(f"Error in hybrid search: {str(e)}")
             traceback.print_exc()
-            raise
+            return []
+
+    def _process_graph_relationships(self, graph: GraphConstructor, min_degree: int) -> List[Dict[str, Any]]:
+        """Process graph relationships."""
+        relationships = []
+        high_degree_nodes = 0
+
+        for node in graph.graph.nodes():
+            degree = graph.graph.degree(node)
+            if degree > min_degree:
+                high_degree_nodes += 1
+                node_data = graph.graph.nodes[node]
+                node_type = node_data.get('type', 'unknown')
+                
+                for neighbor in graph.graph.neighbors(node):
+                    edge = graph.graph.get_edge_data(node, neighbor)
+                    if edge:
+                        rel_type = edge.get('type', 'unknown')
+                        rel_score = min(0.9, 0.7 + (degree - min_degree) * 0.05)
+                        relationships.append({
+                            'text': f"{node} ({node_type}) -{rel_type}-> {neighbor}",
+                            'score': rel_score,
+                            'type': rel_type
+                        })
+
+        logger.info(f"Found {high_degree_nodes} high-degree nodes with {len(relationships)} relationships")
+        return relationships
+
+    def _group_relationships(self, relationships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Group relationships by type."""
+        rel_by_type = {}
+        for rel in relationships:
+            rel_type = rel['type']
+            if rel_type not in rel_by_type:
+                rel_by_type[rel_type] = []
+            rel_by_type[rel_type].append(rel)
+
+        grouped_results = []
+        for rel_type, rels in rel_by_type.items():
+            sorted_rels = sorted(rels, key=lambda x: x['score'], reverse=True)
+            rel_texts = [r['text'] for r in sorted_rels]
+            graph_context = f"Graph Analysis ({rel_type}):\n" + "\n".join(rel_texts)
+            group_score = sorted_rels[0]['score'] if sorted_rels else 0.7
+            
+            grouped_results.append({
+                'text': graph_context,
+                'meta': f'graph_relationships_{rel_type}',
+                'score': group_score,
+                'source_type': 'relationship'
+            })
+
+        logger.info(f"Added {len(rel_by_type)} relationship groups to results")
+        return grouped_results
