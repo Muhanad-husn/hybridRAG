@@ -382,8 +382,9 @@ if (modelSettingsForm) {
         const answerModel = answerModelInput.value.trim();
         const maxTokens = document.getElementById('maxTokens').value.trim();
         const temperature = document.getElementById('temperature').value.trim();
+        const contextLength = document.getElementById('contextLength').value.trim();
         
-        if (!extractionModel || !answerModel || !maxTokens || !temperature) return;
+        if (!extractionModel || !answerModel || !maxTokens || !temperature || !contextLength) return;
 
         try {
             submitButton.disabled = true;
@@ -399,7 +400,8 @@ if (modelSettingsForm) {
                     extraction_model: extractionModel,
                     answer_model: answerModel,
                     max_tokens: parseInt(maxTokens),
-                    temperature: parseFloat(temperature)
+                    temperature: parseFloat(temperature),
+                    context_length: parseInt(contextLength)
                 })
             });
 
@@ -614,5 +616,142 @@ if (modelSettingsForm) {
                 alert('Failed to save result: ' + error.message);
             }
         });
+    });
+
+    // Simple token counting function (approximation)
+    function countTokens(text) {
+        return text.split(/\s+/).length;
+    }
+
+    // Updated search form handler
+    searchForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        errorDiv.classList.add('hidden');
+        resultsDiv.classList.add('hidden');
+        loadingIndicator.classList.remove('hidden');
+        searchButton.disabled = true;
+
+        // Start polling for logs
+        lastLogTimestamp = '';
+        startLogPolling();
+
+        try {
+            const maxTokens = parseInt(document.getElementById('maxTokens').value) || 3000;
+            const contextLength = parseInt(document.getElementById('contextLength').value) || 16000;
+            let rerankCount = Math.min(Math.max(parseInt(document.getElementById('resultsCount').value) || 15, 5), 80);
+
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    translate: document.getElementById('translateToggle').checked,
+                    rerank_count: rerankCount,
+                    max_tokens: maxTokens,
+                    context_length: contextLength
+                })
+            });
+
+            let data = await response.json();
+
+            if (response.ok) {
+                // Token counting and dynamic adjustment
+                if (data.llm_input && data.llm_input.context) {
+                    const tokenCount = countTokens(data.llm_input.context);
+                    const availableTokens = contextLength - maxTokens;
+                    if (tokenCount > availableTokens) {
+                        const adjustmentFactor = availableTokens / tokenCount;
+                        rerankCount = Math.floor(rerankCount * adjustmentFactor);
+                        alert(`Due to token limit constraints, the number of results has been adjusted to ${rerankCount}.`);
+                        
+                        // Re-fetch with adjusted rerank_count
+                        const adjustedResponse = await fetch('/search', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                query: query,
+                                translate: document.getElementById('translateToggle').checked,
+                                rerank_count: rerankCount,
+                                max_tokens: maxTokens,
+                                context_length: contextLength
+                            })
+                        });
+                        data = await adjustedResponse.json();
+                    }
+                }
+
+                // Display results (existing code)
+                loadingIndicator.classList.add('hidden');
+                resultsDiv.classList.remove('hidden');
+
+                // Update confidence if available
+                if (data.confidence !== undefined) {
+                    updateConfidence(data.confidence);
+                }
+                
+                // Display English response
+                const englishContent = document.querySelector('#englishResponse .response-content');
+                if (englishContent && data.answer) {
+                    englishContent.textContent = data.answer;
+                }
+
+                // Display Arabic response
+                const arabicContent = document.querySelector('#arabicResponse .response-content');
+                if (arabicContent) {
+                    if (data.arabic_answer) {
+                        arabicContent.textContent = data.arabic_answer;
+                        arabicContent.dir = 'rtl';
+                        arabicContent.style.textAlign = 'right';
+                        arabicContent.style.fontFamily = "'Noto Naskh Arabic', Arial, sans-serif";
+                    } else {
+                        arabicContent.textContent = 'المحتوى العربي غير متوفر';
+                        arabicContent.dir = 'rtl';
+                        arabicContent.style.textAlign = 'right';
+                    }
+                }
+
+                // Display raw data
+                const vectorContent = document.querySelector('.vector-content');
+                if (vectorContent && data.llm_input) {
+                    try {
+                        const context = data.llm_input.context || 'No context available';
+                        const formattedInput = context.split('\n')
+                            .filter(line => line.trim())
+                            .join('\n');
+                        vectorContent.textContent = formattedInput;
+                    } catch (error) {
+                        console.error('[Display] Error:', error);
+                        vectorContent.textContent = 'Error displaying raw data';
+                    }
+                }
+
+                // Update sources
+                sourcesList.innerHTML = '';
+                if (data.sources) {
+                    data.sources.forEach(source => {
+                        const li = document.createElement('li');
+                        li.textContent = source;
+                        sourcesList.appendChild(li);
+                    });
+                }
+            } else {
+                throw new Error(data.error || 'An error occurred while processing your query');
+            }
+        } catch (error) {
+            console.error('[Search] Error:', error);
+            displayError(error.message);
+        } finally {
+            // Stop polling for logs
+            stopLogPolling();
+            searchButton.disabled = false;
+        }
     });
 });

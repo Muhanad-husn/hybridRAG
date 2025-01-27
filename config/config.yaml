@@ -7,9 +7,10 @@ openrouter:
   model: anthropic/claude-3.5-haiku-20241022
 llm:
   extraction_model: anthropic/claude-3.5-haiku-20241022:beta
-  answer_model: openai/gpt-4o-mini-2024-07-18
-  max_tokens: 3000  # Configuration for max tokens
-  temperature: 0.5  # New configuration for temperature
+  answer_model: microsoft/phi-4
+  max_tokens: 2000
+  temperature: 0.7
+  context_length: 16000
 graph:
   storage:
     nodes_file: data/graphs/nodes.csv
@@ -30,8 +31,6 @@ document:
   - pdf
   - docx
   - txt
-  chunk_size: 512
-  chunk_overlap: 50
 cache:
   directory: data/cache
   ttl_hours: 24
@@ -85,12 +84,11 @@ timeouts:
   document_processing: 20
   query_processing: 30
   embedding_generation: 60
-
 retrieval:
   initial_pool_size: 250
   score_threshold: 0.75
   rerank_size: 75
-
+  default_results: 15
 diversity:
   enable_penalty: true
   penalty_factor: 0.05

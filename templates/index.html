@@ -213,6 +213,16 @@
                                    value="0.0"
                                    required>
                         </div>
+                        <div class="input-group">
+                            <label for="contextLength">Context Length:</label>
+                            <input type="number"
+                                   id="contextLength"
+                                   placeholder="e.g., 16000"
+                                   min="1000"
+                                   max="32000"
+                                   value="16000"
+                                   required>
+                        </div>
                         <button type="submit" class="settings-btn">Update Models</button>
                         <div id="modelSettingsMessage" class="settings-message"></div>
                     </form>
