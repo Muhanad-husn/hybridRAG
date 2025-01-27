@@ -342,7 +342,11 @@ def search():
         
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        error_message = f"An error occurred during the search: {str(e)}"
+        if "expected string or buffer" in str(e):
+            error_message += ". This may be due to an issue with text encoding or processing."
+        return jsonify({'error': error_message}), 500
 
 @app.route('/generate-result', methods=['POST'])
 @log_request
