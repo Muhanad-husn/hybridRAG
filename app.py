@@ -275,46 +275,32 @@ def search():
         context_length = int(data.get('context_length', config['llm'].get('context_length', 16000)))
         temperature = float(data.get('temperature', config['llm'].get('temperature', 0.0)))
         
-        logger.info(f"Using rerank_count: {rerank_count}, max_tokens: {max_tokens}, context_length: {context_length}, temperature: {temperature}")
+        logger.info(f"Initial rerank_count: {rerank_count}, max_tokens: {max_tokens}, context_length: {context_length}, temperature: {temperature}")
 
-        def adjust_rerank_count(context, rerank_count, max_tokens, context_length):
+        def adjust_rerank_count(rerank_count, max_tokens, context_length):
             try:
-                context_tokens = count_tokens(context)
                 available_tokens = context_length - max_tokens
-                if context_tokens > available_tokens:
-                    adjustment_factor = available_tokens / max(context_tokens, 1)  # Avoid division by zero
-                    new_rerank_count = max(5, int(rerank_count * adjustment_factor))
+                new_rerank_count = max(5, min(rerank_count, available_tokens // 200))  # Assuming average 200 tokens per result
+                if new_rerank_count != rerank_count:
                     logger.info(f"Adjusted rerank_count from {rerank_count} to {new_rerank_count} due to token limitations")
-                    return new_rerank_count
-                return rerank_count
+                return new_rerank_count
             except Exception as e:
                 logger.error(f"Error in adjust_rerank_count: {str(e)}")
                 return rerank_count  # Return original rerank_count if there's an error
+
+        # Adjust rerank_count before search
+        adjusted_rerank_count = adjust_rerank_count(rerank_count, max_tokens, context_length)
 
         try:
             if is_arabic:
                 logger.info(f"Processing Arabic query: {query}")
                 english_query = translator.translate(query, source_lang='ar', target_lang='en')
-                initial_result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
-                                                    translate=translate_enabled, rerank_count=rerank_count,
-                                                    max_tokens=max_tokens, temperature=temperature,
-                                                    context_length=context_length)
-            else:
-                logger.info(f"Processing English query: {query}")
-                initial_result = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count,
-                                                    max_tokens=max_tokens, temperature=temperature,
-                                                    context_length=context_length)
-
-            initial_context = initial_result.get('llm_input', {}).get('context', '')
-            adjusted_rerank_count = adjust_rerank_count(initial_context, rerank_count, max_tokens, context_length)
-
-            # Run the search again with adjusted rerank_count
-            if is_arabic:
                 result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
                                            translate=translate_enabled, rerank_count=adjusted_rerank_count,
                                            max_tokens=max_tokens, temperature=temperature,
                                            context_length=context_length)
             else:
+                logger.info(f"Processing English query: {query}")
                 result = run_hybrid_search(query, translate=translate_enabled, rerank_count=adjusted_rerank_count,
                                            max_tokens=max_tokens, temperature=temperature,
                                            context_length=context_length)
@@ -334,7 +320,7 @@ def search():
 
         # Add token count information to the result
         result['token_info'] = {
-            'context_tokens': count_tokens(initial_context),
+            'context_tokens': count_tokens(result.get('llm_input', {}).get('context', '')),
             'max_tokens': max_tokens,
             'context_length': context_length
         }
