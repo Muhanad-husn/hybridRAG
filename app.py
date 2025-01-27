@@ -10,6 +10,11 @@ from src.utils.logger import setup_logger, get_logger
 from functools import wraps
 from Process_files import HyperRAG
 import asyncio
+import tiktoken
+
+def count_tokens(text):
+    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")  # or whichever model you're using
+    return len(encoding.encode(text))
 
 def manage_results_directory():
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
@@ -233,6 +238,11 @@ def get_logs():
 @log_request
 def search():
     try:
+        # Load config
+        config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
         data = request.get_json()
         query = data.get('query', '').strip()
         translate_enabled = data.get('translate', True)  # Default to True for backward compatibility
@@ -251,31 +261,58 @@ def search():
         # Detect if query is Arabic
         is_arabic = translator.is_arabic(query)
         
-        # Get rerank count from request, default to 15 if not provided or invalid
+        # Get parameters from request
         rerank_count = max(min(int(data.get('rerank_count', 15)), 80), 5)
-        logger.info(f"Using rerank count: {rerank_count}")
-
-        # Load config to get max_tokens and temperature
-        config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
+        max_tokens = int(data.get('max_tokens', config['llm'].get('max_tokens', 3000)))
+        context_length = int(data.get('context_length', config['llm'].get('context_length', 16000)))
+        temperature = float(data.get('temperature', config['llm'].get('temperature', 0.0)))
         
-        max_tokens = config['llm'].get('max_tokens', 3000)
-        temperature = config['llm'].get('temperature', 0.0)
-        logger.info(f"Using max_tokens: {max_tokens}, temperature: {temperature}")
+        logger.info(f"Using rerank_count: {rerank_count}, max_tokens: {max_tokens}, context_length: {context_length}, temperature: {temperature}")
+
+        def adjust_rerank_count(context, rerank_count, max_tokens, context_length):
+            context_tokens = count_tokens(context)
+            available_tokens = context_length - max_tokens
+            if context_tokens > available_tokens:
+                adjustment_factor = available_tokens / context_tokens
+                new_rerank_count = max(5, int(rerank_count * adjustment_factor))
+                logger.info(f"Adjusted rerank_count from {rerank_count} to {new_rerank_count} due to token limitations")
+                return new_rerank_count
+            return rerank_count
 
         if is_arabic:
             logger.info(f"Processing Arabic query: {query}")
-            # Translate query to English for internal processing only
             english_query = translator.translate(query, source_lang='ar', target_lang='en')
-            # Pass original query without translation and respect translation preference
+            initial_context = run_hybrid_search(english_query, original_lang='ar', original_query=query,
+                                                translate=translate_enabled, rerank_count=rerank_count,
+                                                max_tokens=max_tokens, temperature=temperature,
+                                                context_length=context_length, get_context_only=True)
+            adjusted_rerank_count = adjust_rerank_count(initial_context, rerank_count, max_tokens, context_length)
             result = run_hybrid_search(english_query, original_lang='ar', original_query=query,
-                                     translate=translate_enabled, rerank_count=rerank_count,
-                                     max_tokens=max_tokens, temperature=temperature)
+                                       translate=translate_enabled, rerank_count=adjusted_rerank_count,
+                                       max_tokens=max_tokens, temperature=temperature,
+                                       context_length=context_length)
         else:
             logger.info(f"Processing English query: {query}")
-            result = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count,
-                                       max_tokens=max_tokens, temperature=temperature)
+            initial_context = run_hybrid_search(query, translate=translate_enabled, rerank_count=rerank_count,
+                                                max_tokens=max_tokens, temperature=temperature,
+                                                context_length=context_length, get_context_only=True)
+            adjusted_rerank_count = adjust_rerank_count(initial_context, rerank_count, max_tokens, context_length)
+            result = run_hybrid_search(query, translate=translate_enabled, rerank_count=adjusted_rerank_count,
+                                       max_tokens=max_tokens, temperature=temperature,
+                                       context_length=context_length)
+
+        if adjusted_rerank_count != rerank_count:
+            result['adjusted_rerank_count'] = adjusted_rerank_count
+            logger.info(f"Rerank count adjusted from {rerank_count} to {adjusted_rerank_count}")
+
+        # Add token count information to the result
+        result['token_info'] = {
+            'context_tokens': count_tokens(initial_context),
+            'max_tokens': max_tokens,
+            'context_length': context_length
+        }
+
+        logger.info(f"Search completed. Token info: {result['token_info']}")
 
         # Generate HTML content without saving
         if result.get('answer'):
@@ -500,9 +537,10 @@ def update_model_settings():
         answer_model = data.get('answer_model', '').strip()
         max_tokens = data.get('max_tokens')
         temperature = data.get('temperature')
+        context_length = data.get('context_length')
         
-        if not extraction_model or not answer_model or max_tokens is None or temperature is None:
-            return jsonify({'error': 'All fields (extraction_model, answer_model, max_tokens, and temperature) must be provided'}), 400
+        if not extraction_model or not answer_model or max_tokens is None or temperature is None or context_length is None:
+            return jsonify({'error': 'All fields (extraction_model, answer_model, max_tokens, temperature, and context_length) must be provided'}), 400
             
         # Read current config
         config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
@@ -512,20 +550,22 @@ def update_model_settings():
         # Update model settings
         config['llm']['extraction_model'] = extraction_model
         config['llm']['answer_model'] = answer_model
-        config['llm']['max_tokens'] = max_tokens
-        config['llm']['temperature'] = temperature
+        config['llm']['max_tokens'] = int(max_tokens)
+        config['llm']['temperature'] = float(temperature)
+        config['llm']['context_length'] = int(context_length)
         
         # Write back to config file
         with open(config_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
             
-        logger.info(f"Model settings updated - Extraction: {extraction_model}, Answer: {answer_model}, Max Tokens: {max_tokens}, Temperature: {temperature}")
+        logger.info(f"Model settings updated - Extraction: {extraction_model}, Answer: {answer_model}, Max Tokens: {max_tokens}, Temperature: {temperature}, Context Length: {context_length}")
         return jsonify({
             'message': 'Model settings updated successfully',
             'extraction_model': extraction_model,
             'answer_model': answer_model,
             'max_tokens': max_tokens,
-            'temperature': temperature
+            'temperature': temperature,
+            'context_length': context_length
         })
         
     except Exception as e:
