@@ -54,6 +54,9 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
 
+        # Load top_k from config
+        top_k = config['retrieval'].get('top_k', 100)  # Default to 100 if not found
+
         # Initialize components
         document_processor = DocumentProcessor(config_path)
         embedding_generator = EmbeddingGenerator(config_path)
@@ -89,7 +92,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                     query=query,
                     query_embedding=query_embedding,
                     graph=None,  # Don't include graph results yet
-                    top_k=100,   # Get more results for better reranking
+                    top_k=top_k,   # Use the value from config
                     mode="Dense" # Only dense retrieval
                 )
                 

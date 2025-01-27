@@ -223,6 +223,16 @@
                                    value="16000"
                                    required>
                         </div>
+                        <div class="input-group">
+                            <label for="topK">Initial Results (top_k):</label>
+                            <input type="number"
+                                   id="topK"
+                                   placeholder="e.g., 100"
+                                   min="10"
+                                   max="1000"
+                                   value="100"
+                                   required>
+                        </div>
                         <button type="submit" class="settings-btn">Update Models</button>
                         <div id="modelSettingsMessage" class="settings-message"></div>
                     </form>

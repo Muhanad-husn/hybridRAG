@@ -383,8 +383,9 @@ if (modelSettingsForm) {
         const maxTokens = document.getElementById('maxTokens').value.trim();
         const temperature = document.getElementById('temperature').value.trim();
         const contextLength = document.getElementById('contextLength').value.trim();
+        const topK = document.getElementById('topK').value.trim();
         
-        if (!extractionModel || !answerModel || !maxTokens || !temperature || !contextLength) return;
+        if (!extractionModel || !answerModel || !maxTokens || !temperature || !contextLength || !topK) return;
 
         try {
             submitButton.disabled = true;
@@ -401,7 +402,8 @@ if (modelSettingsForm) {
                     answer_model: answerModel,
                     max_tokens: parseInt(maxTokens),
                     temperature: parseFloat(temperature),
-                    context_length: parseInt(contextLength)
+                    context_length: parseInt(contextLength),
+                    top_k: parseInt(topK)
                 })
             });
 
@@ -420,6 +422,16 @@ if (modelSettingsForm) {
         } finally {
             submitButton.disabled = false;
         }
+    });
+}
+
+// Add event listener for top_k input to ensure it's within the valid range
+const topKInput = document.getElementById('topK');
+if (topKInput) {
+    topKInput.addEventListener('change', function() {
+        const value = parseInt(this.value);
+        if (value < 10) this.value = 10;
+        if (value > 1000) this.value = 1000;
     });
 }
 

@@ -545,6 +545,46 @@ def update_api_key():
         logger.error(f"Error updating API key: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/update-top-k', methods=['POST'])
+@log_request
+def update_top_k():
+    try:
+        data = request.get_json()
+        new_top_k = data.get('top_k')
+        
+        if new_top_k is None:
+            return jsonify({'error': 'top_k value must be provided'}), 400
+        
+        # Ensure top_k is an integer and within a reasonable range
+        try:
+            new_top_k = int(new_top_k)
+            if new_top_k < 1 or new_top_k > 1000:
+                return jsonify({'error': 'top_k must be between 1 and 1000'}), 400
+        except ValueError:
+            return jsonify({'error': 'top_k must be an integer'}), 400
+        
+        # Read current config
+        config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        # Update top_k
+        config['retrieval']['top_k'] = new_top_k
+        
+        # Write back to config file
+        with open(config_path, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        
+        logger.info(f"top_k updated to: {new_top_k}")
+        return jsonify({
+            'message': 'top_k updated successfully',
+            'top_k': new_top_k
+        })
+    
+    except Exception as e:
+        logger.error(f"Error updating top_k: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/update-model-settings', methods=['POST'])
 @log_request
 def update_model_settings():
@@ -555,9 +595,10 @@ def update_model_settings():
         max_tokens = data.get('max_tokens')
         temperature = data.get('temperature')
         context_length = data.get('context_length')
+        top_k = data.get('top_k')
         
-        if not extraction_model or not answer_model or max_tokens is None or temperature is None or context_length is None:
-            return jsonify({'error': 'All fields (extraction_model, answer_model, max_tokens, temperature, and context_length) must be provided'}), 400
+        if not extraction_model or not answer_model or max_tokens is None or temperature is None or context_length is None or top_k is None:
+            return jsonify({'error': 'All fields (extraction_model, answer_model, max_tokens, temperature, context_length, and top_k) must be provided'}), 400
             
         # Read current config
         config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
@@ -570,19 +611,21 @@ def update_model_settings():
         config['llm']['max_tokens'] = int(max_tokens)
         config['llm']['temperature'] = float(temperature)
         config['llm']['context_length'] = int(context_length)
+        config['retrieval']['top_k'] = int(top_k)
         
         # Write back to config file
         with open(config_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
             
-        logger.info(f"Model settings updated - Extraction: {extraction_model}, Answer: {answer_model}, Max Tokens: {max_tokens}, Temperature: {temperature}, Context Length: {context_length}")
+        logger.info(f"Model settings updated - Extraction: {extraction_model}, Answer: {answer_model}, Max Tokens: {max_tokens}, Temperature: {temperature}, Context Length: {context_length}, Top K: {top_k}")
         return jsonify({
             'message': 'Model settings updated successfully',
             'extraction_model': extraction_model,
             'answer_model': answer_model,
             'max_tokens': max_tokens,
             'temperature': temperature,
-            'context_length': context_length
+            'context_length': context_length,
+            'top_k': top_k
         })
         
     except Exception as e:
