@@ -8,8 +8,30 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const resultsDiv = document.getElementById('results');
     const errorDiv = document.getElementById('error');
+    const docCountElement = document.getElementById('docCount');
+    const nodeCountElement = document.getElementById('nodeCount');
     // Operation status management
     let lastLogTimestamp = '';
+
+    async function fetchDocumentNodeCounts() {
+        try {
+            const response = await fetch('/get-document-node-counts');
+            const data = await response.json();
+            if (response.ok) {
+                docCountElement.textContent = data.document_count;
+                nodeCountElement.textContent = data.node_count;
+            } else {
+                throw new Error(data.error || 'Failed to fetch document and node counts');
+            }
+        } catch (error) {
+            console.error('[Fetch Counts] Error:', error);
+            docCountElement.textContent = 'Error';
+            nodeCountElement.textContent = 'Error';
+        }
+    }
+
+    // Fetch document and node counts on page load
+    fetchDocumentNodeCounts();
 
     async function fetchAndDisplayLogs() {
         try {
@@ -143,9 +165,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Wait 5 seconds to show final logs
                     await new Promise(resolve => setTimeout(resolve, 5000));
                     
-                    // Update stats and navigate to search
-                    document.getElementById('docCount').textContent = processData.vector_count || 0;
-                    document.getElementById('nodeCount').textContent = processData.node_count || 0;
+                    // Fetch updated counts
+                    await fetchDocumentNodeCounts();
+                    
                     document.querySelector('[data-view="search"]').click();
                 } else {
                     throw new Error(processData.error || 'Failed to process files');

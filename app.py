@@ -644,6 +644,30 @@ def update_model_settings():
     except Exception as e:
         logger.error(f"Error updating model settings: {str(e)}")
         return jsonify({'error': str(e)}), 500
+def count_raw_documents():
+    raw_docs_dir = os.path.join("data", "raw_documents")
+    return len([f for f in os.listdir(raw_docs_dir) if os.path.isfile(os.path.join(raw_docs_dir, f))])
+
+def count_graph_nodes():
+    nodes_file = os.path.join("data", "graphs", "nodes.csv")
+    if os.path.exists(nodes_file):
+        with open(nodes_file, 'r') as f:
+            return sum(1 for line in f) - 1  # Subtract 1 for header
+    return 0
+
+@app.route('/get-document-node-counts', methods=['GET'])
+@log_request
+def get_document_node_counts():
+    try:
+        document_count = count_raw_documents()
+        node_count = count_graph_nodes()
+        return jsonify({
+            'document_count': document_count,
+            'node_count': node_count
+        })
+    except Exception as e:
+        logger.error(f"Error getting document and node counts: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     try:
@@ -657,4 +681,5 @@ if __name__ == '__main__':
         app.run(debug=False, port=port)
     except Exception as e:
         logger.error(f"Failed to start application: {str(e)}")
+        raise
         raise
