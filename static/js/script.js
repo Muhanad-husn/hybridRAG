@@ -8,8 +8,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const resultsDiv = document.getElementById('results');
     const errorDiv = document.getElementById('error');
-    const sourcesList = document.querySelector('.sources-list');
-
     // Operation status management
     let lastLogTimestamp = '';
 
@@ -511,15 +509,7 @@ if (topKInput) {
                     }
                 }
 
-                // Update sources
-                sourcesList.innerHTML = '';
-                if (data.sources) {
-                    data.sources.forEach(source => {
-                        const li = document.createElement('li');
-                        li.textContent = source;
-                        sourcesList.appendChild(li);
-                    });
-                }
+                // Sources section removed
             } else {
                 throw new Error(data.error || 'An error occurred while processing your query');
             }
@@ -572,9 +562,6 @@ if (topKInput) {
                 const query = queryInput.value.trim();
                 const translatedQuery = lang === 'ar' ? query : ''; // For Arabic, use original query
                 
-                // Get sources
-                const sources = Array.from(sourcesList.children).map(li => li.textContent);
-                
                 // Generate HTML content
                 const result = await fetch('/generate-result', {
                     method: 'POST',
@@ -585,7 +572,6 @@ if (topKInput) {
                         content: content,
                         query: query,
                         translatedQuery: translatedQuery,
-                        sources: sources,
                         isArabic: lang === 'ar'
                     })
                 });
@@ -756,14 +742,7 @@ if (topKInput) {
                 }
 
                 // Update sources
-                sourcesList.innerHTML = '';
-                if (data.sources) {
-                    data.sources.forEach(source => {
-                        const li = document.createElement('li');
-                        li.textContent = source;
-                        sourcesList.appendChild(li);
-                    });
-                }
+                // Sources section removed
             } else {
                 throw new Error(data.error || 'An error occurred while processing your query');
             }
