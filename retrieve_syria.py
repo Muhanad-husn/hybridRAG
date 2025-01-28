@@ -130,7 +130,9 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 logger.info(f"Reranked to {len(reranked_vector_results)} results")
                 
                 # Get graph results - keep graph results proportional to rerank_count
-                graph_k = max(3, min(current_rerank_count // 3, 10))  # Scale graph results with rerank_count, min 3, max 10
+                min_graph_results = 3  # Minimum number of graph results to include
+                graph_k = max(min_graph_results, min(current_rerank_count // 3, 10))  # Scale graph results with rerank_count
+                logger.info(f"Retrieving graph results with graph_k: {graph_k}")
                 graph_results = retrieval_system.hybrid_search(
                     query=query,
                     query_embedding=query_embedding,
@@ -139,19 +141,21 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                     mode="Hybrid"  # Get graph results
                 )
                 
-                # Filter to keep only the graph analysis results
-                graph_analysis = [r for r in graph_results if r.get('meta') == 'graph_relationships']
+                # Include all graph results without filtering
+                graph_analysis = graph_results
+                logger.info(f"Including {len(graph_analysis)} graph results")
                 
-                # Calculate how many graph results we can include while respecting the total limit
-                remaining_slots = current_rerank_count - len(reranked_vector_results)
-                if remaining_slots > 0 and graph_analysis:
-                    # Add graph results up to the remaining limit
-                    graph_analysis = graph_analysis[:remaining_slots]
-                    combined_results = reranked_vector_results + graph_analysis
-                else:
-                    combined_results = reranked_vector_results
+                # Ensure we have at least min_graph_results
+                graph_analysis = graph_analysis[:max(min_graph_results, len(graph_analysis))]
                 
-                # Sort by score (no need to deduplicate since we're controlling the counts)
+                # Adjust current_rerank_count to make room for graph results
+                current_rerank_count = max(current_rerank_count - len(graph_analysis), 0)
+                
+                # Combine graph and vector results
+                combined_results = graph_analysis + reranked_vector_results[:current_rerank_count]
+                logger.info(f"Added {len(graph_analysis)} graph results and {len(combined_results) - len(graph_analysis)} vector results to combined results")
+                
+                # Sort by score
                 results = sorted(
                     combined_results,
                     key=lambda x: float(x.get('score', 0.0)),
@@ -336,7 +340,11 @@ Please provide a clear and accurate answer based solely on the information provi
             "confidence": confidence,
             "llm_input": {
                 "context": context,
-                "context_tokens": context_tokens if 'context_tokens' in locals() else None
+                "context_tokens": context_tokens if 'context_tokens' in locals() else None,
+            },
+            "raw_data": {
+                "reranked_vector_results": reranked_vector_results,
+                "graph_analysis": graph_analysis
             },
             "warning": f"Context length exceeded available tokens. Results automatically reduced from {rerank_count} to {current_rerank_count} for better processing."
             if current_rerank_count < rerank_count else None

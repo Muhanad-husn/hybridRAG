@@ -328,6 +328,13 @@ def search():
             'context_length': context_length
         }
 
+        # Process raw data for frontend
+        if 'raw_data' in result:
+            result['raw_data'] = {
+                'reranked_vector_results': result['raw_data'].get('reranked_vector_results', []),
+                'graph_analysis': result['raw_data'].get('graph_analysis', [])
+            }
+
         logger.info(f"Search completed. Token info: {result['token_info']}")
 
         # Generate HTML content without saving

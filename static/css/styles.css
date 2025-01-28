@@ -18,7 +18,47 @@
     --card-background: #FAFAFA;   /* Off-white */
     
     /* Text Colors */
-    --text-primary: #333333;     /* Soft black */
+        --text-primary: #333333;     /* Soft black */
+    
+    /* Raw Data Styles */
+    .raw-data-container {
+        max-height: 500px;
+        overflow-y: auto;
+        padding: 10px;
+        background-color: var(--card-background);
+        border: 1px solid var(--secondary-color);
+        border-radius: 4px;
+        margin-top: 20px;
+    }
+    
+    .raw-data-container h3 {
+        margin-top: 20px;
+        margin-bottom: 10px;
+        color: var(--primary-color);
+    }
+    
+    .raw-data-container ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .raw-data-container li {
+        margin-bottom: 5px;
+        padding: 5px;
+        background-color: var(--background-color);
+        border: 1px solid var(--secondary-color);
+        border-radius: 3px;
+    }
+    
+    .code-block {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        background-color: var(--background-color);
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 14px;
+    }
     --text-secondary: #666666;   /* Medium gray */
     
     /* Layout */

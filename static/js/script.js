@@ -731,17 +731,27 @@ if (topKInput) {
                 }
 
                 // Display raw data
-                const vectorContent = document.querySelector('.vector-content');
-                if (vectorContent && data.llm_input) {
+                const rawDataContainer = document.querySelector('.raw-data-container');
+                if (rawDataContainer && data.raw_data) {
                     try {
-                        const context = data.llm_input.context || 'No context available';
-                        const formattedInput = context.split('\n')
-                            .filter(line => line.trim())
-                            .join('\n');
-                        vectorContent.textContent = formattedInput;
+                        let content = '<h3>Reranked Vector Results:</h3>';
+                        content += '<ul>';
+                        data.raw_data.reranked_vector_results.forEach(result => {
+                            content += `<li>${result.text} (Score: ${result.score})</li>`;
+                        });
+                        content += '</ul>';
+
+                        content += '<h3>Graph Analysis:</h3>';
+                        content += '<ul>';
+                        data.raw_data.graph_analysis.forEach(result => {
+                            content += `<li>${result.text}</li>`;
+                        });
+                        content += '</ul>';
+
+                        rawDataContainer.innerHTML = content;
                     } catch (error) {
                         console.error('[Display] Error:', error);
-                        vectorContent.textContent = 'Error displaying raw data';
+                        rawDataContainer.innerHTML = '<p>Error displaying raw data</p>';
                     }
                 }
 
