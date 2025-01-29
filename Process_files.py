@@ -112,6 +112,13 @@ class HyperRAG:
         self.retrieval_system.build_index(documents)
         
         self.logger.info("Document processing completed successfully")
+        
+        # Cleanup raw documents after successful processing
+        raw_docs_dir = os.path.join('data', 'raw_documents')
+        if os.path.exists(raw_docs_dir):
+            shutil.rmtree(raw_docs_dir)
+            os.makedirs(raw_docs_dir)
+            self.logger.info(f"Cleaned raw documents directory at {raw_docs_dir}")
 
     @log_errors(logging.getLogger(__name__))
     def query(
