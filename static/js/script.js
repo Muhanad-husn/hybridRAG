@@ -10,8 +10,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const errorDiv = document.getElementById('error');
     const docCountElement = document.getElementById('docCount');
     const nodeCountElement = document.getElementById('nodeCount');
+    const processFilesBtn = document.getElementById('processFilesBtn');
     // Operation status management
     let lastLogTimestamp = '';
+
+    // Function to disable/enable all buttons except the clicked one
+    function toggleButtons(clickedButton, disable = true) {
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(button => {
+            if (button !== clickedButton) {
+                button.disabled = disable;
+                button.classList.toggle('disabled-state', disable);
+            } else {
+                button.disabled = disable;
+                disable ? button.classList.add('processing')
+                       : button.classList.remove('processing');
+            }
+        });
+    }
 
     async function fetchDocumentNodeCounts() {
         try {
@@ -72,7 +88,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // File Upload functionality
     const loadFilesBtn = document.getElementById('loadFilesBtn');
-    const processFilesBtn = document.getElementById('processFilesBtn');
     const fileInput = document.getElementById('fileInput');
 
     if (loadFilesBtn && fileInput) {
@@ -90,8 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 lastLogTimestamp = '';
                 loadingIndicator.classList.remove('hidden');
                 startLogPolling();
-                loadFilesBtn.disabled = true;
-                processFilesBtn.disabled = true;
+                toggleButtons(loadFilesBtn, true);
                 
                 // Clear any previous content
                 const statusElement = document.getElementById('operationStatus');
@@ -119,8 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayError(error.message);
             } finally {
                 stopLogPolling();
-                loadFilesBtn.disabled = false;
-                processFilesBtn.disabled = false;
+                toggleButtons(loadFilesBtn, false);
                 loadingIndicator.classList.add('hidden');
                 fileInput.value = ''; // Clear file input
             }
@@ -140,8 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 lastLogTimestamp = '';
                 loadingIndicator.classList.remove('hidden');
                 startLogPolling();
-                loadFilesBtn.disabled = true;
-                processFilesBtn.disabled = true;
+                toggleButtons(processFilesBtn, true);
                 
                 // Clear any previous content
                 const statusElement = document.getElementById('operationStatus');
@@ -177,8 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayError(error.message);
             } finally {
                 stopLogPolling();
-                loadFilesBtn.disabled = false;
-                processFilesBtn.disabled = false;
+                toggleButtons(processFilesBtn, false);
                 loadingIndicator.classList.add('hidden');
             }
         });
@@ -465,7 +476,7 @@ if (topKInput) {
         errorDiv.classList.add('hidden');
         resultsDiv.classList.add('hidden');
         loadingIndicator.classList.remove('hidden');
-        searchButton.disabled = true;
+        toggleButtons(searchButton, true);
 
         // Start polling for logs
         lastLogTimestamp = '';
@@ -541,7 +552,7 @@ if (topKInput) {
         } finally {
             // Stop polling for logs
             stopLogPolling();
-            searchButton.disabled = false;
+            toggleButtons(searchButton, false);
         }
     });
 
@@ -653,7 +664,7 @@ if (topKInput) {
         errorDiv.classList.add('hidden');
         resultsDiv.classList.add('hidden');
         loadingIndicator.classList.remove('hidden');
-        searchButton.disabled = true;
+        toggleButtons(searchButton, true);
 
         // Start polling for logs
         lastLogTimestamp = '';
@@ -742,7 +753,7 @@ if (topKInput) {
                 const rawDataContainer = document.querySelector('.raw-data-container');
                 if (rawDataContainer && data.raw_data) {
                     try {
-                        let content = '<h3>Reranked Vector Results:</h3>';
+                        let content = '<h3>Quotes:</h3>';
                         content += '<ul>';
                         data.raw_data.reranked_vector_results.forEach(result => {
                             content += `<li>${result.text} (Score: ${result.score})</li>`;
@@ -774,7 +785,7 @@ if (topKInput) {
         } finally {
             // Stop polling for logs
             stopLogPolling();
-            searchButton.disabled = false;
+            toggleButtons(searchButton, false);
         }
     });
 });
