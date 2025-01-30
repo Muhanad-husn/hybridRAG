@@ -21,16 +21,30 @@ class HybridRetrieval:
         self.config = self._load_config(config_path)
         self.ranker = self._initialize_ranker()
         
-        # Initialize embedding generator
+        # Initialize embedding generator (singleton)
         logger.info("Initializing embedding generator...")
         self.embedding_generator = EmbeddingGenerator(config_path)
         
-        # Verify vector store exists
+        # Verify and load vector store (singleton)
+        self._load_vector_store()
+        
+        # Initialize confidence calculation cache
+        self.confidence_cache = {}
+
+    def _load_vector_store(self):
+        """Load the vector store as a singleton."""
         embeddings_dir = os.path.join('data', 'embeddings')
         index_path = os.path.join(embeddings_dir, 'index.faiss')
         if not os.path.exists(index_path):
             raise ValueError("Vector store not initialized. Please process documents using HyperRAG to initialize the system.")
-        logger.info(f"Found existing FAISS index at {index_path}")
+        
+        if not hasattr(HybridRetrieval, '_vector_store'):
+            logger.info(f"Loading FAISS index from {index_path}")
+            HybridRetrieval._vector_store = self.embedding_generator.vector_store
+        else:
+            logger.info("Using existing vector store")
+        
+        self.vector_store = HybridRetrieval._vector_store
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
@@ -142,14 +156,14 @@ class HybridRetrieval:
             
             # Standard vector store search as fallback
             try:
-                results = self.embedding_generator.vector_store.similarity_search_with_score(
+                results = self.vector_store.similarity_search_with_score(
                     query,
                     k=k
                 )
                 
                 if not results:
                     logger.warning("No results found with similarity_search_with_score, trying similarity_search")
-                    docs = self.embedding_generator.vector_store.similarity_search(
+                    docs = self.vector_store.similarity_search(
                         query,
                         k=k
                     )
@@ -400,18 +414,7 @@ class HybridRetrieval:
             return 'unknown'
         return 'unknown'
 
-    def _apply_diversity_penalty(self, score: float, source_type: str, source_counts: Dict[str, int]) -> float:
-        """Apply diversity penalty based on source type frequency."""
-        config = self.config.get('diversity', {})
-        if not config.get('enable_penalty', True):
-            return score
-            
-        penalty_factor = config.get('penalty_factor', 0.05)
-        max_penalty = config.get('max_penalty', 0.3)
-        
-        # Calculate penalty based on how many times this source type has been seen
-        penalty = min(source_counts[source_type] * penalty_factor, max_penalty)
-        return score * (1 - penalty)
+    # Removed old _apply_diversity_penalty method
 
     def rerank_results(
         self,
@@ -434,157 +437,222 @@ class HybridRetrieval:
         """
         try:
             # Prepare passages for reranking
-            passages = []
-            for idx, result in enumerate(results, start=1):
-                if isinstance(result, tuple):  # Handle (doc, score) format
-                    doc, score = result
-                    passage = {
-                        "id": idx,
-                        "text": doc.page_content,
-                        "meta": doc.metadata.get("source", "unknown"),
-                        "score": float(score)
-                    }
-                elif 'node' in result:  # Handle graph search results
-                    node = result['node']
-                    # Format node properties for better readability
-                    props = node.get('properties', {})
-                    if isinstance(props, str):
-                        try:
-                            import json
-                            props = json.loads(props)
-                        except:
-                            props = {'text': props}
-                    
-                    # Create readable text from properties
-                    text_parts = [
-                        f"Type: {node.get('type', 'unknown')}",
-                        *[f"{k}: {v}" for k, v in props.items() if k != 'source']
-                    ]
-                    
-                    passage = {
-                        "id": idx,
-                        "text": "\n".join(text_parts),
-                        "meta": node.get('id', 'unknown'),
-                        "score": float(node.get('relevance_score', 0.0))  # Use relevance score from graph search
-                    }
-                else:  # Handle dictionary format
-                    passage = {
-                        "id": idx,
-                        "text": result.get("text", ""),
-                        "meta": result.get("meta", "unknown"),
-                        "score": float(result.get("score", 0.0))
-                    }
-                passages.append(passage)
+            passages = self._prepare_passages(results)
             
             if not passages:  # Handle empty results
                 return []
 
             if len(passages) == 1:  # Handle single result
-                return [{
-                    "id": passages[0]["id"],
-                    "text": passages[0]["text"],
-                    "meta": passages[0]["meta"],
-                    "score": 1.0
-                }]
+                return [self._format_single_result(passages[0])]
 
-            # Prepare inputs for the model
-            pairs = [[query, passage["text"]] for passage in passages]
-
-            # Tokenize all pairs
-            features = self.tokenizer(
-                pairs,
-                padding=True,
-                truncation=True,
-                return_tensors="pt",
-                max_length=512
-            ).to(self.device)
-
-            # Get scores from model
-            with torch.no_grad():
-                outputs = self.model(**features)
-                # Handle both single and batch predictions
-                logits = outputs.logits
-                if logits.dim() == 1:
-                    # Single prediction case - reshape to [1, num_classes]
-                    logits = logits.unsqueeze(0)
-                scores = torch.nn.functional.softmax(logits, dim=1)
-                # Ensure we have the right dimension before indexing
-                if scores.shape[1] > 1:
-                    scores = scores[:, 1]
-                else:
-                    scores = scores[:, 0]
-                scores = scores.cpu().numpy()
-
-            # Create reranked results
-            reranked_results = [
-                {
-                    "id": passage["id"],
-                    "text": passage["text"],
-                    "meta": passage["meta"],
-                    "score": float(score)
-                }
-                for passage, score in zip(passages, scores)
-            ]
+            # Rerank passages
+            reranked_results = self._rerank_passages(query, passages)
             
-            # Track source types and apply diversity penalty
-            source_counts = {}
-            diversity_adjusted_results = []
+            # Apply diversity penalty and sort
+            diversity_adjusted_results = self._apply_diversity_penalty(reranked_results)
             
-            for result in reranked_results:
-                source_type = self._get_source_type(result)
-                source_counts[source_type] = source_counts.get(source_type, 0) + 1
-                
-                # Apply diversity penalty to score
-                adjusted_score = self._apply_diversity_penalty(
-                    result['score'],
-                    source_type,
-                    source_counts
-                )
-                
-                result['original_score'] = result['score']
-                result['score'] = adjusted_score
-                diversity_adjusted_results.append(result)
+            # Sort and apply top_k
+            sorted_results = sorted(diversity_adjusted_results, key=lambda x: x['score'], reverse=True)
+            sorted_results = sorted_results[:top_k] if top_k else sorted_results
             
-            # Sort by adjusted score
-            sorted_results = sorted(
-                diversity_adjusted_results,
-                key=lambda x: x['score'],
-                reverse=True
-            )
-            
-            # Apply top_k and log diversity metrics
-            if top_k:
-                sorted_results = sorted_results[:top_k]
-                
             # Log diversity metrics
-            final_source_counts = {}
-            for result in sorted_results:
-                source_type = self._get_source_type(result)
-                final_source_counts[source_type] = final_source_counts.get(source_type, 0) + 1
+            self._log_diversity_metrics(sorted_results)
             
-            logger.info(f"Source type distribution in final results: {final_source_counts}")
-            coverage = len(final_source_counts) / self.config.get('diversity', {}).get('min_source_types', 3)
-            logger.info(f"Source type coverage: {coverage:.2%}")
-            
-            # Convert to standard format with both old and new fields
-            formatted_results = []
-            for result in sorted_results:
-                formatted_result = {
-                    "text": result["text"],
-                    "meta": result["meta"],
-                    "score": float(result["score"]),
-                    # Add page_content for compatibility
-                    "page_content": result["text"],
-                    # Add metadata for compatibility
-                    "metadata": {"source": result["meta"]}
-                }
-                formatted_results.append(formatted_result)
-            
-            return formatted_results
+            # Format results
+            return self._format_results(sorted_results)
             
         except Exception as e:
             logger.error(f"Error in reranking: {str(e)}")
             raise
+
+    def _prepare_passages(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        passages = []
+        for idx, result in enumerate(results, start=1):
+            if isinstance(result, tuple):  # Handle (doc, score) format
+                doc, score = result
+                passage = {
+                    "id": idx,
+                    "text": doc.page_content,
+                    "meta": doc.metadata.get("source", "unknown"),
+                    "score": float(score)
+                }
+            elif 'node' in result:  # Handle graph search results
+                passage = self._prepare_graph_passage(result, idx)
+            else:  # Handle dictionary format
+                passage = {
+                    "id": idx,
+                    "text": result.get("text", ""),
+                    "meta": result.get("meta", "unknown"),
+                    "score": float(result.get("score", 0.0))
+                }
+            passages.append(passage)
+        return passages
+
+    def _prepare_graph_passage(self, result: Dict[str, Any], idx: int) -> Dict[str, Any]:
+        node = result['node']
+        props = node.get('properties', {})
+        if isinstance(props, str):
+            try:
+                import json
+                props = json.loads(props)
+            except:
+                props = {'text': props}
+        
+        text_parts = [
+            f"Type: {node.get('type', 'unknown')}",
+            *[f"{k}: {v}" for k, v in props.items() if k != 'source']
+        ]
+        
+        return {
+            "id": idx,
+            "text": "\n".join(text_parts),
+            "meta": node.get('id', 'unknown'),
+            "score": float(node.get('relevance_score', 0.0))
+        }
+
+    def _format_single_result(self, passage: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "id": passage["id"],
+            "text": passage["text"],
+            "meta": passage["meta"],
+            "score": 1.0
+        }
+
+    def _rerank_passages(self, query: str, passages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        pairs = [[query, passage["text"]] for passage in passages]
+        features = self.tokenizer(
+            pairs,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+            max_length=512
+        ).to(self.device)
+
+        with torch.no_grad():
+            outputs = self.model(**features)
+            logits = outputs.logits
+            if logits.dim() == 1:
+                logits = logits.unsqueeze(0)
+            scores = torch.nn.functional.softmax(logits, dim=1)
+            scores = scores[:, 1] if scores.shape[1] > 1 else scores[:, 0]
+            scores = scores.cpu().numpy()
+
+        return [
+            {
+                "id": passage["id"],
+                "text": passage["text"],
+                "meta": passage["meta"],
+                "score": float(score)
+            }
+            for passage, score in zip(passages, scores)
+        ]
+
+    def _apply_diversity_penalty(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        source_counts = {}
+        diversity_adjusted_results = []
+        
+        for result in results:
+            source_type = self._get_source_type(result)
+            source_counts[source_type] = source_counts.get(source_type, 0) + 1
+            
+            adjusted_score = self._calculate_diversity_penalty(
+                result['score'],
+                source_type,
+                source_counts
+            )
+            
+            result['original_score'] = result['score']
+            result['score'] = adjusted_score
+            diversity_adjusted_results.append(result)
+        
+        return diversity_adjusted_results
+
+    def _calculate_diversity_penalty(self, score: float, source_type: str, source_counts: Dict[str, int]) -> float:
+        """Calculate diversity penalty based on source type frequency."""
+        config = self.config.get('diversity', {})
+        if not config.get('enable_penalty', True):
+            return score
+            
+        penalty_factor = config.get('penalty_factor', 0.05)
+        max_penalty = config.get('max_penalty', 0.3)
+        
+        # Calculate penalty based on how many times this source type has been seen
+        penalty = min(source_counts[source_type] * penalty_factor, max_penalty)
+        return score * (1 - penalty)
+
+    def _log_diversity_metrics(self, results: List[Dict[str, Any]]) -> None:
+        final_source_counts = {}
+        for result in results:
+            source_type = self._get_source_type(result)
+            final_source_counts[source_type] = final_source_counts.get(source_type, 0) + 1
+        
+        logger.info(f"Source type distribution in final results: {final_source_counts}")
+        coverage = len(final_source_counts) / self.config.get('diversity', {}).get('min_source_types', 3)
+        logger.info(f"Source type coverage: {coverage:.2%}")
+
+    def _format_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        formatted_results = []
+        for result in results:
+            confidence = self._calculate_confidence(result)
+            formatted_result = {
+                "text": result["text"],
+                "meta": result["meta"],
+                "score": float(result["score"]),
+                "page_content": result["text"],
+                "metadata": {"source": result["meta"]},
+                "confidence": confidence
+            }
+            formatted_results.append(formatted_result)
+        return formatted_results
+
+    def _calculate_confidence(self, result: Dict[str, Any]) -> float:
+        """Calculate and cache confidence score for a result."""
+        cache_key = (result["text"], result["meta"], result["score"])
+        if cache_key in self.confidence_cache:
+            return self.confidence_cache[cache_key]
+
+        # Calculate confidence score
+        relevance_score = float(result["score"])
+        source_coverage = self._calculate_source_coverage(result)
+        answer_completeness = self._calculate_answer_completeness(result)
+
+        confidence = (relevance_score + source_coverage + answer_completeness) / 3
+        
+        # Cache the calculated confidence
+        self.confidence_cache[cache_key] = confidence
+        
+        return confidence
+
+    def _calculate_source_coverage(self, result: Dict[str, Any]) -> float:
+        """Calculate source coverage based on the diversity of sources."""
+        source_type = self._get_source_type(result)
+        source_counts = self.config.get('diversity', {}).get('source_counts', {})
+        total_sources = sum(source_counts.values())
+        if total_sources == 0:
+            return 0.5  # Default value if no sources are available
+        
+        source_ratio = source_counts.get(source_type, 0) / total_sources
+        return 1 - source_ratio  # Higher score for less common sources
+
+    def _calculate_answer_completeness(self, result: Dict[str, Any]) -> float:
+        """Calculate answer completeness based on text length and content."""
+        text = result.get("text", "")
+        word_count = len(text.split())
+        
+        # Assume optimal answer length is between 50 and 200 words
+        if word_count < 50:
+            completeness = word_count / 50
+        elif word_count > 200:
+            completeness = 1 - ((word_count - 200) / 200)
+        else:
+            completeness = 1.0
+        
+        # Check for key phrases that might indicate a complete answer
+        key_phrases = ["in conclusion", "to summarize", "therefore"]
+        if any(phrase in text.lower() for phrase in key_phrases):
+            completeness += 0.1
+        
+        return min(max(completeness, 0), 1)  # Ensure the score is between 0 and 1
 
     def hybrid_search(
         self,
@@ -623,13 +691,15 @@ class HybridRetrieval:
             # Process dense retrieval results
             for doc, score in embedding_results:
                 if hasattr(doc, 'page_content') and doc.page_content.strip():
-                    combined_results.append({
+                    result = {
                         'text': doc.page_content,
                         'meta': doc.metadata.get('source', 'unknown'),
                         'score': float(score),
                         'page_content': doc.page_content,
                         'metadata': doc.metadata
-                    })
+                    }
+                    result['confidence'] = self._calculate_confidence(result)
+                    combined_results.append(result)
 
             logger.info(f"Added {len(combined_results)} valid dense retrieval results")
 
@@ -640,14 +710,20 @@ class HybridRetrieval:
                 relationships = self._process_graph_relationships(graph, min_degree)
                 
                 if relationships:
-                    combined_results.extend(self._group_relationships(relationships))
+                    graph_results = self._group_relationships(relationships)
+                    for result in graph_results:
+                        result['confidence'] = self._calculate_confidence(result)
+                    combined_results.extend(graph_results)
 
             # Deduplicate and sort results
             unique_results = self.deduplicate_results(combined_results)
-            sorted_results = sorted(unique_results, key=lambda x: float(x.get('score', 0.0)), reverse=True)
+            sorted_results = sorted(unique_results, key=lambda x: float(x.get('confidence', 0.0)), reverse=True)
             
             # Apply top_k if specified
-            return sorted_results[:rerank_top_k] if rerank_top_k else sorted_results
+            final_results = sorted_results[:rerank_top_k] if rerank_top_k else sorted_results
+            
+            # Format final results
+            return self._format_results(final_results)
             
         except Exception as e:
             logger.error(f"Error in hybrid search: {str(e)}")

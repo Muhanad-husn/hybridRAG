@@ -14,6 +14,9 @@ DetectorFactory.seed = 0
 class Translator:
     """Handles translation between Arabic and English."""
     
+    _models_cache = {}
+    _tokenizers_cache = {}
+    
     def __init__(self, config_path: str = "config/translation_config.yaml"):
         """Initialize the translator with configuration."""
         # Get existing logger without reinitializing
@@ -22,7 +25,7 @@ class Translator:
         # Load config and models without reinitializing logger
         self.config = self._load_config(config_path)
         
-        # Initialize translation models and tokenizers
+        # Initialize translation models and tokenizers (using class-level cache)
         self.ar_to_en_model, self.ar_to_en_tokenizer = self._load_model("ar_to_en")
         self.en_to_ar_model, self.en_to_ar_tokenizer = self._load_model("en_to_ar")
         
@@ -82,15 +85,25 @@ class Translator:
             
             model_name = model_mapping[direction]
             
-            self.logger.info(f"Loading translation model: {model_name}")
-            
-            # Use ModelManager to load the model
-            model = model_manager.get_model(model_name)
-            tokenizer = model_manager.get_tokenizer(model_name)
-            
-            # Set device (ModelManager handles this, but we'll keep it for consistency)
-            device = model_config["device"]
-            model = model.to(device)
+            # Check if model and tokenizer are already in cache
+            if model_name in self._models_cache and model_name in self._tokenizers_cache:
+                self.logger.info(f"Using cached translation model and tokenizer: {model_name}")
+                model = self._models_cache[model_name]
+                tokenizer = self._tokenizers_cache[model_name]
+            else:
+                self.logger.info(f"Loading translation model: {model_name}")
+                
+                # Use ModelManager to load the model
+                model = model_manager.get_model(model_name)
+                tokenizer = model_manager.get_tokenizer(model_name)
+                
+                # Set device (ModelManager handles this, but we'll keep it for consistency)
+                device = model_config["device"]
+                model = model.to(device)
+                
+                # Cache the model and tokenizer
+                self._models_cache[model_name] = model
+                self._tokenizers_cache[model_name] = tokenizer
             
             return model, tokenizer
         except Exception as e:
