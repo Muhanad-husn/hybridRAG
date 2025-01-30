@@ -100,8 +100,3 @@ paths:
   graphs: data/graphs
   raw_documents: data/raw_documents
   processed_chunks: data/processed_chunks
-  models:
-    gte_small: models/gte_small
-    translation_ar_en: models/opus-mt-ar-en
-    translation_en_ar: models/opus-mt-en-ar
-    ranking: models/ranking_model
