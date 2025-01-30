@@ -86,7 +86,7 @@ class Translator:
             
             # Use ModelManager to load the model
             model = model_manager.get_model(model_name)
-            tokenizer = MarianTokenizer.from_pretrained(model_name)
+            tokenizer = model_manager.get_tokenizer(model_name)
             
             # Set device (ModelManager handles this, but we'll keep it for consistency)
             device = model_config["device"]

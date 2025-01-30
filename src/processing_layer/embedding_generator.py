@@ -6,6 +6,7 @@ import faiss
 import shutil
 from typing import List, Dict, Optional
 from transformers import AutoTokenizer
+from sentence_transformers import SentenceTransformer
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
 from langchain_community.docstore.in_memory import InMemoryDocstore
@@ -72,7 +73,7 @@ class EmbeddingGenerator:
         """Initialize the tokenizer and model."""
         try:
             logger.info(f"Loading model: {self.model_name}")
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            self.tokenizer = model_manager.get_tokenizer(self.model_name)
             self.model = model_manager.get_model(self.model_name)
             
             # Get the device from the model
@@ -213,31 +214,40 @@ class EmbeddingGenerator:
             numpy array containing the embedding
         """
         try:
-            # Tokenize text
-            inputs = self.tokenizer(
-                text,
-                padding=True,
-                truncation=True,
-                max_length=512,
-                return_tensors="pt"
-            ).to(self.device)
+            if isinstance(self.model, SentenceTransformer):
+                # Handle SentenceTransformer models
+                embedding = self.model.encode(text, convert_to_tensor=True, device=self.device)
+                embedding = embedding.cpu().numpy()
+            else:
+                # Handle Hugging Face transformer models
+                inputs = self.tokenizer(
+                    text,
+                    padding=True,
+                    truncation=True,
+                    max_length=512,
+                    return_tensors="pt"
+                ).to(self.device)
+                
+                with torch.no_grad():
+                    outputs = self.model(**inputs)
+                    embeddings = outputs.last_hidden_state.mean(dim=1)
+                
+                embedding = embeddings[0].cpu().numpy()
             
-            # Generate embeddings
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                embeddings = outputs.last_hidden_state.mean(dim=1)
-            
-            # Convert to numpy and normalize
-            embedding = embeddings[0].cpu().numpy()
             embedding = embedding / np.linalg.norm(embedding)
             
             return embedding
             
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
-            raise
+            return np.zeros(self._get_embedding_dimension())
+    
+    def _get_embedding_dimension(self) -> int:
+        """Get the embedding dimension based on model type."""
+        if isinstance(self.model, SentenceTransformer):
+            return self.model[0].auto_model.config.hidden_size
+        return self.model.config.hidden_size
             
-
     def generate_embeddings_batch(
         self,
         texts: List[str],
