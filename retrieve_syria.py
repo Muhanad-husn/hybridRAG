@@ -33,6 +33,15 @@ def get_translator():
         _translator = Translator()
     return _translator
 
+# Singleton instance of HybridRetrieval
+_hybrid_retrieval_instance = None
+
+def get_hybrid_retrieval_instance(config_path: str = "config/config.yaml") -> HybridRetrieval:
+    global _hybrid_retrieval_instance
+    if _hybrid_retrieval_instance is None:
+        _hybrid_retrieval_instance = HybridRetrieval(config_path)
+    return _hybrid_retrieval_instance
+
 def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None,
                      translate: bool = True, rerank_count: int = 15, max_tokens: int = 3000, temperature: float = 0.0,
                      context_length: int = 16000) -> Dict[str, Any]:
@@ -62,7 +71,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         document_processor = DocumentProcessor(config_path)
         embedding_generator = EmbeddingGenerator(config_path)
         graph_constructor = GraphConstructor(config_path)
-        retrieval_system = HybridRetrieval(config_path)
+        retrieval_system = get_hybrid_retrieval_instance(config_path)
         
         try:
             # Verify vector store exists
