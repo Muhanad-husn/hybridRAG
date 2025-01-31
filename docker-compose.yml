@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  llmsherpa:
+    image: ghcr.io/nlmatics/nlm-ingestor:latest
+    ports:
+      - "5010:5001"
+    networks:
+      - hybridrag-net
+
+  hybridrag:
+    build: .
+    depends_on:
+      - llmsherpa
+    ports:
+      - "3000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./results:/app/results
+      - ./config:/app/config
+      - .env.vol:/app/.env
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LLM_SHERPA_URL=http://llmsherpa:5001
+    networks:
+      - hybridrag-net
+
+networks:
+  hybridrag-net:
+    driver: bridge

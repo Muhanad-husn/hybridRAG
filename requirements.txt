@@ -14,7 +14,7 @@ Requests==2.32.3
 scikit_learn==1.6.1
 thefuzz==0.22.1
 tiktoken==0.8.0
-torch==2.5.1
+torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 transformers==4.48.1
 sentencepiece==0.2.0
 llmsherpa==0.1.4
