@@ -91,45 +91,84 @@ class EmbeddingGenerator:
             # Set up storage directory
             os.makedirs(self.embeddings_dir, exist_ok=True)
             index_path = os.path.join(self.embeddings_dir, 'index.faiss')
+            pkl_path = os.path.join(self.embeddings_dir, 'index.pkl')
 
-            # Load existing index if it exists
-            if os.path.exists(index_path):
-                # Load and verify the index type
-                index = faiss.read_index(index_path)
-                logger.info(f"Loaded FAISS index type: {type(index).__name__}")
-                
-                # Verify it's an IndexFlatIP
-                if not isinstance(index, faiss.IndexFlatIP):
-                    logger.warning(f"Expected IndexFlatIP but found {type(index).__name__}")
-                    # Convert to IndexFlatIP if needed
-                    dimension = index.d
-                    new_index = faiss.IndexFlatIP(dimension)
-                    if index.ntotal > 0:  # If index has vectors
-                        new_index.add(faiss.vector_to_array(index))
-                    index = new_index
-                    logger.info("Converted index to IndexFlatIP")
-                
-                # Get index stats
-                logger.info(f"Index contains {index.ntotal} vectors of dimension {index.d}")
-                
-                # Load the vector store with verified index
-                self.vector_store = FAISS.load_local(
-                    self.embeddings_dir,
-                    self.embedding_function,
-                    allow_dangerous_deserialization=True
-                )
-                logger.info("Loaded existing vector store")
-                
-                # Store the raw index for direct access if needed
-                self.raw_index = index
-                
-            else:
-                # Create new empty vector store
+            # Create new vector store if either file is missing
+            if not os.path.exists(index_path) or not os.path.exists(pkl_path):
                 self._create_new_vector_store()
                 logger.info("Created new vector store")
+            else:
+                self._load_existing_vector_store(index_path)
 
         except Exception as e:
             logger.error(f"Error initializing vector store: {str(e)}")
+            raise
+
+    def _load_existing_vector_store(self, index_path: str) -> None:
+        """Load and verify existing vector store."""
+        index = faiss.read_index(index_path)
+        logger.info(f"Loaded FAISS index type: {type(index).__name__}")
+        
+        # Verify it's an IndexFlatIP
+        if not isinstance(index, faiss.IndexFlatIP):
+            logger.warning(f"Expected IndexFlatIP but found {type(index).__name__}")
+            # Convert to IndexFlatIP if needed
+            dimension = index.d
+            new_index = faiss.IndexFlatIP(dimension)
+            if index.ntotal > 0:  # If index has vectors
+                new_index.add(faiss.vector_to_array(index))
+            index = new_index
+            logger.info("Converted index to IndexFlatIP")
+        
+        # Get index stats
+        logger.info(f"Index contains {index.ntotal} vectors of dimension {index.d}")
+        
+        # Load the vector store with verified index
+        self.vector_store = FAISS.load_local(
+            self.embeddings_dir,
+            self.embedding_function,
+            allow_dangerous_deserialization=True
+        )
+        logger.info("Loaded existing vector store")
+        
+        # Store the raw index for direct access if needed
+        self.raw_index = index
+
+    def _create_new_vector_store(self) -> None:
+        """Create a new empty vector store."""
+        try:
+            logger.info("Creating new FAISS index")
+            dimension = 384  # GTE-small embedding dimension
+            
+            # Create and configure FAISS index
+            index = faiss.IndexFlatIP(dimension)
+            if faiss.get_num_gpus() > 0:
+                logger.info("Moving index to GPU")
+                res = faiss.StandardGpuResources()
+                index = faiss.index_cpu_to_gpu(res, 0, index)
+            
+            # Create vector store with the index
+            self.vector_store = FAISS(
+                embedding_function=self.embedding_function,
+                index=index,
+                docstore=InMemoryDocstore({}),
+                index_to_docstore_id={}
+            )
+            
+            # Save the empty index and store
+            index_path = os.path.join(self.embeddings_dir, 'index.faiss')
+            pkl_path = os.path.join(self.embeddings_dir, 'index.pkl')
+            faiss.write_index(index, index_path)
+            self.vector_store.save_local(self.embeddings_dir)
+            
+            # Verify the files were saved
+            if not os.path.exists(index_path) or not os.path.exists(pkl_path):
+                raise ValueError("Failed to save FAISS index or pickle file")
+            
+            logger.info("Vector store initialized and saved successfully")
+            self.raw_index = index
+        except Exception as e:
+            logger.error(f"Error creating new vector store: {str(e)}")
             raise
             
     def _create_new_vector_store(self) -> None:

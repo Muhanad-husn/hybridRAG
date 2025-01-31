@@ -26,13 +26,17 @@ def count_tokens(text):
 
 def manage_results_directory():
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
-    files = [os.path.join(results_dir, f) for f in os.listdir(results_dir) if f.endswith('.html')]
-    files.sort(key=os.path.getmtime, reverse=True)
+    os.makedirs(results_dir, exist_ok=True)  # Create directory if it doesn't exist
     
-    while len(files) > 15:
-        oldest_file = files.pop()
-        os.remove(oldest_file)
-        logger.info(f"Removed old result file: {oldest_file}")
+    files = []
+    if os.path.exists(results_dir):
+        files = [os.path.join(results_dir, f) for f in os.listdir(results_dir) if f.endswith('.html')]
+        files.sort(key=os.path.getmtime, reverse=True)
+        
+        while len(files) > 15:
+            oldest_file = files.pop()
+            os.remove(oldest_file)
+            logger.info(f"Removed old result file: {oldest_file}")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -413,6 +417,16 @@ def generate_result():
 # Initialize HyperRAG with app logger
 rag_system = HyperRAG(logger=logger)
 
+# Initialize empty vector store if none exists
+vector_store_path = os.path.join("data", "embeddings", "index.faiss")
+if not os.path.exists(vector_store_path):
+    os.makedirs(os.path.dirname(vector_store_path), exist_ok=True)
+    import faiss
+    # Create empty index with 1536 dimensions (typical for text-embedding-3-large)
+    empty_index = faiss.IndexFlatL2(1536)
+    faiss.write_index(empty_index, vector_store_path)
+    logger.info("Created empty vector store index")
+
 @app.route('/upload-files', methods=['POST'])
 @log_request
 def upload_files():
@@ -646,6 +660,7 @@ def update_model_settings():
         return jsonify({'error': str(e)}), 500
 def count_raw_documents():
     raw_docs_dir = os.path.join("data", "raw_documents")
+    os.makedirs(raw_docs_dir, exist_ok=True)
     return len([f for f in os.listdir(raw_docs_dir) if os.path.isfile(os.path.join(raw_docs_dir, f))])
 
 def count_graph_nodes():
@@ -668,6 +683,11 @@ def get_document_node_counts():
     except Exception as e:
         logger.error(f"Error getting document and node counts: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+# Ensure necessary directories exist
+os.makedirs(os.path.join("data", "raw_documents"), exist_ok=True)
+os.makedirs(os.path.join("data", "graphs"), exist_ok=True)
+os.makedirs(os.path.join("data", "embeddings"), exist_ok=True)
 
 if __name__ == '__main__':
     try:
