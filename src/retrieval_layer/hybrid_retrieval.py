@@ -25,26 +25,29 @@ class HybridRetrieval:
         logger.info("Initializing embedding generator...")
         self.embedding_generator = EmbeddingGenerator(config_path)
         
-        # Verify and load vector store (singleton)
-        self._load_vector_store()
+        # Initialize vector store as None (lazy initialization)
+        self.vector_store = None
         
         # Initialize confidence calculation cache
         self.confidence_cache = {}
 
-    def _load_vector_store(self):
-        """Load the vector store as a singleton."""
-        embeddings_dir = os.path.join('data', 'embeddings')
-        index_path = os.path.join(embeddings_dir, 'index.faiss')
-        if not os.path.exists(index_path):
-            raise ValueError("Vector store not initialized. Please process documents using HyperRAG to initialize the system.")
-        
-        if not hasattr(HybridRetrieval, '_vector_store'):
-            logger.info(f"Loading FAISS index from {index_path}")
-            HybridRetrieval._vector_store = self.embedding_generator.vector_store
-        else:
-            logger.info("Using existing vector store")
-        
-        self.vector_store = HybridRetrieval._vector_store
+    def _initialize_vector_store(self):
+        """Initialize or load the vector store."""
+        if self.vector_store is None:
+            embeddings_dir = os.path.join('data', 'embeddings')
+            index_path = os.path.join(embeddings_dir, 'index.faiss')
+            
+            if not os.path.exists(embeddings_dir):
+                os.makedirs(embeddings_dir)
+            
+            if os.path.exists(index_path):
+                logger.info(f"Loading existing FAISS index from {index_path}")
+                self.vector_store = self.embedding_generator.vector_store
+            else:
+                logger.info("Creating new empty vector store")
+                self.vector_store = self.embedding_generator.create_empty_vector_store()
+            
+            logger.info("Vector store initialized")
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from yaml file."""
@@ -84,8 +87,12 @@ class HybridRetrieval:
             documents: List of documents with embeddings in metadata
         """
         try:
-            # Skip building index since save_embeddings already handles this
-            logger.info("Skipping index build - already handled by save_embeddings")
+            # Ensure vector store is initialized
+            self._initialize_vector_store()
+            
+            # Add documents to the vector store
+            self.vector_store.add_documents(documents)
+            logger.info(f"Added {len(documents)} documents to the vector store")
             
         except Exception as e:
             logger.error(f"Error in build_index: {str(e)}")
@@ -109,6 +116,9 @@ class HybridRetrieval:
             List of (document, score) tuples
         """
         try:
+            # Ensure vector store is initialized
+            self._initialize_vector_store()
+            
             # Get raw index for direct search if available
             raw_index = getattr(self.embedding_generator, 'raw_index', None)
             
@@ -132,13 +142,13 @@ class HybridRetrieval:
                     
                     # Get documents from vector store
                     docs = []
-                    total_docs = len(self.embedding_generator.vector_store.docstore._dict)
+                    total_docs = len(self.vector_store.docstore._dict)
                     for idx, score in zip(indices[0], scores[0]):
                         if idx != -1 and idx < total_docs:  # Valid index within bounds
                             try:
                                 doc_id = str(idx)
-                                if doc_id in self.embedding_generator.vector_store.docstore._dict:
-                                    doc = self.embedding_generator.vector_store.docstore._dict[doc_id]
+                                if doc_id in self.vector_store.docstore._dict:
+                                    doc = self.vector_store.docstore._dict[doc_id]
                                     docs.append((doc, float(score)))
                             except KeyError:
                                 logger.warning(f"Document not found for index {idx}")
@@ -781,3 +791,16 @@ class HybridRetrieval:
 
         logger.info(f"Added {len(rel_by_type)} relationship groups to results")
         return grouped_results
+
+    def reset_vector_store(self) -> None:
+        """Reset the vector store to an empty state."""
+        try:
+            # Call the reset_vector_store method of the embedding generator
+            self.embedding_generator.reset_vector_store()
+            
+            # Update the vector store reference
+            self.vector_store = self.embedding_generator.vector_store
+            logger.info("Reset vector store to empty state")
+        except Exception as e:
+            logger.error(f"Error resetting vector store: {str(e)}")
+            raise

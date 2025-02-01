@@ -27,6 +27,7 @@ class HyperRAG:
             self.logger.warning(f"Graph constructor initialization failed: {str(e)}")
             self.graph_constructor = None
             
+        # Initialize retrieval system without loading vector store
         self.retrieval_system = HybridRetrieval(config_path)
         
         self.logger.info("Hyper RAG system initialized")
@@ -34,28 +35,33 @@ class HyperRAG:
     @log_errors(logging.getLogger(__name__))
     def reset_storage(self) -> None:
         """Reset all storage (vector store and graph files)."""
-        # Reset vector store
-        self.embedding_generator.reset_vector_store()
-        self.logger.info("Reset vector store")
+        try:
+            # Reset vector store
+            self.embedding_generator.reset_vector_store()
+            self.retrieval_system.vector_store = self.embedding_generator.vector_store
+            self.logger.info("Reset vector store")
 
-        # Reset graph files
-        graphs_dir = os.path.join('data', 'graphs')
-        if os.path.exists(graphs_dir):
-            shutil.rmtree(graphs_dir)
-        os.makedirs(graphs_dir)
-        
-        # Initialize empty CSV files
-        self._initialize_graph_files(graphs_dir)
-        self.logger.info(f"Reset and initialized graph files at {graphs_dir}")
+            # Reset graph files
+            graphs_dir = os.path.join('data', 'graphs')
+            if os.path.exists(graphs_dir):
+                shutil.rmtree(graphs_dir)
+            os.makedirs(graphs_dir)
+            
+            # Initialize empty CSV files
+            self._initialize_graph_files(graphs_dir)
+            self.logger.info(f"Reset and initialized graph files at {graphs_dir}")
 
-        # Reset processed chunks
-        chunks_dir = os.path.join('data', 'processed_chunks')
-        if os.path.exists(chunks_dir):
-            shutil.rmtree(chunks_dir)
-            os.makedirs(chunks_dir)
-            self.logger.info(f"Reset processed chunks at {chunks_dir}")
+            # Reset processed chunks
+            chunks_dir = os.path.join('data', 'processed_chunks')
+            if os.path.exists(chunks_dir):
+                shutil.rmtree(chunks_dir)
+                os.makedirs(chunks_dir)
+                self.logger.info(f"Reset processed chunks at {chunks_dir}")
 
-        self.logger.info("Storage reset completed")
+            self.logger.info("Storage reset completed")
+        except Exception as e:
+            self.logger.error(f"Error in reset_storage: {str(e)}")
+            raise
 
     def _initialize_graph_files(self, graphs_dir: str) -> None:
         """Initialize empty graph files."""
@@ -141,6 +147,9 @@ class HyperRAG:
             List of search results
         """
         self.logger.info(f"Processing query: {query}")
+        
+        # Ensure vector store is initialized
+        self.retrieval_system._initialize_vector_store()
         
         # Generate query embedding
         query_embedding = self.embedding_generator.generate_embedding(query)
