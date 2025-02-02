@@ -1,7 +1,7 @@
 data/
 models/
 logs/
-.env
+*.log
 *.bak
 __pycache__/
 .pytest_cache/
