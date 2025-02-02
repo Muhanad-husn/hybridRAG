@@ -8,24 +8,26 @@ SocioPolitics GraphMind is an educational tool designed to assist researchers, j
 
 SocioPolitics GraphMind uses a **Hybrid Retrieval** architecture (sometimes referred to as HybridRAG), with a modular design that breaks down into several layers:
 
-- **Input Layer:**  
-  Handles document ingestion and segmentation.  
+- **Input Layer:**\
+  Handles document ingestion and segmentation.\
   *Key File:* [`src/input_layer/document_processor.py`](src/input_layer/document_processor.py)
 
-- **Processing Layer:**  
-  Generates embeddings, constructs knowledge graphs, and transforms these structures for further analysis.  
-  *Key Files:*  
-  - [`src/processing_layer/graph_constructor.py`](src/processing_layer/graph_constructor.py)  
+- **Processing Layer:**\
+  Generates embeddings, constructs knowledge graphs, and transforms these structures for further analysis.\
+  *Key Files:*
+
+  - [`src/processing_layer/graph_constructor.py`](src/processing_layer/graph_constructor.py)
   - [`src/tools/llm_graph_transformer.py`](src/tools/llm_graph_transformer.py)
 
-- **Retrieval Layer:**  
-  Implements hybrid retrieval logic, blending keyword searches with semantic and graph-based methods.  
-  *Key Files:*  
-  - [`Process_files.py`](Process_files.py)  
-  - [`retrieve_syria.py`](retrieve_syria.py)  
+- **Retrieval Layer:**\
+  Implements hybrid retrieval logic, blending keyword searches with semantic and graph-based methods.\
+  *Key Files:*
+
+  - [`Process_files.py`](Process_files.py)
+  - [`retrieve_syria.py`](retrieve_syria.py)
   - [`src/retrieval_layer/hybrid_retrieval.py`](src/retrieval_layer/hybrid_retrieval.py)
 
-- **Utility Components:**  
+- **Utility Components:**\
   Manages API keys, configuration reloading, and caching.
 
 ## Key Functionalities and Endpoints
@@ -86,62 +88,62 @@ Async document processing, caching strategies, and modular structure help the sy
 
 ### 1. Hybrid Retrieval
 
-- **Enhanced Accuracy**  
+- **Enhanced Accuracy**\
   Blends traditional keyword matching with semantic embeddings and a knowledge graph for deeper context. Main logic resides in the [`retrieve_syria.py:run_hybrid_search`](retrieve_syria.py) routine and [`src/retrieval_layer/hybrid_retrieval.py`](src/retrieval_layer/hybrid_retrieval.py).
-- **Comprehensive Search**  
+- **Comprehensive Search**\
   Builds a document graph that connects text chunks, capturing explicit keywords, underlying concepts, and cross-document relationships.
-- **Robust Performance & Efficiency**  
+- **Robust Performance & Efficiency**\
   Optimizes search by leveraging multiple methods to handle diverse queries in different languages or styles.
 
 ### 2. Semantic Chunking
 
-- **Context Preservation**  
+- **Context Preservation**\
   Large documents are broken into coherent segments, preserving context in each chunk. Implemented within [`src/input_layer/document_processor.py`](src/input_layer/document_processor.py).
-- **Improved Processing**  
+- **Improved Processing**\
   Processing contextually relevant chunks (instead of entire documents) yields better embedding quality and indexing precision.
-- **Refined Retrieval & Scalability**  
+- **Refined Retrieval & Scalability**\
   Each chunk aligns closely with a query, improving accuracy and enabling the system to scale across extensive corpora.
 
 ### 3. Deduplication & Reranking
 
-- **Deduplication**  
+- **Deduplication**\
   The system compares similarity and origin to filter out redundant entries, providing a diverse set of relevant documents.
-- **Reranking**  
+- **Reranking**\
   A fine-tuned transformer model then reorders the remaining candidates, ensuring that the most relevant results rise to the top.
-- **Separation of Concerns**  
+- **Separation of Concerns**\
   Dense retrieval retrieves broad candidates efficiently, while the reranker (cross-encoder) re-sorts them for higher precision.
 
 ### 4. Result Count Control
 
-- **Dynamic Control**  
+- **Dynamic Control**\
   Users can set how many results feed into answer generation, maintaining a balance between comprehensive coverage and token limits.
-- **Adaptive Mechanism**  
+- **Adaptive Mechanism**\
   Automatically adjusts to accommodate different LLMs with varying token capacities, letting users switch between quick answers or more in-depth explorations.
 
 ### 5. OpenRouter Integration & Model Customization
 
-- **Default Models**  
+- **Default Models**
   - Extraction Model: `google/gemini-flash-1.5` – optimized for high-frequency entity extraction.
   - Answer Model: `microsoft/phi-4` – a reasoning-focused model trained on top-tier datasets.
-- **Flexible Overrides**  
+- **Flexible Overrides**\
   Users can swap in other models for extraction or answer generation, fine-tuning performance for specialized tasks.
-- **Temperature Control**  
+- **Temperature Control**\
   GPT temperature parameter (0 to 1) lets users tailor output creativity vs. determinism.
 
 ### 6. Local Model Integration & Parallel Processing
 
-- **Cost Reduction**  
+- **Cost Reduction**\
   Embedding, reranking, and translation models (e.g., `thenlper/gte-small`, `cross-encoder/ms-marco-MiniLM-L-12-v2`) run locally, cutting down on recurring API costs.
-- **Concurrent Workloads**  
+- **Concurrent Workloads**\
   Uses multi-core parallelism to handle large-scale document processing efficiently, although actual speed depends on system resources.
 
 ### 7. Bilingual Functionality
 
-- **Auto Detection**  
+- **Auto Detection**\
   The app detects user language. By default, it generates English responses followed by Arabic translations.
-- **Translation Control**  
+- **Translation Control**\
   Users can disable Arabic translation for quicker performance.
-- **English Document Focus**  
+- **English Document Focus**\
   While bilingual, the system is optimized for English-language documents.
 
 ## Usage and User Guidance
@@ -185,6 +187,9 @@ python app.py
 ```
 
 Then navigate to [http://localhost:5000](http://localhost:5000) in your browser to begin using SocioPolitics GraphMind.
+
+**Obtain an OpenRouter API Key (If Required):**
+Visit [https://openrouter.ai](https://openrouter.ai) to register and obtain an OpenRouter API key. Supply this key via the Settings section in the application User Interface.
 
 Once running, you can:
 
