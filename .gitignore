@@ -9,3 +9,9 @@ __pycache__/
 .benchmarks/
 results/
 requirements_1.txt
+implementation_summary.md
+dockerfile_changes.md
+docker_compose_changes.md
+docker-compose.yml
+Dockerfile
+entrypoint.sh

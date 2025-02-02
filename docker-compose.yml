@@ -1,30 +1,46 @@
-version: '3.8'
-
+ 
+ 
 services:
   llmsherpa:
     image: ghcr.io/nlmatics/nlm-ingestor:latest
     ports:
-      - "5010:5001"
+      - "127.0.0.1:5010:5001"
     networks:
       - hybridrag-net
+    restart: unless-stopped
 
   hybridrag:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       - llmsherpa
     ports:
-      - "3000:5000"
+      - "127.0.0.1:3000:5000"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./results:/app/results
       - ./config:/app/config
-      - .env.vol:/app/.env
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - LLM_SHERPA_URL=http://llmsherpa:5001
+      - FLASK_ENV=production
     networks:
       - hybridrag-net
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    command: python app.py
 
 networks:
   hybridrag-net:
