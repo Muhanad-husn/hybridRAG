@@ -2,117 +2,192 @@
 
 ## Introduction
 
-SocioPolitics GraphMind is an educational tool designed to assist researchers, journalists, and students in fields such as Politics, History, Sociology, Sociopolitical, and Socioeconomic studies. The app enables users to interact with documents through a chat interface, extracting structured insights and enhancing their research capabilities.
+SocioPolitics GraphMind is an educational tool designed to assist researchers, journalists, and students in disciplines like Politics, History, Sociology, and Socioeconomic studies. It enables users to interact with their documents through a chat interface, extracting structured insights and boosting research potential.
 
 ## Architecture Overview
 
-SocioPolitics GraphMind uses HybridRAG which is built with a modular architecture, consisting of several layers:
+SocioPolitics GraphMind uses a **Hybrid Retrieval** architecture (sometimes referred to as HybridRAG), with a modular design that breaks down into several layers:
 
-- **Input Layer:** Handles document ingestion and segmentation.
-  - [`src/input_layer/document_processor.py`](src/input_layer/document_processor.py)
-- **Processing Layer:** Generates embeddings and constructs knowledge graphs.
-  - [`src/processing_layer/graph_constructor.py`](src/processing_layer/graph_constructor.py)
+- **Input Layer:**  
+  Handles document ingestion and segmentation.  
+  *Key File:* [`src/input_layer/document_processor.py`](src/input_layer/document_processor.py)
+
+- **Processing Layer:**  
+  Generates embeddings, constructs knowledge graphs, and transforms these structures for further analysis.  
+  *Key Files:*  
+  - [`src/processing_layer/graph_constructor.py`](src/processing_layer/graph_constructor.py)  
   - [`src/tools/llm_graph_transformer.py`](src/tools/llm_graph_transformer.py)
-- **Retrieval Layer:** Implements hybrid retrieval mechanisms.
-  - [`Process_files.py`](Process_files.py)
-- **Utility Components:** Manages API keys, configuration reloading, and caching.
+
+- **Retrieval Layer:**  
+  Implements hybrid retrieval logic, blending keyword searches with semantic and graph-based methods.  
+  *Key Files:*  
+  - [`Process_files.py`](Process_files.py)  
+  - [`retrieve_syria.py`](retrieve_syria.py)  
+  - [`src/retrieval_layer/hybrid_retrieval.py`](src/retrieval_layer/hybrid_retrieval.py)
+
+- **Utility Components:**  
+  Manages API keys, configuration reloading, and caching.
 
 ## Key Functionalities and Endpoints
 
 ### Search Operations
 
 - **Endpoint:** `/search`
-- **Description:** Handles both Arabic and English queries, adjusts rerank counts, and integrates token count monitoring.
+- **Description:** Accepts Arabic and English queries, applies semantic chunking, deduplication, and reranking. Monitors token usage to stay within model limits.
 - **File:** [`app.py`](app.py)
 
 ### Document Processing
 
 - **Endpoint:** `/process-documents`
-- **Description:** Resets storage, processes documents, and builds vector stores and graphs.
+- **Description:** Resets storage, processes uploaded documents, and builds vector stores and knowledge graphs.
 - **File:** [`app.py`](app.py)
 
 ### File Management
 
 - **Endpoints:** `/upload-files`, `/save-result`
-- **Description:** Manages file uploads and result saving.
+- **Description:** Manages file uploads and persists processed outputs.
 - **File:** [`app.py`](app.py)
 
 ### Configuration and Settings
 
 - **Endpoints:** `/update-model-settings`, `/update-api-key`
-- **Description:** Allows dynamic updates to model settings and API keys, providing user control.
+- **Description:** Dynamically updates model preferences (extraction/answer models, temperature) and API keys, ensuring flexibility for diverse use cases.
 - **File:** [`app.py`](app.py)
 
 ### System Monitoring
 
 - **Endpoints:** `/logs`, `/get-document-node-counts`
-- **Description:** Fetches logs and obtains document/node counts.
+- **Description:** Provides logs and high-level document-node statistics for oversight and debugging.
 - **File:** [`app.py`](app.py)
 
 ## Benefits of the Technology & Design Choices
 
 ### Modular Architecture
 
-- **Description:** Separation of concerns for document ingestion, processing, and retrieval allows flexible scalability.
+Separating concerns into distinct modules (document ingestion, processing, retrieval) makes the system easy to scale and maintain.
 
 ### Robust Error Handling and Logging
 
-- **Description:** Logging and error monitoring are applied at various endpoints to ensure reliability.
+Comprehensive logging and error monitoring at multiple endpoints enhance stability and help diagnose issues efficiently.
 
 ### User Control and Customization
 
-- **Description:** Users can adjust settings for retrieval (`top_k`), model parameters (extraction/answer models, temperature, tokens), and API keys.
+By exposing endpoints to modify retrieval parameters (`top_k`), model settings (extraction/answer model, temperature), and API keys, the system empowers users to tailor performance and cost.
 
 ### Hybrid Retrieval Approach
 
-- **Description:** Combines document processing with embeddings and knowledge graph construction to improve search relevancy and depth of information.
-- **File:** [`src/tools/llm_graph_transformer.py`](src/tools/llm_graph_transformer.py)
+Combines document processing, semantic embeddings, and a knowledge graph to improve search relevancy and depth. This multi-pronged strategy reduces missed connections and boosts retrieval accuracy.
 
 ### Scalability and Maintainability
 
-- **Description:** Uses async operations for processing documents, caching strategies, and a modular design to simplify future extensions and maintenance.
+Async document processing, caching strategies, and modular structure help the system handle bigger datasets without sacrificing performance.
 
-## Key Features Overview
+## Expanded Feature Highlights
 
-To delve deeper into specific features like hybrid retrieval, semantic chunking, or bilingual functionality, consult the [FEATURES.md](FEATURES.md) file. Here is a quick summary of some important highlights:
+### 1. Hybrid Retrieval
 
-- **Hybrid Retrieval:** Combines keyword searches with semantic and graph-based approaches for robust performance and reduced missed connections.
-- **Semantic Chunking:** Optimizes document segmentation, preserving context and improving retrieval accuracy.
-- **Deduplication & Reranking:** Ensures result quality by removing duplicates and ordering the most relevant answers first.
-- **Result Count Control:** Enables balancing coverage and efficiency within model token limits, adaptable to different LLMs.
-- **Local Model Integration & Parallel Processing:** Executes embeddings, reranking, and translation locally to reduce costs and handle workloads more efficiently.
-- **Bilingual Functionality:** Detects language automatically, defaults to generating English answers with Arabic translation, and provides an option to disable translation for faster performance.
+- **Enhanced Accuracy**  
+  Blends traditional keyword matching with semantic embeddings and a knowledge graph for deeper context. Main logic resides in the [`retrieve_syria.py:run_hybrid_search`](retrieve_syria.py) routine and [`src/retrieval_layer/hybrid_retrieval.py`](src/retrieval_layer/hybrid_retrieval.py).
+- **Comprehensive Search**  
+  Builds a document graph that connects text chunks, capturing explicit keywords, underlying concepts, and cross-document relationships.
+- **Robust Performance & Efficiency**  
+  Optimizes search by leveraging multiple methods to handle diverse queries in different languages or styles.
 
-## Detailed Walkthrough
+### 2. Semantic Chunking
 
-### Flow Diagrams
+- **Context Preservation**  
+  Large documents are broken into coherent segments, preserving context in each chunk. Implemented within [`src/input_layer/document_processor.py`](src/input_layer/document_processor.py).
+- **Improved Processing**  
+  Processing contextually relevant chunks (instead of entire documents) yields better embedding quality and indexing precision.
+- **Refined Retrieval & Scalability**  
+  Each chunk aligns closely with a query, improving accuracy and enabling the system to scale across extensive corpora.
 
-- **Description:** Flow diagrams for search and document processing pipelines map the journey from file upload to result generation.
+### 3. Deduplication & Reranking
 
-### Code Excerpts and Explanations
+- **Deduplication**  
+  The system compares similarity and origin to filter out redundant entries, providing a diverse set of relevant documents.
+- **Reranking**  
+  A fine-tuned transformer model then reorders the remaining candidates, ensuring that the most relevant results rise to the top.
+- **Separation of Concerns**  
+  Dense retrieval retrieves broad candidates efficiently, while the reranker (cross-encoder) re-sorts them for higher precision.
 
-- **Description:** Annotated snippets from key files explaining business logic.
-- **Files:** [`app.py`](app.py), [`Process_files.py`](Process_files.py)
+### 4. Result Count Control
 
-### Configuration Files
+- **Dynamic Control**  
+  Users can set how many results feed into answer generation, maintaining a balance between comprehensive coverage and token limits.
+- **Adaptive Mechanism**  
+  Automatically adjusts to accommodate different LLMs with varying token capacities, letting users switch between quick answers or more in-depth explorations.
 
-- **Description:** Manages system settings and tuning.
-- **File:** [`config/config.yaml`](config/config.yaml)
+### 5. OpenRouter Integration & Model Customization
+
+- **Default Models**  
+  - Extraction Model: `google/gemini-flash-1.5` – optimized for high-frequency entity extraction.
+  - Answer Model: `microsoft/phi-4` – a reasoning-focused model trained on top-tier datasets.
+- **Flexible Overrides**  
+  Users can swap in other models for extraction or answer generation, fine-tuning performance for specialized tasks.
+- **Temperature Control**  
+  GPT temperature parameter (0 to 1) lets users tailor output creativity vs. determinism.
+
+### 6. Local Model Integration & Parallel Processing
+
+- **Cost Reduction**  
+  Embedding, reranking, and translation models (e.g., `thenlper/gte-small`, `cross-encoder/ms-marco-MiniLM-L-12-v2`) run locally, cutting down on recurring API costs.
+- **Concurrent Workloads**  
+  Uses multi-core parallelism to handle large-scale document processing efficiently, although actual speed depends on system resources.
+
+### 7. Bilingual Functionality
+
+- **Auto Detection**  
+  The app detects user language. By default, it generates English responses followed by Arabic translations.
+- **Translation Control**  
+  Users can disable Arabic translation for quicker performance.
+- **English Document Focus**  
+  While bilingual, the system is optimized for English-language documents.
 
 ## Usage and User Guidance
 
-### Quick Start
+### 1. Docker Instructions (Preferred)
 
-- **Instructions:** How to run the app (e.g., `python app.py` commands, setting up Docker if using [run_docker.txt](run_docker.txt)).
+If you prefer to run the application in a Docker container, use the following command:
 
-### Developer Guidelines
+```bash
+docker run -p 5010:5001 ghcr.io/nlmatics/nlm-ingestor:latest
+```
 
-- **Description:** How to add new document processors or customize retrieval logic.
+### 2. Create a Virtual Environment (Recommended)
 
-### Troubleshooting
+**Using Conda**:
 
-- **Description:** Common issues with configurations, caching, and API responses.
+```bash
+conda create -n socioenv python=3.12.8
+conda activate socioenv
+pip install --upgrade pip==25.0
+```
 
-## Future Enhancements and Roadmap
+**Using Python venv**:
 
-- **Description:** Planned improvements such as enhanced language support, additional document parsing modules, or integration with other data sources.
+```bash
+python3.12 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip==25.0
+```
+
+### 3. Install Requirements
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Run the Application
+
+```bash
+python app.py
+```
+
+Then navigate to [http://localhost:5000](http://localhost:5000) in your browser to begin using SocioPolitics GraphMind.
+
+Once running, you can:
+
+- **Upload Documents**: Access the `/upload-files` endpoint or interface to upload your documents.
+- **Process Documents**: Send a request to `/process-documents` to segment, embed, and build the knowledge graph.
+- **Perform Searches**: Use `/search` with a text query. By default, results appear in English, followed by an Arabic translation if enabled.
