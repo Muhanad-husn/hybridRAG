@@ -214,18 +214,18 @@ Async document processing, caching strategies, and a modular structure help the 
 
 ## Usage and User Guidance
 
-### 0. Obtain an OpenRouter API Key (If Required)
+### 1. Obtain an OpenRouter API Key 
 
 Visit [https://openrouter.ai](https://openrouter.ai) to register and obtain an OpenRouter API key. And fill it in the dedicated box in the setting section in when you start the application for the 1st timeز
 
-### 1. Clone the Repository
+### 2. Clone the Repository
 
 ```bash
 git clone https://github.com/nlmatics/SocioPoliticsGraphMind.git
 cd SocioPoliticsGraphMind
 ```
 
-### 2. Create a Virtual Environment (Recommended)
+### 3. Create a Virtual Environment (Recommended)
 
 Using **Conda**:
 
@@ -243,13 +243,13 @@ source venv/bin/activate
 pip install --upgrade pip==25.0
 ```
 
-### 3. Install Requirements
+### 4. Install Requirements
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Run the Application
+### 5. Run the Application
 
 ```bash
 python app.py
