@@ -4,7 +4,7 @@ import os
 import json
 import yaml
 from datetime import datetime
-from retrieve_syria import run_hybrid_search
+from retrieve_main import run_hybrid_search
 from src.input_layer.translator import Translator
 from src.utils.logger import setup_logger, get_logger
 from functools import wraps

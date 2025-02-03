@@ -58,7 +58,7 @@ SocioPolitics GraphMind uses a **Hybrid Retrieval** architecture (sometimes refe
 
   - `Process_files.py`\
 
-  - `retrieve_syria.py`\
+  - `retrieve_main.py`\
 
   - `src/retrieval_layer/hybrid_retrieval.py`
 
@@ -139,7 +139,7 @@ Async document processing, caching strategies, and a modular structure help the 
 ### 1. Hybrid Retrieval
 
 - **Enhanced Accuracy**\
-  Blends traditional keyword matching with semantic embeddings and a knowledge graph for deeper context. Main logic resides in the `retrieve_syria.py:run_hybrid_search` routine and `src/retrieval_layer/hybrid_retrieval.py`.
+  Blends traditional keyword matching with semantic embeddings and a knowledge graph for deeper context. Main logic resides in the `retrieve_main.py:run_hybrid_search` routine and `src/retrieval_layer/hybrid_retrieval.py`.
 
 - **Comprehensive Search**\
   Builds a document graph that connects text chunks, capturing explicit keywords, underlying concepts, and cross-document relationships.
