@@ -216,11 +216,7 @@ Async document processing, caching strategies, and a modular structure help the 
 
 ### 0. Obtain an OpenRouter API Key (If Required)
 
-Visit [https://openrouter.ai](https://openrouter.ai) to register and obtain an OpenRouter API key. And fill it in the dedicated box in the setting section in when you start the application for the 1st time:
-
-```env
-OPENROUTER_API_KEY=sd-.....
-```
+Visit [https://openrouter.ai](https://openrouter.ai) to register and obtain an OpenRouter API key. And fill it in the dedicated box in the setting section in when you start the application for the 1st timeز
 
 ### 1. Clone the Repository
 
