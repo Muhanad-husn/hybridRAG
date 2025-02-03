@@ -2,9 +2,12 @@ import os
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from datetime import datetime
-from langchain_community.document_loaders.llmsherpa import LLMSherpaFileLoader
 from langchain.schema import Document
 from pathlib import Path
+
+from llama_index.core import SimpleDirectoryReader
+from llama_index.core.node_parser import SemanticSplitterNodeParser
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 from src.utils.config_handler import config
 from src.utils.cache_handler import DocumentCache
@@ -57,8 +60,13 @@ class DocumentProcessor:
     def __init__(self):
         """Initialize the document processor with configuration."""
         self.supported_formats = config.get("document.supported_formats", [])
-        self.llmsherpa_api_url = config.get("llm_sherpa.api_url")
         self.batch_size = config.get("processing.batch_size", 1000)
+        self.embed_model = HuggingFaceEmbedding(model_name="thenlper/gte-small")
+        self.splitter = SemanticSplitterNodeParser(
+            buffer_size=1, 
+            breakpoint_percentile_threshold=75, 
+            embed_model=self.embed_model
+        )
         
         # Initialize cache with config
         self.cache = DocumentCache[List[Document]](
@@ -90,7 +98,7 @@ class DocumentProcessor:
 
     @log_errors(logger)
     def _process_single_file(self, file_path: str) -> List[Document]:
-        """Process a single file using LLMSherpa with optimized chunk processing."""
+        """Process a single file using llama_index with optimized chunk processing."""
         try:
             self._is_supported_format(file_path)
 
@@ -102,20 +110,19 @@ class DocumentProcessor:
 
             logger.info(f"Processing file: {file_path}")
             
-            # Initialize the LLMSherpa loader with configuration
-            loader = LLMSherpaFileLoader(
-                file_path=file_path,
-                new_indent_parser=True,
-                apply_ocr=True,
-                strategy="chunks",
-                llmsherpa_api_url=self.llmsherpa_api_url
-            )
-
-            # Load and process the document
-            docs = loader.load()
+            # New document loading and processing
+            documents = SimpleDirectoryReader(input_files=[file_path]).load_data()
+            nodes = self.splitter.get_nodes_from_documents(documents)
+            
+            # Convert nodes to Documents and add metadata
+            processed_docs = []
+            for node in nodes:
+                doc = Document(page_content=node.text, metadata=node.metadata)
+                doc.metadata.update(MetadataBuilder.from_file(file_path))
+                processed_docs.append(doc)
             
             # Process chunks in batches using parallel processing
-            processed_docs = self._process_chunk_batch(docs, file_path)
+            processed_docs = self._process_chunk_batch(processed_docs, file_path)
             
             logger.info(f"Successfully processed {file_path}: {len(processed_docs)} chunks created")
             
