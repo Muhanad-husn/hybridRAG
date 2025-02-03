@@ -7,6 +7,7 @@ from src.processing_layer.embedding_generator import EmbeddingGenerator
 from src.processing_layer.graph_constructor import GraphConstructor
 from src.retrieval_layer.hybrid_retrieval import HybridRetrieval
 from src.utils.error_handler import log_errors
+from src.utils.config_handler import config
 
 class HyperRAG:
     """Main class for the Hyper RAG system."""
@@ -16,18 +17,21 @@ class HyperRAG:
         # Use provided logger or get a new one
         self.logger = logger or logging.getLogger(__name__)
         
+        # Load configuration
+        config.load_config(config_path)
+        
         # Initialize components
-        self.document_processor = DocumentProcessor(config_path)
-        self.embedding_generator = EmbeddingGenerator(config_path)
+        self.document_processor = DocumentProcessor()
+        self.embedding_generator = EmbeddingGenerator(config_path)  # Will update in next phase
         
         # Try to initialize graph constructor (optional)
         try:
-            self.graph_constructor = GraphConstructor(config_path)
+            self.graph_constructor = GraphConstructor(config_path)  # Will update in next phase
         except Exception as e:
             self.logger.warning(f"Graph constructor initialization failed: {str(e)}")
             self.graph_constructor = None
             
-        self.retrieval_system = HybridRetrieval(config_path)
+        self.retrieval_system = HybridRetrieval(config_path)  # Will update in next phase
         
         self.logger.info("Hyper RAG system initialized")
 

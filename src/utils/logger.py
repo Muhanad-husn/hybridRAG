@@ -2,6 +2,7 @@ import logging
 import os
 import yaml
 from typing import Optional
+from logging.handlers import RotatingFileHandler
 
 class DuplicateFilter(logging.Filter):
     """Filter to prevent repeated log messages within a short time window."""
@@ -67,46 +68,45 @@ def setup_logger(config_path: str = "config/config.yaml") -> None:
         
         # Configure root logger
         root_logger = logging.getLogger()
-        root_logger.setLevel(logging.INFO)
+        root_logger.setLevel(getattr(logging, log_config.get('log_level', 'INFO')))
         
         # Remove any existing handlers
         root_logger.handlers = []
         
         # Create formatters
-        file_formatter = RequestFormatter(
-            '%(asctime)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        console_formatter = RequestFormatter(
-            '%(levelname)s - %(message)s'
-        )
+        formatters = {}
+        for name, fmt_config in log_config.get('formatters', {}).items():
+            formatters[name] = logging.Formatter(
+                fmt=fmt_config.get('format'),
+                datefmt=fmt_config.get('datefmt')
+            )
         
-        # Setup file handler
-        log_file = os.path.join(log_dir, 'app.log')
-        
-        # Only clear the file if this is the initial startup (not a reload)
-        if not any(isinstance(h, logging.FileHandler) for h in logging.getLogger().handlers):
-            open(log_file, 'w').close()
-            
-        # Always open in append mode to preserve logs
+        # Setup file handler with overwrite
         file_handler = logging.FileHandler(
-            log_file,
-            mode='a',
+            filename=os.path.join(log_dir, 'app.log'),
+            mode='w',  # Overwrite existing log file
             encoding='utf-8'
         )
         file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(file_formatter)
-        file_handler.addFilter(DuplicateFilter(1.0))  # 1 second timeout for duplicates
+        file_handler.setFormatter(formatters.get('detailed'))
+        file_handler.addFilter(DuplicateFilter(1.0))
         root_logger.addHandler(file_handler)
         
         # Setup console handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(console_formatter)
+        console_handler.setFormatter(formatters.get('simple'))
         console_handler.addFilter(DuplicateFilter(1.0))
         root_logger.addHandler(console_handler)
         
-        # Configure werkzeug logger to reduce HTTP request logs
+        # Configure specific loggers
+        for logger_name, logger_config in log_config.get('loggers', {}).items():
+            if logger_name != 'root':
+                logger = logging.getLogger(logger_name)
+                logger.setLevel(getattr(logging, logger_config.get('level', 'INFO')))
+                logger.propagate = logger_config.get('propagate', False)
+        
+        # Configure werkzeug logger
         werkzeug_logger = logging.getLogger('werkzeug')
         werkzeug_logger.setLevel(logging.WARNING)
         
@@ -114,13 +114,6 @@ def setup_logger(config_path: str = "config/config.yaml") -> None:
         flask_logger = logging.getLogger('flask')
         flask_logger.setLevel(logging.INFO)
         flask_logger.propagate = False
-        
-        # Configure other loggers
-        for logger_name, logger_config in log_config.get('loggers', {}).items():
-            if logger_name != 'root':
-                logger = logging.getLogger(logger_name)
-                logger.setLevel(getattr(logging, logger_config.get('level', 'INFO')))
-                logger.propagate = logger_config.get('propagate', False)
         
         logging.info("Logger initialized successfully")
         

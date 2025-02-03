@@ -6,10 +6,10 @@ openrouter:
   site_name: HybridRAG
   model: anthropic/claude-3.5-haiku-20241022
 llm:
-  extraction_model: anthropic/claude-3.5-haiku-20241022:beta
+  extraction_model: google/gemini-pro-1.5
   answer_model: microsoft/phi-4
   max_tokens: 3000
-  temperature: 0.5
+  temperature: 0.0
   context_length: 16000
 graph:
   storage:
@@ -61,11 +61,10 @@ logging:
       - console
   handlers:
     file:
-      class: logging.handlers.RotatingFileHandler
+      class: logging.FileHandler
       formatter: detailed
       filename: logs/app.log
-      maxBytes: 5242880
-      backupCount: 3
+      mode: w
     console:
       class: logging.StreamHandler
       formatter: simple
@@ -89,7 +88,7 @@ retrieval:
   score_threshold: 0.75
   rerank_size: 75
   default_results: 15
-  top_k: 60
+  top_k: 100
 diversity:
   enable_penalty: true
   penalty_factor: 0.05
