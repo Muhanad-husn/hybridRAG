@@ -9,7 +9,7 @@ llm:
   extraction_model: google/gemini-pro-1.5
   answer_model: microsoft/phi-4
   max_tokens: 3000
-  temperature: 0.0
+  temperature: 0.5
   context_length: 16000
 graph:
   storage:

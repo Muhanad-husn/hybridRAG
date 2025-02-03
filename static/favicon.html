@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Favicon</title>
+</head>
+<body>
+    <canvas id="favicon" width="64" height="64"></canvas>
+    <script>
+        const canvas = document.getElementById('favicon');
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#007bff';
+        ctx.fillRect(0, 0, 64, 64);
+        ctx.font = 'bold 40px Arial';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('H', 32, 32);
+    </script>
+</body>
+</html>

@@ -14,6 +14,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Operation status management
     let lastLogTimestamp = '';
 
+    // Set default values for Model Settings
+    const extractionModelInput = document.getElementById('extractionModel');
+    const answerModelInput = document.getElementById('answerModel');
+    const temperatureInput = document.getElementById('temperature');
+
+    if (extractionModelInput) extractionModelInput.value = extractionModelInput.value || 'google/gemini-pro-1.5';
+    if (answerModelInput) answerModelInput.value = answerModelInput.value || 'microsoft/phi-4';
+    if (temperatureInput) temperatureInput.value = temperatureInput.value || '0.5';
+
     // Function to disable/enable all buttons except the clicked one
     function toggleButtons(clickedButton, disable = true) {
         const buttons = document.querySelectorAll('button');
@@ -346,6 +355,18 @@ navButtons.forEach(button => {
             view.classList.toggle('hidden', view.id !== `${viewName}View`);
         });
 
+        // Additional logic for settingsView
+        if (viewName === 'settings') {
+            // Any specific logic for opening settings view
+        } else {
+            // Ensure settingsView is hidden when switching to other views
+            const settingsView = document.getElementById('settingsView');
+            if (settingsView) {
+                settingsView.classList.add('hidden');
+                settingsView.classList.remove('active');
+            }
+        }
+
         // Update content based on view
         if (viewName === 'history') {
             updateSearchHistoryView();
@@ -406,17 +427,18 @@ if (modelSettingsForm) {
         
         const extractionModelInput = document.getElementById('extractionModel');
         const answerModelInput = document.getElementById('answerModel');
+        const temperatureInput = document.getElementById('temperature');
         const messageDiv = document.getElementById('modelSettingsMessage');
         const submitButton = modelSettingsForm.querySelector('button[type="submit"]');
         
-        const extractionModel = extractionModelInput.value.trim();
-        const answerModel = answerModelInput.value.trim();
+        const extractionModel = extractionModelInput.value.trim() || 'google/gemini-pro-1.5';
+        const answerModel = answerModelInput.value.trim() || 'microsoft/phi-4';
+        const temperature = parseFloat(temperatureInput.value.trim()) || 0.5;
         const maxTokens = document.getElementById('maxTokens').value.trim();
-        const temperature = document.getElementById('temperature').value.trim();
         const contextLength = document.getElementById('contextLength').value.trim();
         const topK = document.getElementById('topK').value.trim();
         
-        if (!extractionModel || !answerModel || !maxTokens || !temperature || !contextLength || !topK) return;
+        if (!maxTokens || !contextLength || !topK) return;
 
         try {
             submitButton.disabled = true;
@@ -443,6 +465,10 @@ if (modelSettingsForm) {
             if (response.ok) {
                 messageDiv.textContent = 'Model settings updated successfully';
                 messageDiv.className = 'settings-message success';
+                
+                // Switch to Ask panel
+                const askButton = document.querySelector('[data-view="search"]');
+                if (askButton) askButton.click();
             } else {
                 throw new Error(data.error || 'Failed to update model settings');
             }
