@@ -24,7 +24,12 @@ from src.input_layer.translator import Translator
 from src.utils.config_handler import config
 
 # Initialize logger
-logger = logging.getLogger(__name__)
+def initialize_logger(external_logger=None):
+    global logger
+    logger = external_logger or logging.getLogger(__name__)
+
+# Initialize logger with default
+initialize_logger()
 
 # Initialize translator lazily
 _translator = None
@@ -43,9 +48,11 @@ def get_hybrid_retrieval_instance(config_path: str = "config/config.yaml") -> Hy
         _hybrid_retrieval_instance = HybridRetrieval(config_path)
     return _hybrid_retrieval_instance
 
-def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_query: Optional[str] = None,
-                     translate: bool = True, rerank_count: int = 15, max_tokens: int = 3000, temperature: float = 0.0,
-                     context_length: int = 16000) -> Dict[str, Any]:
+def run_hybrid_search(query: str, external_logger: Optional[logging.Logger] = None, original_lang: Optional[str] = None,
+                     original_query: Optional[str] = None, translate: bool = True, rerank_count: int = 15,
+                     max_tokens: int = 3000, temperature: float = 0.0, context_length: int = 16000) -> Dict[str, Any]:
+    if external_logger:
+        initialize_logger(external_logger)
     """
     Run hybrid search with both dense retrieval and graph analysis,
     then process results with LLM to generate an answer.
@@ -58,6 +65,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
     Returns:
         Dict containing retrieved context and LLM-generated answer
     """
+    initialize_logger()
     logger.info(f"Starting run_hybrid_search with query: {query}, translate: {translate}")
     try:
         # Load config
@@ -77,11 +85,14 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
             # Verify vector store exists
             if not (os.path.exists(embedding_generator.embeddings_dir) and
                    os.listdir(embedding_generator.embeddings_dir)):
+                initialize_logger()
                 logger.error("Vector store not found. Please process documents using HyperRAG to initialize the system.")
                 raise ValueError("Vector store not initialized. Please process documents using HyperRAG to initialize the system.")
-                
+                    
+            initialize_logger()
             logger.info("Using existing embeddings")
         except Exception as e:
+            initialize_logger()
             logger.error(f"Error preparing documents: {str(e)}")
             raise
         
@@ -93,10 +104,11 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         context_tokens = float('inf')
         available_tokens = context_length - max_tokens
         enc = tiktoken.encoding_for_model("gpt-4")  # Using GPT-4 encoding as a standard
-
+    
         while context_tokens > available_tokens and current_rerank_count >= 5:
             try:
                 # Get vector store results
+                initialize_logger()
                 logger.info(f"Retrieving dense vector results with rerank_count: {current_rerank_count}...")
                 vector_results = retrieval_system.hybrid_search(
                     query=query,
@@ -107,6 +119,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 )
                 
                 if not vector_results:
+                    initialize_logger()
                     logger.warning("No vector results found")
                     return {
                         "query": query,
@@ -116,9 +129,11 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                         "confidence": 0
                     }
                 
+                initialize_logger()
                 logger.info(f"Found {len(vector_results)} initial vector results")
                 
                 # Rerank vector results
+                initialize_logger()
                 logger.info("Reranking vector results...")
                 reranked_vector_results = retrieval_system.rerank_results(
                     query=query,
@@ -127,6 +142,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 )
                 
                 if not reranked_vector_results:
+                    initialize_logger()
                     logger.warning("No results after reranking")
                     return {
                         "query": query,
@@ -136,11 +152,13 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                         "confidence": 0
                     }
                 
+                initialize_logger()
                 logger.info(f"Reranked to {len(reranked_vector_results)} results")
                 
                 # Get graph results - keep graph results proportional to rerank_count
                 min_graph_results = 3  # Minimum number of graph results to include
                 graph_k = max(min_graph_results, min(current_rerank_count // 3, 10))  # Scale graph results with rerank_count
+                initialize_logger()
                 logger.info(f"Retrieving graph results with graph_k: {graph_k}")
                 graph_results = retrieval_system.hybrid_search(
                     query=query,
@@ -152,6 +170,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 
                 # Include all graph results without filtering
                 graph_analysis = graph_results
+                initialize_logger()
                 logger.info(f"Including {len(graph_analysis)} graph results")
                 
                 # Ensure we have at least min_graph_results
@@ -162,6 +181,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 
                 # Combine graph and vector results
                 combined_results = graph_analysis + reranked_vector_results[:current_rerank_count]
+                initialize_logger()
                 logger.info(f"Added {len(graph_analysis)} graph results and {len(combined_results) - len(graph_analysis)} vector results to combined results")
                 
                 # Sort by score
@@ -193,6 +213,7 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 
                 # Check context length
                 context_tokens = len(enc.encode(context))
+                initialize_logger()
                 logger.info(f"Context length: {context_tokens} tokens")
                 
                 if context_tokens <= available_tokens:
@@ -200,17 +221,21 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
                 
                 # Reduce rerank_count for next iteration
                 current_rerank_count = max(5, current_rerank_count - 5)
+                initialize_logger()
                 logger.warning(f"Context length ({context_tokens} tokens) exceeds available tokens ({available_tokens}). "
                                f"Reducing rerank_count to {current_rerank_count}")
                 
             except Exception as e:
+                initialize_logger()
                 logger.error(f"Error in search pipeline: {str(e)}")
                 raise
-
+    
         if context_tokens > available_tokens:
+            initialize_logger()
             logger.warning(f"Could not reduce context length below the limit. Final context length: {context_tokens} tokens")
-
+    
         if not context.strip():
+            initialize_logger()
             logger.warning("No context generated from search results")
             return {
                 "query": query,
@@ -234,28 +259,29 @@ def run_hybrid_search(query: str, original_lang: Optional[str] = None, original_
         
         # Initialize OpenRouter client with answer model from config
         llm_client = OpenRouterClient(model=config.get('llm.answer_model'))
+        initialize_logger()
         logger.info(f"Using answer model: {config.get('llm.answer_model')}")
         
         # Create system prompt
         system_prompt = """You are a well-informed academic assistant. Your goal is to provide structured, educational, and accessible responses in a semi-academic tone. Specifically:
-
-    Start your response with a concise, relevant title on the first line, without prefixing it with 'Title:'.
-    Base your content on the provided context. If the context does not contain enough information, acknowledge this.
-    Adopt an article-like structure with paragraphs:
-        Introduction: Briefly set the stage.
-        Body: Present ideas in paragraph form with smooth transitions. Use subheadings if needed, but rely on paragraphs rather than bullet points.
-        Conclusion: Summarize the key points in a final paragraph.
-    Avoid bullet points except for minor lists that must be itemized. When possible, integrate details into sentences rather than listing them.
-    Semi-Academic Tone: Maintain clarity and accessibility for students or researchers in fields like sociopolitical, historical, or socioeconomic studies.
-    Acknowledge Gaps: If certain details are missing, explicitly note these gaps."""
-
+    
+            Start your response with a concise, relevant title on the first line, without prefixing it with 'Title:'.
+            Base your content on the provided context. If the context does not contain enough information, acknowledge this.
+            Adopt an article-like structure with paragraphs:
+                Introduction: Briefly set the stage.
+                Body: Present ideas in paragraph form with smooth transitions. Use subheadings if needed, but rely on paragraphs rather than bullet points.
+                Conclusion: Summarize the key points in a final paragraph.
+            Avoid bullet points except for minor lists that must be itemized. When possible, integrate details into sentences rather than listing them.
+            Semi-Academic Tone: Maintain clarity and accessibility for students or researchers in fields like sociopolitical, historical, or socioeconomic studies.
+            Acknowledge Gaps: If certain details are missing, explicitly note these gaps."""
+    
         # Create user prompt
         user_prompt = f"""Context:
-{context}
-
-Question: {query}
-
-Please provide a clear and accurate answer based solely on the information provided in the context above. Begin your response with a concise, relevant title on the first line, without prefixing it with 'Title:'."""
+    {context}
+    
+    Question: {query}
+    
+    Please provide a clear and accurate answer based solely on the information provided in the context above. Begin your response with a concise, relevant title on the first line, without prefixing it with 'Title:'."""
         
         # Get LLM response
         llm_response = llm_client.get_completion(
@@ -271,25 +297,30 @@ Please provide a clear and accurate answer based solely on the information provi
         
         # Always keep English answer
         answer = english_answer
-
+    
         # Only translate to Arabic if translation is enabled
         arabic_answer = None
         if english_answer and translate:
             try:
+                initialize_logger()
                 logger.info("Attempting to translate LLM response to Arabic")
                 translator = get_translator()
                 arabic_answer = translator.translate(english_answer, source_lang='en', target_lang='ar')
+                initialize_logger()
                 logger.info(f"Arabic translation completed. Length: {len(arabic_answer)}")
-
+    
                 if not arabic_answer:
                     raise ValueError("Arabic translation is empty")
-
+    
             except Exception as e:
+                initialize_logger()
                 logger.error(f"Error in Arabic processing: {str(e)}")
+                initialize_logger()
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 # Don't fallback to English for Arabic answer
                 arabic_answer = None
         elif english_answer and not translate:
+            initialize_logger()
             logger.info("Skipping Arabic translation as per user preference")
         
         # Calculate UI-optimized confidence score with dynamic scaling
@@ -322,20 +353,31 @@ Please provide a clear and accurate answer based solely on the information provi
             confidence = int(MIN_CONFIDENCE + (raw_confidence * RANGE))
             
             # Log detailed calculation with dynamic scaling info
+            initialize_logger()
             logger.info(f"Dynamic confidence calculation:")
+            initialize_logger()
             logger.info(f"- Using {scores_to_consider} scores for relevance calculation")
+            initialize_logger()
             logger.info(f"- Expected sources scaled to {expected_sources}")
+            initialize_logger()
             logger.info(f"- Expected length scaled to {expected_length} characters")
             
             # Log detailed calculation
+            initialize_logger()
             logger.info(f"Confidence calculation:")
+            initialize_logger()
             logger.info(f"- Relevance score: {relevance_prob:.3f} ({relevance_prob*100:.1f}%)")
+            initialize_logger()
             logger.info(f"- Source coverage: {source_prob:.3f} ({source_prob*100:.1f}%)")
+            initialize_logger()
             logger.info(f"- Answer completeness: {length_prob:.3f} ({length_prob*100:.1f}%)")
+            initialize_logger()
             logger.info(f"- Raw confidence: {raw_confidence:.3f} ({raw_confidence*100:.1f}%)")
+            initialize_logger()
             logger.info(f"- UI-scaled confidence: {confidence}%")
-
+    
         # Prepare base response
+        initialize_logger()
         logger.info("Creating response dictionary")
         response = {
             "query": query,
@@ -358,11 +400,13 @@ Please provide a clear and accurate answer based solely on the information provi
             "warning": f"Context length exceeded available tokens. Results automatically reduced from {rerank_count} to {current_rerank_count} for better processing."
             if current_rerank_count < rerank_count else None
         }
-
+    
+        initialize_logger()
         logger.info("Completed run_hybrid_search")
         return response
             
     except Exception as e:
+        initialize_logger()
         logger.error(f"Error in hybrid search: {str(e)}")
         raise
 

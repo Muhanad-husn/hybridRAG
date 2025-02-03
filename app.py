@@ -13,6 +13,10 @@ import asyncio
 import tiktoken
 import traceback
 
+# Initialize logger using the unified logging setup
+setup_logger()
+logger = get_logger(__name__)
+
 def count_tokens(text):
     if not isinstance(text, str):
         logger.warning(f"count_tokens received non-string input: {type(text)}")
@@ -38,9 +42,9 @@ def manage_results_directory():
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Ensure proper UTF-8 encoding for JSON responses
 
-# Initialize logger using the unified logging setup
-setup_logger()
-logger = get_logger(__name__)
+# Initialize HyperRAG with app logger
+rag_system = HyperRAG(logger=logger)
+
 
 # Initialize translator and search history
 translator = Translator()
@@ -409,9 +413,6 @@ def generate_result():
             'error': 'Failed to process request',
             'details': str(e)
         }), 400
-
-# Initialize HyperRAG with app logger
-rag_system = HyperRAG(logger=logger)
 
 @app.route('/upload-files', methods=['POST'])
 @log_request
